@@ -6,6 +6,7 @@ import { LayoutGrid, Check, Crown } from "lucide-react";
 import { Ship, Rank, Behavior } from "@/types";
 import { updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getAssetPath } from "@/lib/utils";
 
 // Reuse TinyFlag - We should probably export this too, but for now I'll duplicate quickly or check if I can export it from SolarSystem (not easy).
 // I will define it locally here or better yet make a shared component later. For now, local is fine to avoid circular deps.
@@ -95,13 +96,13 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
 
             {/* Avatar */}
             <div className="relative w-24 h-24 mb-4">
-                <img 
-                    src="/images/ships/finalship.png" 
-                    alt="Ship" 
+                <img
+                    src={getAssetPath("/images/ships/finalship.png")}
+                    alt="Ship"
                     className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] relative z-20"
                 />
                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                    <img src="/images/avatar/spacebunny.png" className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                    <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
                 </div>
                 {student.flag && (
                     <div className="absolute -top-2 -left-2 z-40 transform -rotate-12 scale-110 drop-shadow-md">
