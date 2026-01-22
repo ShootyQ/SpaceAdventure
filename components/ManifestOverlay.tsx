@@ -236,7 +236,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                         if (xp === 0) return;
 
                                         // Apply to all selected
-                                        const batch = [];
+                                        const batch: Promise<void>[] = [];
                                         selectedIds.forEach(id => {
                                             const ship = ships.find(s => s.id === id);
                                             if (ship) {

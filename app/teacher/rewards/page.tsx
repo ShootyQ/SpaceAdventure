@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { UserData, Rank } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
+import { UserData, Rank } from "@/types";
 import { Star, Plus, Trash2, Save, X, Zap, Award } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";

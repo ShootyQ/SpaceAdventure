@@ -1,7 +1,8 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
-import { useAuth, Rank } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
+import { Rank, FlagConfig } from "@/types";
 import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -20,7 +21,6 @@ const Rocket = ({ size = 24, className = "" }: { size?: number, className?: stri
 );
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { FlagConfig } from "@/context/AuthContext";
 
 const SHIP_COLORS = [
     { name: "Nebula Blue", class: "text-blue-400", bg: "bg-blue-400" },

@@ -102,7 +102,7 @@ export default function SettingsPage() {
                                 ease: "easeInOut" 
                             }}
                         >
-                            <Rocket size={180} strokeWidth={1} className="drop-shadow-[0_0_15px_currentColor]" />
+                            <Rocket size={180} className="drop-shadow-[0_0_15px_currentColor]" />
                         </motion.div>
 
                         <div className="mt-12 text-center z-10">

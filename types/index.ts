@@ -21,16 +21,25 @@ export interface Rank {
     minXP: number;
     image: string;
 }
-  
+
+export interface AvatarConfig {
+    hue?: number;
+    skinHue?: number;
+    bgHue?: number;
+    bgSat?: number;
+    bgLight?: number;
+}
+
 export interface UserData {
     uid: string;
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
-    role: 'teacher' | 'student' | 'pending';
+    role: 'teacher' | 'student' | 'pending' | 'admin';
     status: 'active' | 'pending_approval' | 'rejected';
     spaceship?: SpaceshipConfig;
     flag?: FlagConfig;
+    avatar?: AvatarConfig;
     location?: string; // Planet ID
     xp?: number;
     level?: number;

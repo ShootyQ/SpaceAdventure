@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio } from "lucide-react";
-import { useAuth, FlagConfig, Rank } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ManifestOverlay from "@/components/ManifestOverlay";

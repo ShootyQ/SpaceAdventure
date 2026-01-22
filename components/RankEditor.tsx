@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Save, Trash2, Plus } from "lucide-react";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Rank } from "@/context/AuthContext";
+import { Rank } from "@/types";
 
 const DEFAULT_RANKS: Rank[] = [
     { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
