@@ -7,11 +7,12 @@ import { db } from "@/lib/firebase";
 import { ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { getAssetPath } from "@/lib/utils";
 
 // Custom Rocket Icon
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
     <img 
-        src="/images/ships/finalship.png" 
+        src={getAssetPath("/images/ships/finalship.png")}
         alt="Rocket"
         className={`object-contain ${className}`}
         style={{ width: size, height: size }}

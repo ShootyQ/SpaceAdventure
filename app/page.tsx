@@ -5,6 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { getAssetPath } from "@/lib/utils";
+
 export default function Home() {
   const { user, userData, signInWithGoogle, loading } = useAuth();
   const router = useRouter();
@@ -40,7 +42,7 @@ export default function Home() {
             <div className="relative">
                 <div className="absolute -inset-1 rounded-full bg-blue-500 opacity-25 blur-xl animate-pulse"></div>
                 <img 
-                  src="/images/ships/finalship.png" 
+                  src={getAssetPath("/images/ships/finalship.png")} 
                   alt="Space Adventure" 
                   className="w-24 h-24 object-contain relative z-10 transform -rotate-45" 
                 />

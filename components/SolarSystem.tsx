@@ -6,6 +6,7 @@ import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star,
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getAssetPath } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig } from "@/types";
 
@@ -13,16 +14,16 @@ import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig } from "@/types";
 
 // Default Ranks Definition (Fallback)
 const DEFAULT_RANKS: Rank[] = [
-    { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
-    { id: '2', name: "Rookie Pilot", minXP: 100, image: "/images/badges/RookiePilot.png" },
-    { id: '3', name: "Star Scout", minXP: 300, image: "/images/badges/StarScout.png" },
-    { id: '4', name: "Nebula Navigator", minXP: 600, image: "/images/badges/NebulaNavigator.png" },
-    { id: '5', name: "Solar Specialist", minXP: 1000, image: "/images/badges/SolarSpecialist.png" },
-    { id: '6', name: "Comet Captain", minXP: 1500, image: "/images/badges/CometCaptain.png" },
-    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: "/images/badges/GalaxyGuardian.png" },
-    { id: '8', name: "Cosmic Commander", minXP: 3000, image: "/images/badges/CosmicCommander.png" },
-    { id: '9', name: "Void Admiral", minXP: 4000, image: "/images/badges/VoidAdmiral.png" },
-    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: "/images/badges/GrandStarAdmiral.png" }
+    { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
+    { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
+    { id: '3', name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
+    { id: '4', name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
+    { id: '5', name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
+    { id: '6', name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
+    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
+    { id: '8', name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
+    { id: '9', name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
+    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
 ];
 
 // Data Prototypes
@@ -546,13 +547,13 @@ export default function SolarSystem() {
                               >
                                   <div className="relative w-full h-full">
                                       <img 
-                                            src="/images/ships/finalship.png"
+                                            src={getAssetPath("/images/ships/finalship.png")}
                                             alt="Traveling Ship"
                                             className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                            <img src="/images/avatar/spacebunny.png" className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                                            <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
                                       </div>
                                   </div>
                               </div>
@@ -690,12 +691,12 @@ export default function SolarSystem() {
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
-                                                    src="/images/ships/finalship.png"
+                                                    src={getAssetPath("/images/ships/finalship.png")}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
                                                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                                    <img src="/images/avatar/spacebunny.png" className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                                                    <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
                                                 </div>
                                             </div>
                                         </div>
@@ -985,7 +986,7 @@ export default function SolarSystem() {
                             >
                                 <div className={`relative ${awardQueue.length > 1 ? 'w-24 h-24' : 'w-40 h-40'}`}>
                                     <img 
-                                        src="/images/ships/finalship.png" 
+                                        src={getAssetPath("/images/ships/finalship.png")} 
                                         alt="Award Ship"
                                         className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] relative z-20"
                                     />
@@ -1118,8 +1119,8 @@ export default function SolarSystem() {
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">
                                <div className="w-full h-full relative overflow-visible">
-                                    <div className="absolute inset-0" style={{ backgroundColor: `hsl(${userData.avatar?.skinHue || 0}, 70%, 50%)`, maskImage: 'url(/images/avatar/spacebunny.png)', WebkitMaskImage: 'url(/images/avatar/spacebunny.png)', maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center', WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'center' }} />
-                                    <img src="/images/avatar/spacebunny.png" className="w-full h-full object-contain relative z-10" style={{ filter: `hue-rotate(${userData.avatar?.hue || 0}deg)` }} />
+                                    <div className="absolute inset-0" style={{ backgroundColor: `hsl(${userData.avatar?.skinHue || 0}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center', WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'center' }} />
+                                    <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-contain relative z-10" style={{ filter: `hue-rotate(${userData.avatar?.hue || 0}deg)` }} />
                                </div>
                          </div>
                      </motion.div>

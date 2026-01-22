@@ -10,10 +10,12 @@ import {
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity
 } from "lucide-react";
 
+import { getAssetPath } from "@/lib/utils";
+
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
-    <img 
-        src="/images/ships/finalship.png" 
+    <img
+        src={getAssetPath("/images/ships/finalship.png")}
         alt="Rocket"
         className={`object-contain ${className}`}
         style={{ width: size, height: size }}
@@ -89,8 +91,8 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
 
     return (
        <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-            <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: 'url(/images/avatar/spacebunny.png)', WebkitMaskImage: 'url(/images/avatar/spacebunny.png)', maskSize: 'cover' }} />
-            <img src="/images/avatar/spacebunny.png" alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
+            <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
+            <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
        </div>
     );
 }
@@ -211,8 +213,8 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                       {/* Avatar Bubble */}
                       <div className="absolute left-0 w-24 h-24 rounded-full border-2 border-purple-500/50 overflow-hidden bg-black shadow-[0_0_20px_rgba(168,85,247,0.3)] z-20">
                            <div className="w-full h-full relative" style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-                                <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: 'url(/images/avatar/spacebunny.png)', WebkitMaskImage: 'url(/images/avatar/spacebunny.png)', maskSize: 'cover' }} />
-                                <img src="/images/avatar/spacebunny.png" alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
+                                <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
+                                <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
                            </div>
                       </div>
 
@@ -320,7 +322,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src="/images/ships/finalship.png"
+                        src={getAssetPath("/images/ships/finalship.png")}
                         alt="Ship"
                         className="w-[180px] h-[180px] object-contain drop-shadow-[0_0_15px_currentColor]"
                     />
@@ -481,8 +483,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         style={{ 
                             backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
                             opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: 'url(/images/avatar/spacebunny.png)',
-                            WebkitMaskImage: 'url(/images/avatar/spacebunny.png)',
+                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
                             maskSize: 'cover',
                             WebkitMaskSize: 'cover'
                         }} 
@@ -490,7 +492,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     
                     {/* Avatar Image */}
                     <img 
-                        src="/images/avatar/spacebunny.png" 
+                        src={getAssetPath("/images/avatar/spacebunny.png")}
                         alt="Avatar" 
                         className="w-full h-full object-cover relative z-10"
                         style={{ 
@@ -662,15 +664,15 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                         style={{
                             backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
                             opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: 'url(/images/avatar/spacebunny.png)',
-                            WebkitMaskImage: 'url(/images/avatar/spacebunny.png)',
+                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
                             maskSize: 'cover',
                             WebkitMaskSize: 'cover'
                         }}
                     />
 
                     <img
-                        src="/images/avatar/spacebunny.png"
+                        src={getAssetPath("/images/avatar/spacebunny.png")}
                         alt="Pilot Avatar"
                         className="w-full h-full object-cover relative z-10 transition-transform duration-500 group-hover:scale-110"
                         style={{
@@ -982,16 +984,16 @@ function FlagDesigner() {
 }
 
 const DEFAULT_RANKS: Rank[] = [
-    { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
-    { id: '2', name: "Rookie Pilot", minXP: 100, image: "/images/badges/RookiePilot.png" },
-    { id: '3', name: "Star Scout", minXP: 300, image: "/images/badges/StarScout.png" },
-    { id: '4', name: "Nebula Navigator", minXP: 600, image: "/images/badges/NebulaNavigator.png" },
-    { id: '5', name: "Solar Specialist", minXP: 1000, image: "/images/badges/SolarSpecialist.png" },
-    { id: '6', name: "Comet Captain", minXP: 1500, image: "/images/badges/CometCaptain.png" },
-    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: "/images/badges/GalaxyGuardian.png" },
-    { id: '8', name: "Cosmic Commander", minXP: 3000, image: "/images/badges/CosmicCommander.png" },
-    { id: '9', name: "Void Admiral", minXP: 4000, image: "/images/badges/VoidAdmiral.png" },
-    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: "/images/badges/GrandStarAdmiral.png" }
+    { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
+    { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
+    { id: '3', name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
+    { id: '4', name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
+    { id: '5', name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
+    { id: '6', name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
+    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
+    { id: '8', name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
+    { id: '9', name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
+    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
 ];
 
 // --- Main Component ---

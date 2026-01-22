@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Map, Settings, Power, Shield, Activity, Star } from 'lucide-react';
 import SolarSystem from '@/components/SolarSystem';
+import { getAssetPath } from '@/lib/utils';
 
 // Custom Icon
 const Rocket = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
     <img 
-        src="/images/ships/finalship.png" 
+        src={getAssetPath("/images/ships/finalship.png")}
         alt="Rocket"
         className={`object-contain ${className}`}
         style={{ width: size, height: size }}
