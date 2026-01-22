@@ -68,8 +68,6 @@ interface ManifestOverlayProps {
     behaviors: Behavior[];
 }
 
-const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, setSelectedIds, behaviors }: ManifestOverlayProps) => {
-    
 const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void }) => {
     // Memoize rank reset per card to avoid array operations
     const rank = React.useMemo(() => ranks.find(r => student.xp >= r.minXP), [ranks, student.xp]);
