@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal } from 'lucide-react';  
+import { usePathname } from 'next/navigation';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import RankEditor from '@/components/RankEditor';
 
 export default function TeacherConsole() {
   const { logout } = useAuth();
+  const pathname = usePathname();
   const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
   return (
@@ -34,16 +36,16 @@ export default function TeacherConsole() {
 
        {/* Main Viewport (The Window to Space) */}
        <main className="flex-1 relative z-10 p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-          
+
           {/* Left Panel - Navigation */}
           <nav className="col-span-1 md:col-span-3 lg:col-span-2 flex flex-col gap-4">
-             <NavButton icon={<Users />} label="Roster" href="/teacher/roster" active />
-             <NavButton icon={<Target />} label="Missions" href="/teacher/missions" />
-             <NavButton icon={<Map />} label="Star Map" href="/teacher/map" />
-             <NavButton icon={<Award />} label="Rewards" href="/teacher/rewards" />
+             <NavButton icon={<Users />} label="Roster" href="/teacher/roster" isActive={pathname === '/teacher/roster'} />
+             <NavButton icon={<Target />} label="Missions" href="/teacher/missions" isActive={pathname === '/teacher/missions'} />
+             <NavButton icon={<Map />} label="Star Map" href="/teacher/map" isActive={pathname === '/teacher/map'} />
+             <NavButton icon={<Award />} label="Rewards" href="/teacher/rewards" isActive={pathname === '/teacher/rewards'} />
              <div className="mt-auto">
-                <NavButton icon={<Settings />} label="Config" href="/teacher/settings" />
-                <button 
+                <NavButton icon={<Settings />} label="Config" href="/teacher/settings" isActive={pathname === '/teacher/settings'} />
+                <button
                     onClick={logout}
                     className="w-full mt-4 flex items-center gap-3 p-4 rounded-xl border border-red-500/30 bg-red-900/10 hover:bg-red-900/30 text-red-400 transition-all hover:scale-105 group text-left"
                 >
@@ -56,7 +58,7 @@ export default function TeacherConsole() {
           {/* Center Panel - Main Dashboard Area */}
           <div className="col-span-1 md:col-span-9 lg:col-span-7 flex flex-col gap-6">
              {/* Big Greeting / Quick Actions */}
-             <div className="flex-1 border border-cyan-500/30 rounded-2xl bg-black/50 backdrop-blur-sm p-8 relative overflow-hidden group">
+             <div className="flex-1 border border-cyan-500/30 rounded-2xl bg-black/50 backdrop-blur-sm p-8 relative overflow-hidden group flex flex-col">
                 <div className="absolute inset-0 bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors pointer-events-none" />
                 
                 {/* Decorative HUD lines */}
@@ -65,21 +67,22 @@ export default function TeacherConsole() {
                 <div className="absolute bottom-0 left-0 w-16 h-16 border-b-2 border-l-2 border-cyan-500/50 rounded-bl-lg" />
                 <div className="absolute bottom-0 right-0 w-16 h-16 border-b-2 border-r-2 border-cyan-500/50 rounded-br-lg" />
 
-                <h2 className="text-3xl font-bold text-white mb-2">Welcome Back, Commander.</h2>
-                <p className="text-cyan-300/80 mb-8">Classroom systems functional. Warp drive ready.</p>
+                <div className="mb-8">
+                    <h2 className="text-3xl font-bold text-white mb-2">Welcome Back, Commander.</h2>
+                    <p className="text-cyan-300/80">Classroom systems functional. Warp drive ready.</p>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Link href="/teacher/rewards">
-                        <DashboardCard title="Quick Award" value="Select Cadet" icon={<ExternalLink size={16} />} />
-                    </Link>
-                    <Link href="/teacher/missions">
-                        <DashboardCard title="Active Missions" value="Mission Control" icon={<ExternalLink size={16} />} />
-                    </Link>
-                    <Link href="/teacher/map" target="_blank">
-                        <DashboardCard title="Display Mode" value="Open Galaxy Map" icon={<Map size={16} />} />
-                    </Link>
-                    <div onClick={() => setIsRankEditorOpen(true)}>
-                        <DashboardCard title="Config" value="Rank Protocols" icon={<SlidersHorizontal size={16} />} />
+                {/* Comms Feed (Moved from Right) */}
+                <div className="flex-1 flex flex-col border border-cyan-500/20 bg-black/40 rounded-xl p-6 overflow-hidden">
+                    <div className="flex items-center gap-2 mb-4 text-cyan-300 border-b border-cyan-500/20 pb-4">
+                        <Radio size={20} />
+                        <span className="text-sm font-bold tracking-widest uppercase">Comms Feed</span>
+                    </div>
+                    <div className="space-y-4 text-sm text-cyan-200/80 font-mono overflow-y-auto pr-2 custom-scrollbar">
+                        <p className="flex gap-3"><span className="text-cyan-500 opacity-50">10:42</span> <span>{'>'} Student A reached Rank 3</span></p>
+                        <p className="flex gap-3"><span className="text-cyan-500 opacity-50">10:35</span> <span>{'>'} Mission "Homework" issued</span></p>
+                        <p className="flex gap-3"><span className="text-cyan-500 opacity-50">09:15</span> <span>{'>'} System check complete...</span></p>
+                        <p className="flex gap-3 animate-pulse"><span className="text-cyan-500 opacity-50">NOW</span> <span>{'>'} Awaiting input_</span></p>
                     </div>
                 </div>
              </div>
@@ -87,28 +90,28 @@ export default function TeacherConsole() {
 
           {/* Right Panel - Sensors / Stats */}
           <div className="col-span-1 md:col-span-12 lg:col-span-3 flex flex-col gap-4">
-             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-4 text-cyan-300 border-b border-cyan-500/20 pb-2">
-                    <Shield size={18} />
-                    <span className="text-sm font-bold">HULL INTEGRITY</span>
+             {/* Class Bonus / Shields */}
+             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-2 text-cyan-300">
+                    <div className="flex items-center gap-2">
+                        <Zap size={18} className="text-yellow-400" />
+                        <span className="text-sm font-bold uppercase tracking-wider">Class Bonus</span>
+                    </div>
+                    <span className="text-xs text-yellow-400 font-bold">7,500 / 10,000</span>
                 </div>
-                <div className="w-full bg-gray-800 rounded-full h-2 mb-1">
-                    <div className="bg-green-500 h-2 rounded-full w-[92%] shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                
+                <div className="w-full bg-gray-900 rounded-full h-4 mb-2 border border-cyan-500/20 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-yellow-400/10 animate-pulse"></div>
+                    <div 
+                        className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full w-[75%] shadow-[0_0_15px_rgba(250,204,21,0.5)] transition-all duration-1000"
+                    ></div>
                 </div>
-                <div className="text-right text-xs text-green-400">92%</div>
+                <div className="text-right text-xs text-cyan-500/60 uppercase tracking-widest">Shields Charging...</div>
              </div>
 
-             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-4 flex-1">
-                <div className="flex items-center gap-2 mb-4 text-cyan-300 border-b border-cyan-500/20 pb-2">
-                    <Radio size={18} />
-                    <span className="text-sm font-bold">COMMS FEED</span>
-                </div>
-                <div className="space-y-3 text-xs text-cyan-200/60 font-mono">
-                    <p>{'>'} Student A reached Rank 3</p>
-                    <p>{'>'} Mission "Homework" issued</p>
-                    <p>{'>'} System check complete...</p>
-                    <p className="animate-pulse">{'>'} Awaiting input_</p>
-                </div>
+             {/* Placeholder for future sidebar items (since Comms moved) */}
+             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-4 min-h-[200px] flex items-center justify-center text-cyan-500/30 text-xs uppercase tracking-widest border-dashed">
+                 Auxiliary Systems
              </div>
           </div>
 
@@ -117,25 +120,13 @@ export default function TeacherConsole() {
   );
 }
 
-function NavButton({ icon, label, href, active = false }: any) {
+function NavButton({ icon, label, href, isActive = false }: any) {
     return (
-        <Link href={href} className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 group ${active ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-black/40 border-cyan-800/50 text-cyan-400 hover:bg-cyan-900/20 hover:border-cyan-500/50'}`}>
-            <div className={`${active ? 'text-cyan-200' : 'text-cyan-500 group-hover:text-cyan-300'}`}>
+        <Link href={href} className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 group ${isActive ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-black/40 border-cyan-800/50 text-cyan-400 hover:bg-cyan-900/20 hover:border-cyan-500/50'}`}>
+            <div className={`${isActive ? 'text-cyan-200' : 'text-cyan-500 group-hover:text-cyan-300'}`}>
                 {icon}
             </div>
             <span className="font-bold tracking-wider">{label}</span>
         </Link>
-    )
-}
-
-function DashboardCard({ title, value, icon }: any) {
-    return (
-        <div className="p-4 bg-cyan-900/10 border border-cyan-500/20 rounded-lg hover:bg-cyan-900/30 transition-colors cursor-pointer group h-full">
-            <div className="flex justify-between items-start mb-1">
-                 <h3 className="text-sm text-cyan-400 uppercase tracking-widest group-hover:text-cyan-200">{title}</h3>
-                 {icon && <span className="text-cyan-500/50 group-hover:text-cyan-400">{icon}</span>}
-            </div>
-            <p className="text-2xl text-white font-bold">{value}</p>
-        </div>
     )
 }
