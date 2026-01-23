@@ -42,6 +42,7 @@ export interface UserData {
     avatar?: AvatarConfig;
     location?: string; // Planet ID
     xp?: number;
+    fuel?: number; // Renewable Resource
     level?: number;
     upgrades?: {
         boosters: number;

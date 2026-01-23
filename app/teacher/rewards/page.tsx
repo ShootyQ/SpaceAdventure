@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
@@ -82,11 +82,40 @@ export default function RewardsPage() {
 
         try {
             const studentRef = doc(db, "users", selectedStudent.uid);
-            await updateDoc(studentRef, {
-                xp: increment(behavior.xp),
-                lastXpReason: behavior.label
+            
+            // Transaction to handle Fuel Cap logic
+            await runTransaction(db, async (transaction) => {
+                 const sfDoc = await transaction.get(studentRef);
+                 if (!sfDoc.exists()) throw "Student document not found";
+                 const data = sfDoc.data();
+                 
+                 // Calc New Fuel
+                 // Cap = 500 + (UpgradeLevel * 250)
+                 const fuelLevel = data.upgrades?.fuel || 0;
+                 const maxFuel = 500 + (fuelLevel * 250);
+                 const currentFuel = data.fuel !== undefined ? data.fuel : 0;
+                 // If XP is positive, add to fuel (capped). If negative (punishment), deduct? assume yes.
+                 // User said "XP fills fuel gauge". Usually punishment doesn't drain fuel, but logic implies xp/fuel parity.
+                 // Let's implement addition only for now? No, behavior.xp can be negative.
+                 let newFuel = currentFuel + behavior.xp;
+                 
+                 // Clamp
+                 if (newFuel > maxFuel) newFuel = maxFuel;
+                 // Don't let it go below 0? Maybe punishments don't drain fuel?
+                 // "takes 1xp of fuel per 5 mins" -> usage.
+                 // "fills their fuel gauge" -> XP gain.
+                 // Punishments (negative XP) usually mean behavior correction. Draining fuel seems harsh but consistent.
+                 // I'll ensure min 0.
+                 if (newFuel < 0) newFuel = 0;
+
+                 transaction.update(studentRef, {
+                    xp: increment(behavior.xp),
+                    fuel: newFuel,
+                    lastXpReason: behavior.label
+                 });
             });
-            console.log(`Awarded  XP to student`);
+
+            console.log(`Awarded XP to student`);
             
             setSelectedStudent(null); // Close modal
         } catch (error) {

@@ -317,9 +317,12 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
         setLoading(false);
     };
 
-    // Derived Fuel/XP Stat (Visual Only for now)
-    const currentXP = userData?.xp || 0;
-    const fuelPercentage = Math.min((currentXP / 2000) * 100, 100); // Visual cap example
+    // Fuel Mechanics
+    // Base 500. Each level of "Fuel" upgrade adds 250 capacity.
+    const fuelUpgradeLevel = userData?.upgrades?.fuel || 0;
+    const maxFuel = 500 + (fuelUpgradeLevel * 250);
+    const currentFuel = userData?.fuel !== undefined ? userData.fuel : 500; // Default to Max/500 if not set (Migration)
+    const fuelPercentage = Math.min((currentFuel / maxFuel) * 100, 100);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
@@ -345,7 +348,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     <div className="bg-black/60 border border-cyan-900/50 rounded-xl p-4 w-full">
                         <div className="flex justify-between items-center text-xs uppercase font-bold tracking-widest mb-2">
                             <span className="text-cyan-500">Hyperfuel Reserves</span>
-                            <span className="text-white">{currentXP} Units</span>
+                            <span className="text-white">{Math.floor(currentFuel)} / {maxFuel} Units</span>
                         </div>
                         <div className="relative h-4 bg-cyan-950/50 rounded-full overflow-hidden border border-cyan-900">
                              <div 
@@ -407,10 +410,10 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                         <Wrench size={16} /> System Upgrades
                     </label>
                     <div className="grid grid-cols-2 gap-4">
-                        <UpgradeSlot icon={Zap} label="Boosters" level={1} active />
-                        <UpgradeSlot icon={Database} label="Fuel Capacity" level={0} />
-                        <UpgradeSlot icon={Map} label="Landers" level={0} />
-                        <UpgradeSlot icon={Shield} label="Hull Plating" level={2} active />
+                        <UpgradeSlot icon={Zap} label="Boosters" level={userData?.upgrades?.boosters || 0} active={(userData?.upgrades?.boosters || 0) > 0} />
+                        <UpgradeSlot icon={Database} label="Fuel Tank" level={userData?.upgrades?.fuel || 0} active={(userData?.upgrades?.fuel || 0) > 0} />
+                        <UpgradeSlot icon={Map} label="Landers" level={userData?.upgrades?.landers || 0} active={(userData?.upgrades?.landers || 0) > 0} />
+                        <UpgradeSlot icon={Shield} label="Hull Plating" level={userData?.upgrades?.hull || 0} active={(userData?.upgrades?.hull || 0) > 0} />
                     </div>
                 </div>
 

@@ -395,18 +395,19 @@ export default function SolarSystem() {
     const fuelCost = Math.ceil(travelMinutes / 5);
 
     // 3. Validation & Confirmation
-    const hasEnoughFuel = (userData.xp || 0) >= fuelCost;
+    const currentFuel = userData.fuel !== undefined ? userData.fuel : 500; // Default to 500 (migration)
+    const hasEnoughFuel = currentFuel >= fuelCost;
     
     if (!isOverride) {
         if (!hasEnoughFuel) {
-            alert(`Insufficient Fuel Required: ${fuelCost} XP\nCurrent: ${userData.xp || 0} XP`);
+            alert(`Insufficient Fuel.\nRequired: ${fuelCost} Units\nCurrent: ${currentFuel} Units\n\nRequest resupply via completed missions.`);
             return;
         }
 
         const confirmMsg = `Plotting course to ${selectedPlanet.name}...\n\n` +
                            `Distance: ${Math.round(dist)} AU\n` +
                            `Estimated Time: ${formatDuration(travelMinutes)}\n` +
-                           `Fuel Cost: ${fuelCost} XP ${boosterLevel > 0 ? `(Booster Lv.${boosterLevel})` : ''}\n\n` +
+                           `Fuel Cost: ${fuelCost} Units ${boosterLevel > 0 ? `(Booster Lv.${boosterLevel})` : ''}\n\n` +
                            `Engage Hyperdrive?`;
         
         if (!confirm(confirmMsg)) return;
@@ -428,9 +429,9 @@ export default function SolarSystem() {
             travelEnd: Date.now() + TRAVEL_DURATION_MS
         };
         
-        // Deduct Fuel (XP) - Teacher can choose to waive it
-        if (!isOverride || confirm("Deduct fuel (XP) from student reserves?")) {
-             updates.xp = increment(-fuelCost);
+        // Deduct Fuel - Teacher can choose to waive it
+        if (!isOverride || confirm("Deduct fuel from student reserves?")) {
+             updates.fuel = increment(-fuelCost);
         }
 
         await updateDoc(userRef, updates);
