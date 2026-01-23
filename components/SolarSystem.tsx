@@ -431,7 +431,12 @@ export default function SolarSystem() {
         
         // Deduct Fuel - Teacher can choose to waive it
         if (!isOverride || confirm("Deduct fuel from student reserves?")) {
-             updates.fuel = increment(-fuelCost);
+             // Handle Migration: If fuel is undefined in DB, it defaults to 500 (Full Tank)
+             if (userData.fuel === undefined) {
+                 updates.fuel = 500 - fuelCost;
+             } else {
+                 updates.fuel = increment(-fuelCost);
+             }
         }
 
         await updateDoc(userRef, updates);

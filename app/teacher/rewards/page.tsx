@@ -93,10 +93,12 @@ export default function RewardsPage() {
                  // Cap = 500 + (UpgradeLevel * 250)
                  const fuelLevel = data.upgrades?.fuel || 0;
                  const maxFuel = 500 + (fuelLevel * 250);
-                 const currentFuel = data.fuel !== undefined ? data.fuel : 0;
-                 // If XP is positive, add to fuel (capped). If negative (punishment), deduct? assume yes.
+                 // Default to 500 if undefined (Migration logic)
+                 const currentFuel = data.fuel !== undefined ? data.fuel : 500;
+                 
+                 // Calc New Fuel
+                 // If XP is positive, add to fuel (capped). If negative (punishment), deduct?
                  // User said "XP fills fuel gauge". Usually punishment doesn't drain fuel, but logic implies xp/fuel parity.
-                 // Let's implement addition only for now? No, behavior.xp can be negative.
                  let newFuel = currentFuel + behavior.xp;
                  
                  // Clamp
