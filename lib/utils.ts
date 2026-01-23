@@ -1,11 +1,11 @@
 export const getAssetPath = (path: string) => {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     
-    // Client-side override for GitHub Pages if environment variables fail
+    // Use absolute URL for GitHub Pages to ensure correct loading
     if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
-        return `/SpaceAdventure${cleanPath}`;
+        return `https://shootyq.github.io/SpaceAdventure${cleanPath}`;
     }
 
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/SpaceAdventure' : '');
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     return `${basePath}${cleanPath}`;
 };
