@@ -4,20 +4,23 @@ import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { getAssetPath } from "@/lib/utils";
 import { UserData, Rank } from "@/types";
 import { Star, Plus, Trash2, Save, X, Zap, Award } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
 // Custom Rocket Icon
-const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
-    <img 
-        src="/images/ships/finalship.png" 
-        alt="Rocket"
-        className={`object-contain ${className}`}
-        style={{ width: size, height: size }}
-    />
-);
+const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
+    return (
+        <img 
+            src={getAssetPath("/images/ships/finalship.png")}
+            alt="Rocket"
+            className={`object-contain ${className}`}
+            style={{ width: size, height: size }}
+        />
+    );
+};
 
 interface Behavior {
     id: string;
@@ -69,6 +72,14 @@ export default function RewardsPage() {
     const handleAward = async (behavior: Behavior) => {
         if (!selectedStudent) return;
 
+        // Play notification sound immediately (User Interaction)
+        const audioElement = document.getElementById('notification-audio') as HTMLAudioElement;
+        if (audioElement) {
+            audioElement.currentTime = 0;
+            audioElement.volume = 0.5;
+            audioElement.play().catch(e => console.error("Audio playback failed:", e));
+        }
+
         try {
             const studentRef = doc(db, "users", selectedStudent.uid);
             await updateDoc(studentRef, {
@@ -76,6 +87,7 @@ export default function RewardsPage() {
                 lastXpReason: behavior.label
             });
             console.log(`Awarded  XP to student`);
+            
             setSelectedStudent(null); // Close modal
         } catch (error) {
             console.error("Error awarding XP:", error);
@@ -108,6 +120,9 @@ export default function RewardsPage() {
 
     return (
         <div className="min-h-screen bg-space-950 p-4 font-mono text-cyan-400">
+            {/* Hidden Audio Element */}
+            <audio id="notification-audio" src={getAssetPath("/sounds/notification.m4a?v=1")} preload="auto" />
+
             <div className="max-w-7xl mx-auto h-[calc(100vh-2rem)] flex flex-col">
                 
                 {/* Header */}
@@ -118,13 +133,24 @@ export default function RewardsPage() {
                         </Link>
                         <h1 className="text-2xl font-bold uppercase tracking-widest text-white">Rewards Command</h1>
                     </div>
-                    <button 
-                        onClick={() => setIsManagingProtocols(!isManagingProtocols)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors `}
-                    >
-                        <Zap size={16} />
-                        {isManagingProtocols ? 'DONE EDITING' : 'MANAGE PROTOCOLS'}
-                    </button>
+                    <div className="flex gap-2">
+                         <button
+                            onClick={() => {
+                                const audio = document.getElementById('notification-audio') as HTMLAudioElement;
+                                if(audio) audio.play().then(() => alert("Sound Played")).catch(e => alert("Sound Error: " + e.message));
+                            }}
+                            className="px-4 py-2 rounded border border-yellow-500/30 text-yellow-500 hover:bg-yellow-900/20 text-xs font-bold uppercase tracking-wider"
+                         >
+                            Test Audio
+                         </button>
+                         <button 
+                            onClick={() => setIsManagingProtocols(!isManagingProtocols)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors `}
+                        >
+                            <Zap size={16} />
+                            {isManagingProtocols ? 'DONE EDITING' : 'MANAGE PROTOCOLS'}
+                        </button>
+                    </div>
                  </div>
 
                 {/* Main Content Area */}
@@ -226,8 +252,15 @@ export default function RewardsPage() {
 
                                             {/* Center Content */}
                                             <div className="flex-1 flex flex-col items-center justify-center w-full z-10 space-y-2 mt-4">
-                                                <div className={`w-20 h-20 rounded-full flex items-center justify-center  bg-gradient-to-b from-white/10 to-transparent group-hover:from-cyan-500/20 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 group-hover:border-cyan-400/30`}>
-                                                    <Rocket size={40} />
+                                                <div className={`w-28 h-28 rounded-full flex items-center justify-center bg-gradient-to-b from-white/10 to-transparent group-hover:from-cyan-500/20 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 group-hover:border-cyan-400/30 overflow-hidden relative`}>
+                                                    <img 
+                                                        src={getAssetPath("/images/ships/finalship.png")}
+                                                        className="w-full h-full object-contain relative z-20 scale-75"
+                                                        alt="Rocket"
+                                                    />
+                                                    <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20 scale-75 origin-center">
+                                                        <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                                                    </div>
                                                 </div>
                                                 <div className="text-center w-full">
                                                     <h3 className="text-white font-bold text-lg truncate w-full px-2 tracking-wide">
@@ -299,6 +332,9 @@ export default function RewardsPage() {
                         </div>
                     )}
                 </AnimatePresence>
+                
+                {/* Audio Element for Notifications */}
+                <audio id="notification-audio" src={getAssetPath("/sounds/notification.m4a")} preload="auto" /> 
 
             </div>
         </div>

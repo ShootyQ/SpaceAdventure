@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio } from "lucide-react";
+import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -106,6 +106,27 @@ export default function SolarSystem() {
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
+
+  const [isSoundOn, setIsSoundOn] = useState(false); // Default off
+  const toggleSound = () => {
+      const newState = !isSoundOn;
+      setIsSoundOn(newState);
+      if (newState) {
+          // Unlock audio context
+          const audio = document.getElementById('map-notification-audio') as HTMLAudioElement;
+          if (audio) {
+              audio.volume = 0;
+              audio.play().then(() => {
+                  audio.pause();
+                  audio.currentTime = 0;
+                  audio.volume = 0.5;
+              }).catch(e => console.error("Audio unlock failed", e));
+          }
+      }
+  };
+
+  const isSoundOnRef = useRef(isSoundOn);
+  useEffect(() => { isSoundOnRef.current = isSoundOn; }, [isSoundOn]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
@@ -261,6 +282,14 @@ export default function SolarSystem() {
                             startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
                             reason: shipData.lastXpReason
                         };
+                        
+                        // Play notification sound safely if enabled
+                        const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
+                        if (audioElement && isSoundOnRef.current) {
+                            audioElement.currentTime = 0;
+                            audioElement.volume = 0.5;
+                            audioElement.play().catch(e => console.error("Map audio playback failed:", e));
+                        }
                         
                         // Add to queue
                         setAwardQueue(prev => [...prev, event]);
@@ -471,6 +500,17 @@ export default function SolarSystem() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
     >
+       {/* Hidden Audio Element */}
+       <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=1")} preload="auto" />
+
+       {/* Sound Toggle */}
+       <button 
+           onClick={(e) => { e.stopPropagation(); toggleSound(); }}
+           className={`absolute top-6 right-6 z-50 p-3 rounded-full border backdrop-blur-md transition-all ${isSoundOn ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-black/20 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
+       >
+           {isSoundOn ? <Volume2 size={24} /> : <VolumeX size={24} />}
+       </button>
+
        {/* Starfield Background */}
        <div className="absolute inset-0 pointer-events-none">
           {stars.map(star => (

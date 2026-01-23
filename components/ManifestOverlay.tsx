@@ -95,7 +95,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             </div>
 
             {/* Avatar */}
-            <div className="relative w-24 h-24 mb-4">
+            <div className="relative w-32 h-32 mb-4">
                 <img
                     src={getAssetPath("/images/ships/finalship.png")}
                     alt="Ship"
@@ -115,8 +115,16 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             <div className="text-center w-full mb-4">
                 <h3 className="text-white font-bold truncate w-full mb-1">{student.cadetName}</h3>
                 <div className="flex flex-col items-center justify-center gap-1">
-                    {rank?.image && <img src={rank.image} alt={rank.name} className="w-16 h-16 object-contain drop-shadow-md" />}
-                    <p className="text-cyan-400/70 text-xs uppercase tracking-wider">{rank?.name || 'Recruit'}</p>
+                    {rank?.image && <img src={rank.image} alt={rank.name} className="w-24 h-24 object-contain drop-shadow-md" />}
+                    
+                    {/* Dynamic Rank Styling */}
+                    <div className={`text-xs uppercase tracking-wider font-bold ${
+                        (rank?.minXP || 0) > 3000 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)] text-sm' :
+                        (rank?.minXP || 0) > 1000 ? 'text-cyan-300 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]' :
+                        'text-cyan-400/70'
+                    }`}>
+                        {rank?.name || 'Recruit'}
+                    </div>
                 </div>
             </div>
             
