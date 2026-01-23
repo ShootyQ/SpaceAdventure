@@ -43,6 +43,12 @@ export interface UserData {
     location?: string; // Planet ID
     xp?: number;
     level?: number;
+    upgrades?: {
+        boosters: number;
+        fuel: number;
+        landers: number;
+        hull: number;
+    };
     travelStatus?: "idle" | "traveling";
     destinationId?: string;
     travelStart?: number;

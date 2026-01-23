@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
@@ -332,6 +332,17 @@ export default function SolarSystem() {
       };
   };
 
+  // Helper to format duration
+  const formatDuration = (minutes: number) => {
+      if (minutes < 60) return `${Math.round(minutes)} mins`;
+      const hours = Math.floor(minutes / 60);
+      const mins = Math.round(minutes % 60);
+      if (hours < 24) return `${hours}h ${mins}m`;
+      const days = Math.floor(hours / 24);
+      const h = hours % 24;
+      return `${days}d ${h}h`;
+  };
+
   // Travel Logic
   const handleTravel = async (overrideId?: string) => {
     if (!selectedPlanet || !userData) return;
@@ -349,29 +360,80 @@ export default function SolarSystem() {
         return;
     }
 
-    const currentLoc = ship?.locationId || (isOverride ? 'earth' : (userData.location || 'earth'));
+    const currentLocId = ship?.locationId || (isOverride ? 'earth' : (userData.location || 'earth'));
     
-    if (currentLoc === selectedPlanet.id && !isOverride) {
+    if (currentLocId === selectedPlanet.id && !isOverride) {
         alert("You are already here!");
         return;
     }
 
-    // 2. Calculate Travel Time
-    // For teachers moving students, maybe instant? Or fast?
-    // Let's keep it standard for now to simulate the "journey".
-    // 100 minutes standard.
-    // Teacher Override: Same speed as normal students (6000000ms = 100 mins)
-    const TRAVEL_DURATION = 6000000;   
+    // 2. Calculate Distance & Duration
+    const startPlanet = PLANETS.find(p => p.id === currentLocId);
+    const endPlanet = selectedPlanet; 
+    
+    if (!startPlanet) {
+         console.error("Unknown start planet");
+         return;
+    }
+
+    // Distance in logic units (Difference in orbit radii)
+    const dist = Math.abs(endPlanet.orbitSize - startPlanet.orbitSize) / 2;
+    
+    // Base Speed: Earth->Neptune (1875 units) takes 1 Week (10080 mins)
+    // Unit Time = 10080 / 1875 = ~5.376 mins per unit
+    const TIME_PER_UNIT = 5.376;
+    const baseMinutes = dist * TIME_PER_UNIT;
+
+    // Apply Boosters
+    // Formula: SpeedMultiplier = 1 + (Level * 1.2) -> Max Lvl 5 = 7x speed (1 wk -> 24h)
+    const boosterLevel = userData.upgrades?.boosters || 0;
+    const speedMultiplier = 1 + (boosterLevel * 1.2);
+    
+    // Final Duration
+    let travelMinutes = Math.max(baseMinutes / speedMultiplier, 1); // Minimum 1 min
+    
+    const fuelCost = Math.ceil(travelMinutes / 5);
+
+    // 3. Validation & Confirmation
+    const hasEnoughFuel = (userData.xp || 0) >= fuelCost;
+    
+    if (!isOverride) {
+        if (!hasEnoughFuel) {
+            alert(`Insufficient Fuel Required: ${fuelCost} XP\nCurrent: ${userData.xp || 0} XP`);
+            return;
+        }
+
+        const confirmMsg = `Plotting course to ${selectedPlanet.name}...\n\n` +
+                           `Distance: ${Math.round(dist)} AU\n` +
+                           `Estimated Time: ${formatDuration(travelMinutes)}\n` +
+                           `Fuel Cost: ${fuelCost} XP ${boosterLevel > 0 ? `(Booster Lv.${boosterLevel})` : ''}\n\n` +
+                           `Engage Hyperdrive?`;
+        
+        if (!confirm(confirmMsg)) return;
+    } else {
+        // Teacher moving a student
+        if (!confirm(`Command ${ship?.cadetName} to travel to ${selectedPlanet.name}?\nDuration: ${formatDuration(travelMinutes)}`)) return;
+    }
+
+    const TRAVEL_DURATION_MS = travelMinutes * 60 * 1000;
 
     try {
         const userRef = doc(db, "users", targetId);
-        await updateDoc(userRef, {
+        
+        const updates: any = {
             travelStatus: 'traveling',
-            location: currentLoc, // Origin
+            location: currentLocId, // Origin
             destinationId: selectedPlanet.id, // Target
             travelStart: Date.now(),
-            travelEnd: Date.now() + TRAVEL_DURATION
-        });
+            travelEnd: Date.now() + TRAVEL_DURATION_MS
+        };
+        
+        // Deduct Fuel (XP) - Teacher can choose to waive it
+        if (!isOverride || confirm("Deduct fuel (XP) from student reserves?")) {
+             updates.xp = increment(-fuelCost);
+        }
+
+        await updateDoc(userRef, updates);
         
         if (!isOverride) setSelectedPlanet(null);
         if (isOverride) alert(`Command Sent: ${ship?.cadetName} en route to ${selectedPlanet.name}`);
