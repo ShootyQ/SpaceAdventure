@@ -33,11 +33,17 @@ const SHIP_COLORS = [
     { name: "Ice Cyan", class: "text-cyan-400", bg: "bg-cyan-400" },
 ];
 
-const SHIP_TYPES = [
-    { id: 'scout', name: 'Nano Scout', desc: 'Fast, agile, weak hull.', icon: Rocket },
-    { id: 'fighter', name: 'Star Fighter', desc: 'Balanced combat specs.', icon: Zap },
-    { id: 'cargo', name: 'Heavy Hauler', desc: 'Slow, massive storage.', icon: Shield },
-];
+const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
+    <div className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer ${active ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900/40 hover:border-cyan-500/50 hover:bg-cyan-900/20'}`}>
+        <Icon size={24} className={`mb-2 ${active ? 'text-cyan-300' : 'text-cyan-700'}`} />
+        <div className={`text-[10px] uppercase font-bold text-center tracking-wider ${active ? 'text-cyan-100' : 'text-cyan-800'}`}>{label}</div>
+        <div className="flex gap-1 mt-2">
+            {[...Array(3)].map((_, i) => (
+                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-cyan-400 shadow-[0_0_5px_currentColor]' : 'bg-cyan-950'}`} />
+            ))}
+        </div>
+    </div>
+);
 
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
     const getColor = (id: string) => {
@@ -282,14 +288,14 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [loading, setLoading] = useState(false);
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
-    const [selectedType, setSelectedType] = useState('scout');
+    // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
 
     useEffect(() => {
         if (userData?.spaceship) {
             setShipName(userData.spaceship.name);
             const col = SHIP_COLORS.find(c => c.class === userData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
-            setSelectedType(userData.spaceship.type);
+            // setSelectedType(userData.spaceship.type);
         }
     }, [userData]);
 
@@ -301,7 +307,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
             await updateDoc(userRef, {
                 "spaceship.name": shipName,
                 "spaceship.color": selectedColor.class,
-                "spaceship.type": selectedType
+                // "spaceship.type": selectedType
             });
             alert("Ship specifications updated, Commander.");
         } catch (e) {
@@ -311,27 +317,50 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
         setLoading(false);
     };
 
+    // Derived Fuel/XP Stat (Visual Only for now)
+    const currentXP = userData?.xp || 0;
+    const fuelPercentage = Math.min((currentXP / 2000) * 100, 100); // Visual cap example
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
              {/* Left Column: Visualizer */}
-             <div className="bg-black/50 border border-cyan-900/50 rounded-2xl p-8 flex flex-col items-center justify-center relative min-h-[400px]">
+             <div className="bg-black/50 border border-cyan-900/50 rounded-2xl p-8 flex flex-col items-center justify-center relative min-h-[500px]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 to-transparent pointer-events-none" />
                 <motion.div
                     className={`relative z-10 ${selectedColor.class}`}
-                    animate={{ y: [-10, 10, -10], rotate: [0, 2, -2, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    animate={{ y: [-15, 15, -15], rotate: [0, 1, -1, 0] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
                         src={getAssetPath("/images/ships/finalship.png")}
                         alt="Ship"
-                        className="w-[180px] h-[180px] object-contain drop-shadow-[0_0_15px_currentColor]"
+                        className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />
                 </motion.div>
 
-                <div className="mt-12 text-center z-10">
-                    <h2 className="text-2xl font-bold text-white tracking-widest uppercase">{shipName || "Unknown Vessel"}</h2>
-                    <div className="text-sm text-cyan-600 mt-2 uppercase tracking-widest">
-                        Class: {SHIP_TYPES.find(t => t.id === selectedType)?.name}
+                <div className="mt-12 text-center z-10 w-full max-w-md">
+                    <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-6">{shipName || "Unknown Vessel"}</h2>
+                    
+                    {/* Fuel Gauge */}
+                    <div className="bg-black/60 border border-cyan-900/50 rounded-xl p-4 w-full">
+                        <div className="flex justify-between items-center text-xs uppercase font-bold tracking-widest mb-2">
+                            <span className="text-cyan-500">Hyperfuel Reserves</span>
+                            <span className="text-white">{currentXP} Units</span>
+                        </div>
+                        <div className="relative h-4 bg-cyan-950/50 rounded-full overflow-hidden border border-cyan-900">
+                             <div 
+                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-1000 ease-out"
+                                style={{ width: `${fuelPercentage}%` }}
+                             />
+                             {/* Ticks */}
+                             <div className="absolute inset-0 flex justify-between px-2">
+                                <div className="w-px h-full bg-black/20" />
+                                <div className="w-px h-full bg-black/20" />
+                                <div className="w-px h-full bg-black/20" />
+                                <div className="w-px h-full bg-black/20" />
+                             </div>
+                        </div>
+                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE • POWERED BY XP</div>
                     </div>
                 </div>
 
@@ -372,26 +401,16 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     </div>
                 </div>
 
+                {/* New Upgrades Section */}
                 <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
                     <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
-                        <Car size={16} /> Chassis Configuration
+                        <Wrench size={16} /> System Upgrades
                     </label>
-                    <div className="grid grid-cols-1 gap-3">
-                        {SHIP_TYPES.map(type => (
-                            <button
-                                key={type.id}
-                                onClick={() => setSelectedType(type.id)}
-                                className={`p-4 rounded border flex items-center gap-4 text-left transition-all ${selectedType === type.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
-                            >
-                                <div className={`p-2 rounded bg-cyan-900/30 ${selectedType === type.id ? 'text-white' : 'text-gray-500'}`}>
-                                    <type.icon size={24} />
-                                </div>
-                                <div>
-                                    <div className={`text-sm font-bold uppercase ${selectedType === type.id ? 'text-white' : 'text-gray-400'}`}>{type.name}</div>
-                                    <div className="text-xs text-gray-500">{type.desc}</div>
-                                </div>
-                            </button>
-                        ))}
+                    <div className="grid grid-cols-2 gap-4">
+                        <UpgradeSlot icon={Zap} label="Boosters" level={1} active />
+                        <UpgradeSlot icon={Database} label="Fuel Capacity" level={0} />
+                        <UpgradeSlot icon={Map} label="Landers" level={0} />
+                        <UpgradeSlot icon={Shield} label="Hull Plating" level={2} active />
                     </div>
                 </div>
 
