@@ -16,18 +16,6 @@ export default function TeacherConsole() {
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono">
        <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />
-<<<<<<< HEAD
-       
-       {/* Background Image & Overlay */}
-       <div className="absolute inset-0 z-0 pointer-events-none">
-           <img 
-               src={getAssetPath("/images/teacherbackground.png?v=1")}
-               alt="" 
-               className="absolute inset-0 w-full h-full object-cover opacity-80" 
-           />
-           <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-black/80" />
-       </div>
-=======
        
        {/* Background Image & Overlay */}
        <div className="absolute inset-0 z-0 pointer-events-none">
@@ -38,7 +26,6 @@ export default function TeacherConsole() {
            />
            <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-black/80" />
        </div>
->>>>>>> de7cf323bdf237b90e683e19f62e62ca9b5fb85a
 
        {/* Top HUD Bar */}
        <header className="z-10 flex justify-between items-center p-4 border-b border-cyan-500/30 bg-black/40 backdrop-blur-md">
