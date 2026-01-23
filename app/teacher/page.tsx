@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import RankEditor from '@/components/RankEditor';
+import { getAssetPath } from '@/lib/utils';
 
 export default function TeacherConsole() {
   const { logout } = useAuth();
@@ -15,8 +16,16 @@ export default function TeacherConsole() {
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono">
        <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />
-       {/* Background is handled by globals.css stars, but we add a subtle overlay for UI contrast */}
-       <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-black/80 pointer-events-none z-0" />
+       
+       {/* Background Image & Overlay */}
+       <div className="absolute inset-0 z-0 pointer-events-none">
+           <img 
+               src={getAssetPath("/images/teacherbackground.png?v=2")}
+               alt="" 
+               className="absolute inset-0 w-full h-full object-cover opacity-80" 
+           />
+           <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-black/80" />
+       </div>
 
        {/* Top HUD Bar */}
        <header className="z-10 flex justify-between items-center p-4 border-b border-cyan-500/30 bg-black/40 backdrop-blur-md">
