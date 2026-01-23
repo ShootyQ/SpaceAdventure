@@ -279,3 +279,4 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
 ManifestOverlay.displayName = "ManifestOverlay";
 
 export default ManifestOverlay;
+ 
