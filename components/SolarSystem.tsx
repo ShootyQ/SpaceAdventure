@@ -107,7 +107,7 @@ export default function SolarSystem() {
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
 
-  const [isSoundOn, setIsSoundOn] = useState(false); // Default off
+  const [isSoundOn, setIsSoundOn] = useState(true); // Default on for Map View
   const toggleSound = () => {
       const newState = !isSoundOn;
       setIsSoundOn(newState);
@@ -286,9 +286,10 @@ export default function SolarSystem() {
                         // Play notification sound safely if enabled
                         const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
                         if (audioElement && isSoundOnRef.current) {
+                            console.log("Map: Playing Award Sound");
                             audioElement.currentTime = 0;
                             audioElement.volume = 0.5;
-                            audioElement.play().catch(e => console.error("Map audio playback failed:", e));
+                            audioElement.play().catch(e => console.error("Map audio playback failed (Autoplay blocked? Click map to enable):", e));
                         }
                         
                         // Add to queue
@@ -501,7 +502,7 @@ export default function SolarSystem() {
         onMouseLeave={handleMouseUp}
     >
        {/* Hidden Audio Element */}
-       <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=1")} preload="auto" />
+       <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
 
        {/* Sound Toggle */}
        <button 
