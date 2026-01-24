@@ -133,22 +133,27 @@ export default function RewardsPage() {
             });
 
             // Handle Planet XP Contribution (Fire & Forget)
-            const locationId = studentData?.location;
+            const locationId = studentData?.location || selectedStudent.location; // Fallback to initial state
+            
+            console.log("PLANET XP CHECK:", { locationId, xp: behavior.xp, studentData });
+
             if (locationId && behavior.xp > 0) {
-                 console.log(`Attempting to add ${behavior.xp} XP to Planet ${locationId}`);
+                 const planetId = locationId.toLowerCase(); // Ensure lowercase match
+                 console.log(`Attempting to add ${behavior.xp} XP to Planet ${planetId}`);
+                 
                  try {
-                     const planetRef = doc(db, "planets", locationId);
+                     const planetRef = doc(db, "planets", planetId);
                      await setDoc(planetRef, { 
                          currentXP: increment(behavior.xp),
-                         id: locationId 
+                         id: planetId 
                      }, { merge: true });
-                     console.log(`SUCCESS: Contributed ${behavior.xp} XP to Sector ${locationId}`);
+                     console.log(`SUCCESS: Contributed ${behavior.xp} XP to Sector ${planetId}`);
                  } catch (err) {
                      console.error("FAILED to update planet XP:", err);
-                     alert(`Error updating planet XP: ${err}`);
+                     alert(`System Notice: Student XP updated, but Planet Tracking failed.\n\nError: ${err}`);
                  }
             } else {
-                console.warn("Skipping Planet XP: Invalid Location or Zero XP", { locationId, xp: behavior.xp });
+                console.warn("Skipping Planet XP - Conditions not met.");
             }
 
             console.log(`Awarded XP to student`);
