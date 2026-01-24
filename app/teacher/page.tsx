@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap } from 'lucide-react';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import RankEditor from '@/components/RankEditor';
 import { getAssetPath } from '@/lib/utils';
