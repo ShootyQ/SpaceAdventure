@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
@@ -84,10 +84,13 @@ export default function RewardsPage() {
             const studentRef = doc(db, "users", selectedStudent.uid);
             
             // Transaction to handle Fuel Cap logic
+            let studentData: any; // Store for post-transaction use
+
             await runTransaction(db, async (transaction) => {
                  const sfDoc = await transaction.get(studentRef);
                  if (!sfDoc.exists()) throw "Student document not found";
                  const data = sfDoc.data();
+                 studentData = data; // Export for Planet Logic
                  
                  // Calc New Fuel
                  // Cap = 500 + (UpgradeLevel * 250)
@@ -115,7 +118,35 @@ export default function RewardsPage() {
                     fuel: newFuel,
                     lastXpReason: behavior.label
                  });
+
+                 // PLANET CONTRIBUTION LOGIC
+                 // If student is at a planet (and not 'earth' maybe? Or yes earth?), add to planet XP.
+                 // We need to know if the locationId corresponds to a planet document.
+                 // We will blindly increment if the locationId is valid.
+                 // Note: 'earth' might not have a document yet if teacher hasn't visited the page, 
+                 // but setDoc with merge in the management page handles initialization.
+                 // Here we use update(), which fails if doc doesn't exist.
+                 // So we should check or use set w/ merge. But we are in a transaction reading user only.
+                 // We can't easily do a cross-document conditional update if we don't read the planet doc first.
+                 // However, we can just fire-and-forget a separate update outside the user transaction 
+                 // (since planet XP doesn't need to be perfectly atomic with user XP for this game).
             });
+
+            // Handle Planet XP Contribution (Fire & Forget)
+            const locationId = studentData.location;
+            if (locationId && behavior.xp > 0) {
+                 // Check if it's a valid planet ID (optional, but good practice)
+                 // Or just try to update.
+                 // We will increment.
+                 const planetRef = doc(db, "planets", locationId);
+                 // We use setDoc with merge simply to ensure it exists if it's the first time
+                 // But increment() requires updateDoc or setDoc with merge.
+                 await setDoc(planetRef, { 
+                     currentXP: increment(behavior.xp),
+                     id: locationId 
+                 }, { merge: true });
+                 console.log(`Contributed ${behavior.xp} XP to Sector ${locationId}`);
+            }
 
             console.log(`Awarded XP to student`);
             

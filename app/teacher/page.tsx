@@ -51,6 +51,7 @@ export default function TeacherConsole() {
              <NavButton icon={<Users />} label="Roster" href="/teacher/roster" isActive={pathname === '/teacher/roster'} />
              <NavButton icon={<Target />} label="Missions" href="/teacher/missions" isActive={pathname === '/teacher/missions'} />
              <NavButton icon={<Map />} label="Star Map" href="/teacher/map" isActive={pathname === '/teacher/map'} />
+             <NavButton icon={<Globe />} label="Planets" href="/teacher/planets" isActive={pathname === '/teacher/planets'} />
              <NavButton icon={<Award />} label="Rewards" href="/teacher/rewards" isActive={pathname === '/teacher/rewards'} />
              <div className="mt-auto">
                 <NavButton icon={<Settings />} label="Config" href="/teacher/settings" isActive={pathname === '/teacher/settings'} />
