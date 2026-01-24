@@ -133,19 +133,22 @@ export default function RewardsPage() {
             });
 
             // Handle Planet XP Contribution (Fire & Forget)
-            const locationId = studentData.location;
+            const locationId = studentData?.location;
             if (locationId && behavior.xp > 0) {
-                 // Check if it's a valid planet ID (optional, but good practice)
-                 // Or just try to update.
-                 // We will increment.
-                 const planetRef = doc(db, "planets", locationId);
-                 // We use setDoc with merge simply to ensure it exists if it's the first time
-                 // But increment() requires updateDoc or setDoc with merge.
-                 await setDoc(planetRef, { 
-                     currentXP: increment(behavior.xp),
-                     id: locationId 
-                 }, { merge: true });
-                 console.log(`Contributed ${behavior.xp} XP to Sector ${locationId}`);
+                 console.log(`Attempting to add ${behavior.xp} XP to Planet ${locationId}`);
+                 try {
+                     const planetRef = doc(db, "planets", locationId);
+                     await setDoc(planetRef, { 
+                         currentXP: increment(behavior.xp),
+                         id: locationId 
+                     }, { merge: true });
+                     console.log(`SUCCESS: Contributed ${behavior.xp} XP to Sector ${locationId}`);
+                 } catch (err) {
+                     console.error("FAILED to update planet XP:", err);
+                     alert(`Error updating planet XP: ${err}`);
+                 }
+            } else {
+                console.warn("Skipping Planet XP: Invalid Location or Zero XP", { locationId, xp: behavior.xp });
             }
 
             console.log(`Awarded XP to student`);
