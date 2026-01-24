@@ -300,6 +300,20 @@ export default function SolarSystem() {
   }, []);
 
 
+  const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+
+  // Load Dynamic Planet Stats
+  useEffect(() => {
+     const unsub = onSnapshot(collection(db, "planets"), (snapshot) => {
+         const d = new Map();
+         snapshot.forEach(doc => {
+             d.set(doc.id, doc.data());
+         });
+         setDynamicPlanets(d);
+     });
+     return () => unsub();
+  }, []);
+
   // Helper: Get Planet Position at specific time
   const getPlanetPosition = (planetId: string, timestamp: number) => {
       const planet = PLANETS.find(p => p.id === planetId);
@@ -879,6 +893,41 @@ export default function SolarSystem() {
                
                <p className="text-gray-300 mb-6">{selectedPlanet.description}</p>
                
+               {/* DYNAMIC PLANET STATS */}
+               {(() => {
+                   const stats = dynamicPlanets.get(selectedPlanet.id);
+                   const current = stats?.currentXP || 0;
+                   const goal = stats?.xpGoal || 1000;
+                   const progress = Math.min((current/goal)*100, 100);
+                   
+                   return (
+                       <div className="mb-6 p-4 bg-cyan-950/20 rounded-lg border border-cyan-900/50">
+                           <div className="text-xs uppercase tracking-widest text-cyan-500 mb-2 flex justify-between">
+                               <span>Colony Progress</span>
+                               <span className="text-white font-bold">{Math.round(progress)}%</span>
+                           </div>
+                           <div className="h-2 bg-black/50 rounded-full overflow-hidden border border-white/10 mb-2">
+                               <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${progress}%` }}
+                                    className="h-full bg-cyan-500"
+                               />
+                           </div>
+                           <div className="text-[10px] text-gray-400 text-right mb-4">{current} / {goal} XP</div>
+
+                           {stats?.rewardName && (
+                               <div className="border-t border-cyan-800/30 pt-3">
+                                   <div className="text-[10px] text-yellow-500 uppercase tracking-widest font-bold mb-1 flex items-center gap-1">
+                                       <Award size={12} /> Target Reward
+                                   </div>
+                                   <div className="text-white font-bold text-sm">{stats.rewardName}</div>
+                                   {stats.rewardDescription && <div className="text-gray-400 text-xs italic mt-1">{stats.rewardDescription}</div>}
+                               </div>
+                           )}
+                       </div>
+                   );
+               })()}
+
                <div className="mb-6">
                   <div className="text-xs uppercase tracking-widest text-gray-500 mb-2">Travel Requirements</div>
                   <div className="flex items-center gap-2 text-yellow-400">
