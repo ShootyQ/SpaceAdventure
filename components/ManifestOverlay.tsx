@@ -4,7 +4,7 @@ import React, { memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutGrid, Check, Crown } from "lucide-react";
 import { Ship, Rank, Behavior } from "@/types";
-import { updateDoc, doc } from "firebase/firestore";
+import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 
@@ -239,33 +239,67 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
 
                                 <button 
                                     onClick={async () => {
-                                        const xp = parseInt((document.getElementById('bulk-xp') as HTMLInputElement).value) || 0;
-                                        const reason = (document.getElementById('bulk-reason') as HTMLInputElement).value || "Command Award";
+                                        const xpInput = parseInt((document.getElementById('bulk-xp') as HTMLInputElement).value) || 0;
+                                        const reasonInput = (document.getElementById('bulk-reason') as HTMLInputElement).value || "Command Award";
                                         
-                                        if (xp === 0) return;
+                                        if (xpInput === 0) return;
 
-                                        // Apply to all selected
-                                        const batch: Promise<void>[] = [];
-                                        selectedIds.forEach(id => {
-                                            const ship = ships.find(s => s.id === id);
-                                            if (ship) {
-                                               const sRef = doc(db, "users", id);
-                                               batch.push(updateDoc(sRef, {
-                                                   xp: (ship.xp || 0) + xp,
-                                                   lastAward: {
-                                                      reason,
-                                                      xpGained: xp,
-                                                      timestamp: Date.now()
-                                                   }
-                                               }));
+                                        // Apply to all selected using atomic transactions
+                                        const promises = Array.from(selectedIds).map(async (id) => {
+                                            const studentRef = doc(db, "users", id);
+                                            
+                                            try {
+                                                await runTransaction(db, async (transaction) => {
+                                                    const sfDoc = await transaction.get(studentRef);
+                                                    if (!sfDoc.exists()) return; // Skip if user deleted
+                                                    
+                                                    const data = sfDoc.data();
+                                                    
+                                                    // 1. Calculate Fuel Logic
+                                                    const fuelLevel = data.upgrades?.fuel || 0;
+                                                    const maxFuel = 500 + (fuelLevel * 250);
+                                                    const currentFuel = data.fuel !== undefined ? data.fuel : 500;
+                                                    
+                                                    let newFuel = currentFuel + xpInput;
+                                                    if (newFuel > maxFuel) newFuel = maxFuel;
+                                                    if (newFuel < 0) newFuel = 0;
+
+                                                    // 2. Queue User Update
+                                                    transaction.update(studentRef, {
+                                                        xp: increment(xpInput),
+                                                        fuel: newFuel,
+                                                        lastAward: {
+                                                            reason: reasonInput,
+                                                            xpGained: xpInput,
+                                                            timestamp: Date.now()
+                                                        },
+                                                        // Ensure legacy field is updated too for compatibility
+                                                        lastXpReason: reasonInput
+                                                    });
+
+                                                    // 3. Queue Planet Update (Atomic)
+                                                    const rawLocation = data.location;
+                                                    if (rawLocation && xpInput > 0) {
+                                                        const planetId = rawLocation.toLowerCase();
+                                                        const planetRef = doc(db, "planets", planetId);
+                                                        
+                                                        transaction.set(planetRef, { 
+                                                            currentXP: increment(xpInput),
+                                                            id: planetId 
+                                                        }, { merge: true });
+                                                    }
+                                                });
+                                            } catch (e) {
+                                                console.error(`Failed to update student ${id}:`, e);
                                             }
                                         });
 
-                                        await Promise.all(batch);
+                                        await Promise.all(promises);
+                                        
                                         setSelectedIds(new Set());
                                         (document.getElementById('bulk-xp') as HTMLInputElement).value = '';
                                         (document.getElementById('bulk-reason') as HTMLInputElement).value = '';
-                                        (document.getElementById('bulk-protocol') as HTMLSelectElement).value = '';
+                                        // (document.getElementById('bulk-protocol') as HTMLSelectElement).value = '';
                                     }}
                                     className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-8 rounded uppercase tracking-wider shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all"
                                 >
