@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX } from "lucide-react";
+import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
