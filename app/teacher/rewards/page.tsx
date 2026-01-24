@@ -71,6 +71,9 @@ export default function RewardsPage() {
 
     const handleAward = async (behavior: Behavior) => {
         if (!selectedStudent) return;
+        
+        // Ensure atomic number handling
+        const xpAmount = Number(behavior.xp);
 
         // Play notification sound immediately (User Interaction)
         const audioElement = document.getElementById('notification-audio') as HTMLAudioElement;
@@ -83,84 +86,50 @@ export default function RewardsPage() {
         try {
             const studentRef = doc(db, "users", selectedStudent.uid);
             
-            // Transaction to handle Fuel Cap logic
-            let studentData: any; // Store for post-transaction use
-
+            // ATOMIC TRANSACTION: User + Planet
             await runTransaction(db, async (transaction) => {
+                 // 1. Read Student Data
                  const sfDoc = await transaction.get(studentRef);
                  if (!sfDoc.exists()) throw "Student document not found";
                  const data = sfDoc.data();
-                 studentData = data; // Export for Planet Logic
                  
-                 // Calc New Fuel
-                 // Cap = 500 + (UpgradeLevel * 250)
+                 // 2. Calculate User Updates (Fuel Logic)
                  const fuelLevel = data.upgrades?.fuel || 0;
                  const maxFuel = 500 + (fuelLevel * 250);
-                 // Default to 500 if undefined (Migration logic)
                  const currentFuel = data.fuel !== undefined ? data.fuel : 500;
                  
-                 // Calc New Fuel
-                 // If XP is positive, add to fuel (capped). If negative (punishment), deduct?
-                 // User said "XP fills fuel gauge". Usually punishment doesn't drain fuel, but logic implies xp/fuel parity.
-                 let newFuel = currentFuel + behavior.xp;
-                 
-                 // Clamp
+                 let newFuel = currentFuel + xpAmount;
                  if (newFuel > maxFuel) newFuel = maxFuel;
-                 // Don't let it go below 0? Maybe punishments don't drain fuel?
-                 // "takes 1xp of fuel per 5 mins" -> usage.
-                 // "fills their fuel gauge" -> XP gain.
-                 // Punishments (negative XP) usually mean behavior correction. Draining fuel seems harsh but consistent.
-                 // I'll ensure min 0.
                  if (newFuel < 0) newFuel = 0;
 
+                 // 3. Queue User Update
                  transaction.update(studentRef, {
-                    xp: increment(behavior.xp),
+                    xp: increment(xpAmount),
                     fuel: newFuel,
                     lastXpReason: behavior.label
                  });
 
-                 // PLANET CONTRIBUTION LOGIC
-                 // If student is at a planet (and not 'earth' maybe? Or yes earth?), add to planet XP.
-                 // We need to know if the locationId corresponds to a planet document.
-                 // We will blindly increment if the locationId is valid.
-                 // Note: 'earth' might not have a document yet if teacher hasn't visited the page, 
-                 // but setDoc with merge in the management page handles initialization.
-                 // Here we use update(), which fails if doc doesn't exist.
-                 // So we should check or use set w/ merge. But we are in a transaction reading user only.
-                 // We can't easily do a cross-document conditional update if we don't read the planet doc first.
-                 // However, we can just fire-and-forget a separate update outside the user transaction 
-                 // (since planet XP doesn't need to be perfectly atomic with user XP for this game).
-            });
-
-            // Handle Planet XP Contribution (Fire & Forget)
-            const locationId = studentData?.location || selectedStudent.location; // Fallback to initial state
-            
-            console.log("PLANET XP CHECK:", { locationId, xp: behavior.xp, studentData });
-
-            if (locationId && behavior.xp > 0) {
-                 const planetId = locationId.toLowerCase(); // Ensure lowercase match
-                 console.log(`Attempting to add ${behavior.xp} XP to Planet ${planetId}`);
+                 // 4. Queue Planet Update (Atomic)
+                 const rawLocation = data.location;
                  
-                 try {
+                 if (rawLocation && xpAmount > 0) {
+                     const planetId = rawLocation.toLowerCase();
                      const planetRef = doc(db, "planets", planetId);
-                     await setDoc(planetRef, { 
-                         currentXP: increment(behavior.xp),
+                     
+                     // Use set with merge to ensure doc exists and update safely
+                     transaction.set(planetRef, { 
+                         currentXP: increment(xpAmount),
                          id: planetId 
                      }, { merge: true });
-                     console.log(`SUCCESS: Contributed ${behavior.xp} XP to Sector ${planetId}`);
-                 } catch (err) {
-                     console.error("FAILED to update planet XP:", err);
-                     alert(`System Notice: Student XP updated, but Planet Tracking failed.\n\nError: ${err}`);
                  }
-            } else {
-                console.warn("Skipping Planet XP - Conditions not met.");
-            }
+            });
 
-            console.log(`Awarded XP to student`);
+            console.log(`SUCCESS: Awarded ${xpAmount} XP to student and updated local sector.`);
             
             setSelectedStudent(null); // Close modal
         } catch (error) {
             console.error("Error awarding XP:", error);
+            alert(`Award Transaction Failed!\n\n${error}`);
         }
     };
 
