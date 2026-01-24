@@ -372,6 +372,15 @@ export default function RewardsPage() {
                                     </div>
                                     <h2 className="text-2xl font-bold text-white mb-1">{selectedStudent.displayName}</h2>
                                     <p className="text-cyan-600 text-xs uppercase font-bold tracking-widest mb-4">{selectedStudent.spaceship?.name || 'USS Unknown'}</p>
+                                    
+                                    {/* Location Indicator for Debugging */}
+                                    <div className="flex items-center justify-center gap-2 mb-4 bg-cyan-950/30 py-1 px-3 rounded-full inline-flex border border-cyan-900/50">
+                                         <div className={`w-2 h-2 rounded-full ${selectedStudent.location ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                                         <span className="text-[10px] text-cyan-400 font-mono uppercase tracking-widest">
+                                            LOC: {selectedStudent.location || "UNKNOWN"}
+                                         </span>
+                                    </div>
+
                                     <p className="text-cyan-400 text-sm border-t border-cyan-900/50 pt-4">Select Protocol to Issue Award</p>
                                 </div>
 
