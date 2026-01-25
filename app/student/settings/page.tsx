@@ -105,8 +105,14 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     const hat = userData?.activeHat || userData?.avatar?.activeHat || userData?.avatar?.hat;
     const hatSrc = HAT_OPTIONS.find(h => h.id === hat)?.src;
     
-    // Debug path
-    if (hatSrc) console.log('Hat Src:', getAssetPath(hatSrc));
+        // Hat Styles Configuration
+    const getHatStyle = (id: string) => {
+        switch(id) {
+            case 'hat1': return "scale-[1.65] translate-y-[5%]"; // Helmet - Needs to be much larger to fit over head
+            case 'hat2': return "scale-[1.35] translate-y-[12%]"; // Fedora - Bigger and lower
+            default: return "scale-100";
+        }
+    };
 
     return (
        <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
@@ -116,7 +122,7 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
                 <img 
                     src={getAssetPath(hatSrc)} 
                     alt="Accessory" 
-                    className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
+                    className={"absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform \"} 
                     onError={(e) => console.error('Error loading hat:', hatSrc, getAssetPath(hatSrc))}
                 />
             )}
@@ -1187,6 +1193,7 @@ export default function SettingsPage() {
         </div>
     );
 }
+
 
 
 
