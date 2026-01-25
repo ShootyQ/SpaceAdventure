@@ -245,10 +245,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                  <div className="relative h-48 flex items-center justify-center">
                       {/* Avatar Bubble */}
                       <div className="absolute left-0 w-24 h-24 rounded-full border-2 border-purple-500/50 overflow-hidden bg-black shadow-[0_0_20px_rgba(168,85,247,0.3)] z-20">
-                           <div className="w-full h-full relative" style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-                                <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
-                                <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
-                           </div>
+                           <UserAvatar userData={userData} className="w-full h-full" />
                       </div>
 
                       {/* Connection Line */}
