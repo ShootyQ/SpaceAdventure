@@ -17,9 +17,11 @@
     "react": "^18",
     "react-dom": "^18",
     "tailwind-merge": "^2.2.1",
-    "undici": "^5.28.2"
+    "undici": "^5.28.2",
+    "canvas-confetti": "^1.9.2"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.6.4",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
