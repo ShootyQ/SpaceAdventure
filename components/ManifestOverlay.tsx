@@ -122,18 +122,22 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                     </div>
                     {student?.avatar?.activeHat && student.avatar.activeHat !== 'none' && (
                          <div className="absolute -top-[50%] left-0 right-0 z-40 flex justify-center pointer-events-none">
-                             <span className="text-3xl drop-shadow-md filter shadow-black leading-none">
-                                {(() => {
-                                    const h = student.avatar.activeHat;
-                                    if(h === 'cowboy') return '🤠';
-                                    if(h === 'astronaut') return '👩‍🚀';
-                                    if(h === 'alien') return '👽';
-                                    if(h === 'crown') return '👑';
-                                    if(h === 'wizard') return '🧙‍♂️';
-                                    if(h === 'police') return '👮';
-                                    return '';
-                                })()}
-                             </span>
+                             {(() => {
+                                const h = student.avatar.activeHat;
+                                let src = '';
+                                if(h === 'hat1') src = '/images/hats/hat1.png';
+                                else if(h === 'hat2') src = '/images/hats/hat2.png';
+                                // Fallback for legacy ID (optional)
+                                else return null; 
+                                
+                                return (
+                                    <img 
+                                        src={getAssetPath(src)} 
+                                        alt="Hat"
+                                        className="w-8 h-8 object-contain filter drop-shadow-md"
+                                    />
+                                );
+                             })()}
                          </div>
                     )}
                 </div>

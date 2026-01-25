@@ -461,13 +461,9 @@ function InventoryView() {
 }
 
 const HAT_OPTIONS = [
-    { id: 'none', name: 'No Hat', price: 0, icon: '🚫' },
-    { id: 'cowboy', name: 'Space Cowboy', price: 100, icon: '🤠' },
-    { id: 'astronaut', name: 'Astro-Helm', price: 200, icon: '👩‍🚀' },
-    { id: 'alien', name: 'Martian Mask', price: 300, icon: '👽' },
-    { id: 'crown', name: 'Galactic Crown', price: 1000, icon: '👑' },
-    { id: 'wizard', name: 'Nebula Wizard', price: 500, icon: '🧙‍♂️' },
-    { id: 'police', name: 'Patrol Cap', price: 150, icon: '👮' },
+    { id: 'none', name: 'No Hat', src: '' },
+    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.png' },
+    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
 ];
 
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
@@ -491,28 +487,17 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
         }
     }, [userData]);
 
-    const unlockedHats = (userData?.unlockedHats as string[]) || ['none'];
-
-    const handlePurchase = async (hatId: string, price: number) => {
-        if (!user || !userData) return;
-        if ((userData.xp || 0) < price) {
-            alert("Insufficient XP for this modification.");
-            return;
-        }
-        if (!confirm(`Purchase ${hatId} accessory for ${price} XP?`)) return;
-
+    const handleSelectHat = async (hatId: string) => {
+        if (!user) return;
         setLoading(true);
+        setActiveHat(hatId);
         try {
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
-                unlockedHats: [...unlockedHats, hatId],
-                xp: increment(-price),
                 "avatar.activeHat": hatId
             });
-            setActiveHat(hatId);
         } catch (e) {
-            console.error(e);
-            alert("Transaction failed.");
+            console.error("Error setting hat", e);
         }
         setLoading(false);
     };
@@ -570,11 +555,15 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     />
 
                     {/* Accessories Layer */}
-                    {activeHat !== 'none' && (
+                    {activeHat !== 'none' && HAT_OPTIONS.find(h => h.id === activeHat)?.src ? (
                         <div className="absolute -top-16 left-0 right-0 z-20 flex justify-center pointer-events-none">
-                             <span className="text-9xl drop-shadow-2xl filter drop-shadow-lg">{HAT_OPTIONS.find(h => h.id === activeHat)?.icon}</span>
+                             <img 
+                                src={getAssetPath(HAT_OPTIONS.find(h => h.id === activeHat)?.src || '')} 
+                                alt="Hat" 
+                                className="w-32 h-32 object-contain filter drop-shadow-xl" 
+                             />
                         </div>
-                    )}
+                    ) : null}
                  </div>
 
                  <div className="mt-8 text-center">
@@ -672,45 +661,29 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                             <Crown size={20} className="text-yellow-400" />
                             <span className="uppercase tracking-wider">Accessory Vendor</span>
                         </h3>
-                         <div className="text-yellow-400 font-bold bg-yellow-950/40 px-3 py-1 rounded-full border border-yellow-500/30 text-sm">
-                            {userData?.xp || 0} XP
-                        </div>
                     </div>
                     
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                         {HAT_OPTIONS.map(h => {
-                             const isUnlocked = unlockedHats.includes(h.id);
                              const isActive = activeHat === h.id;
-                             const canAfford = (userData?.xp || 0) >= h.price;
 
                              return (
                                 <button 
                                     key={h.id}
-                                    onClick={() => {
-                                        if (isUnlocked) setActiveHat(h.id);
-                                        else handlePurchase(h.id, h.price);
-                                    }}
+                                    onClick={() => handleSelectHat(h.id)}
                                     className={`relative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
                                         isActive
                                         ? 'bg-purple-600/30 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
-                                        : isUnlocked
-                                            ? 'bg-black/40 border-purple-500/30 hover:border-purple-400 hover:bg-purple-900/20'
-                                            : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
+                                        : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
                                     }`}
                                 >
-                                    <div className="text-4xl">{h.icon}</div>
+                                    {h.src ? (
+                                        <img src={getAssetPath(h.src)} alt={h.name} className="w-12 h-12 object-contain" />
+                                    ) : (
+                                       <div className="text-4xl text-gray-500">🚫</div>
+                                    )}
                                     <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
                                     
-                                    {isUnlocked ? (
-                                        <div className="text-[9px] uppercase font-bold text-green-400 bg-green-950/50 px-2 py-0.5 rounded-full border border-green-500/30">
-                                            Owned
-                                        </div>
-                                    ) : (
-                                        <div className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border ${canAfford ? 'text-yellow-400 bg-yellow-950/30 border-yellow-500/30' : 'text-red-400 bg-red-950/30 border-red-500/30'}`}>
-                                            {h.price} XP
-                                        </div>
-                                    )}
-
                                     {isActive && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_5px_currentColor]" />}
                                 </button>
                              );
