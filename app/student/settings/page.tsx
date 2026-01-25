@@ -122,7 +122,7 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
                 <img 
                     src={getAssetPath(hatSrc)} 
                     alt="Accessory" 
-                    className={"absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform \"} 
+                    className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform ${getHatStyle(hat)}`} 
                     onError={(e) => console.error('Error loading hat:', hatSrc, getAssetPath(hatSrc))}
                 />
             )}
@@ -1193,6 +1193,7 @@ export default function SettingsPage() {
         </div>
     );
 }
+
 
 
 
