@@ -57,6 +57,12 @@ export default function StudentConsole() {
           
           {/* Overlay Controls for Student */}
           <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+              <Link href="/student/missions" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2 group">
+                  <div className="bg-cyan-500/20 p-1 rounded group-hover:bg-cyan-500/40 transition-colors">
+                    <Activity size={20} className="text-cyan-300" />
+                  </div>
+                  <span className="hidden md:inline font-bold text-cyan-100">Mission Log</span>
+              </Link>
               <Link href="/student/settings" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
                   <Settings size={20} />
                   <span className="hidden md:inline font-bold">Ship Config</span>
