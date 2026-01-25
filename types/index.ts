@@ -40,7 +40,8 @@ export interface AvatarConfig {
     bgHue?: number;
     bgSat?: number;
     bgLight?: number;
-    hat?: string;
+    activeHat?: string;
+    hat?: string; // Legacy support if needed
 }
 
 export interface UserData {
@@ -91,6 +92,7 @@ export interface Ship {
     status: "idle" | "traveling";
     destinationId?: string;
     avatarColor: string;
+    avatar?: AvatarConfig;
     travelStart?: number; // Timestamp
     travelEnd?: number; // Timestamp
     role?: 'teacher' | 'student';

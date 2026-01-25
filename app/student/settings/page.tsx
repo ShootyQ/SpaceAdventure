@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
-    ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
+    ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity
 } from "lucide-react";
 
@@ -460,6 +460,16 @@ function InventoryView() {
     );
 }
 
+const HAT_OPTIONS = [
+    { id: 'none', name: 'No Hat', price: 0, icon: '🚫' },
+    { id: 'cowboy', name: 'Space Cowboy', price: 100, icon: '🤠' },
+    { id: 'astronaut', name: 'Astro-Helm', price: 200, icon: '👩‍🚀' },
+    { id: 'alien', name: 'Martian Mask', price: 300, icon: '👽' },
+    { id: 'crown', name: 'Galactic Crown', price: 1000, icon: '👑' },
+    { id: 'wizard', name: 'Nebula Wizard', price: 500, icon: '🧙‍♂️' },
+    { id: 'police', name: 'Patrol Cap', price: 150, icon: '👮' },
+];
+
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const { userData, user } = useAuth();
     const [hue, setHue] = useState(0);
@@ -467,13 +477,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [bgHue, setBgHue] = useState(260); // Default purple
     const [bgSat, setBgSat] = useState(50);
     const [bgLight, setBgLight] = useState(20);
-    const [hat, setHat] = useState<string | null>(null);
+    const [activeHat, setActiveHat] = useState<string>('none');
     const [loading, setLoading] = useState(false);
-
-    const HATS = [
-        { id: 'fedora', name: 'Detective Fedora' },
-        { id: 'spacehelmet', name: 'Void Helmet' }
-    ];
 
     useEffect(() => {
         if (userData?.avatar) {
@@ -482,9 +487,35 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             if (userData.avatar.bgHue !== undefined) setBgHue(userData.avatar.bgHue);
             if (userData.avatar.bgSat !== undefined) setBgSat(userData.avatar.bgSat);
             if (userData.avatar.bgLight !== undefined) setBgLight(userData.avatar.bgLight);
-            if (userData.avatar.hat !== undefined) setHat(userData.avatar.hat);
+            if (userData.avatar.activeHat !== undefined) setActiveHat(userData.avatar.activeHat);
         }
     }, [userData]);
+
+    const unlockedHats = (userData?.unlockedHats as string[]) || ['none'];
+
+    const handlePurchase = async (hatId: string, price: number) => {
+        if (!user || !userData) return;
+        if ((userData.xp || 0) < price) {
+            alert("Insufficient XP for this modification.");
+            return;
+        }
+        if (!confirm(`Purchase ${hatId} accessory for ${price} XP?`)) return;
+
+        setLoading(true);
+        try {
+            const userRef = doc(db, "users", user.uid);
+            await updateDoc(userRef, {
+                unlockedHats: [...unlockedHats, hatId],
+                xp: increment(-price),
+                "avatar.activeHat": hatId
+            });
+            setActiveHat(hatId);
+        } catch (e) {
+            console.error(e);
+            alert("Transaction failed.");
+        }
+        setLoading(false);
+    };
 
     const handleSave = async () => {
         if (!user) return;
@@ -497,7 +528,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.bgHue": bgHue,
                 "avatar.bgSat": bgSat,
                 "avatar.bgLight": bgLight,
-                "avatar.hat": hat
+                "avatar.activeHat": activeHat
             });
             onBack();
         } catch (e) {
@@ -508,11 +539,11 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     };
 
     return (
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="border border-purple-500/30 bg-black/40 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[400px] relative">
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 to-transparent pointer-events-none" />
                  
-                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center transition-colors duration-300"
+                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-visible flex items-center justify-center transition-colors duration-300 ring-4 ring-purple-900/30 shadow-[0_0_50px_rgba(168,85,247,0.4)]"
                       style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
                  >
                     {/* Skin Tint Layer - Masked to bunny shape */}
@@ -539,22 +570,21 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     />
 
                     {/* Accessories Layer */}
-                    {hat && (
-                        <img 
-                            src={getAssetPath(`/images/avatar/hats/${hat}.png`)}
-                            alt="Accessory" 
-                            className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
-                        />
+                    {activeHat !== 'none' && (
+                        <div className="absolute -top-16 left-0 right-0 z-20 flex justify-center pointer-events-none">
+                             <span className="text-9xl drop-shadow-2xl filter drop-shadow-lg">{HAT_OPTIONS.find(h => h.id === activeHat)?.icon}</span>
+                        </div>
                     )}
                  </div>
 
                  <div className="mt-8 text-center">
-                    <h3 className="text-xl font-bold text-purple-400 uppercase tracking-widest">Preview</h3>
+                    <h3 className="text-xl font-bold text-purple-400 uppercase tracking-widest mb-1">Preview</h3>
+                    <p className="text-purple-300/60 text-sm font-mono">{activeHat !== 'none' ? HAT_OPTIONS.find(h => h.id === activeHat)?.name : 'Standard Uniform'}</p>
                  </div>
             </div>
 
-            <div className="space-y-6">
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20 max-h-[500px] overflow-y-auto custom-scrollbar">
+            <div className="space-y-6 max-h-[700px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <Palette size={20} className="text-purple-400" />
                         <span className="uppercase tracking-wider">Appearance</span>
@@ -637,35 +667,54 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 </div>
 
                 <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Sparkles size={20} className="text-purple-400" />
-                        <span className="uppercase tracking-wider">Accessories</span>
-                    </h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Crown size={20} className="text-yellow-400" />
+                            <span className="uppercase tracking-wider">Accessory Vendor</span>
+                        </h3>
+                         <div className="text-yellow-400 font-bold bg-yellow-950/40 px-3 py-1 rounded-full border border-yellow-500/30 text-sm">
+                            {userData?.xp || 0} XP
+                        </div>
+                    </div>
                     
-                    <div className="grid grid-cols-3 gap-2">
-                        <button 
-                            onClick={() => setHat(null)}
-                            className={`p-3 rounded-lg border text-xs font-bold uppercase transition-all ${
-                                !hat 
-                                ? 'bg-purple-500 border-purple-400 text-white' 
-                                : 'bg-black/40 border-purple-500/30 text-purple-400 hover:bg-purple-900/20'
-                            }`}
-                        >
-                            None
-                        </button>
-                        {HATS.map(h => (
-                             <button 
-                                key={h.id}
-                                onClick={() => setHat(h.id)}
-                                className={`p-3 rounded-lg border text-xs font-bold uppercase transition-all ${
-                                    hat === h.id
-                                    ? 'bg-purple-500 border-purple-400 text-white' 
-                                    : 'bg-black/40 border-purple-500/30 text-purple-400 hover:bg-purple-900/20'
-                                }`}
-                             >
-                                {h.name}
-                             </button>
-                        ))}
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                        {HAT_OPTIONS.map(h => {
+                             const isUnlocked = unlockedHats.includes(h.id);
+                             const isActive = activeHat === h.id;
+                             const canAfford = (userData?.xp || 0) >= h.price;
+
+                             return (
+                                <button 
+                                    key={h.id}
+                                    onClick={() => {
+                                        if (isUnlocked) setActiveHat(h.id);
+                                        else handlePurchase(h.id, h.price);
+                                    }}
+                                    className={`relative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
+                                        isActive
+                                        ? 'bg-purple-600/30 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
+                                        : isUnlocked
+                                            ? 'bg-black/40 border-purple-500/30 hover:border-purple-400 hover:bg-purple-900/20'
+                                            : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
+                                    }`}
+                                >
+                                    <div className="text-4xl">{h.icon}</div>
+                                    <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
+                                    
+                                    {isUnlocked ? (
+                                        <div className="text-[9px] uppercase font-bold text-green-400 bg-green-950/50 px-2 py-0.5 rounded-full border border-green-500/30">
+                                            Owned
+                                        </div>
+                                    ) : (
+                                        <div className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border ${canAfford ? 'text-yellow-400 bg-yellow-950/30 border-yellow-500/30' : 'text-red-400 bg-red-950/30 border-red-500/30'}`}>
+                                            {h.price} XP
+                                        </div>
+                                    )}
+
+                                    {isActive && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_5px_currentColor]" />}
+                                </button>
+                             );
+                        })}
                     </div>
                 </div>
 

@@ -101,8 +101,41 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                     alt="Ship"
                     className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] relative z-20"
                 />
-                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                    <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-visible flex items-center justify-center bg-cyan-900/20">
+                    <div className="relative w-full h-full overflow-hidden rounded-full">
+                         <div 
+                            className="absolute inset-0 z-0"
+                            style={{ 
+                                backgroundColor: `hsl(${student?.avatar?.skinHue || 0}, 70%, 50%)`,
+                                opacity: (student?.avatar?.skinHue || 0) === 0 ? 0 : 0.6,
+                                maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                                WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                                maskSize: 'cover',
+                                WebkitMaskSize: 'cover'
+                            }} 
+                        />
+                        <img 
+                            src={getAssetPath("/images/avatar/spacebunny.png")} 
+                            className="w-full h-full object-cover scale-[1.35] translate-y-1 relative z-10"
+                            style={{ filter: `hue-rotate(${student?.avatar?.hue || 0}deg)` }} 
+                        />
+                    </div>
+                    {student?.avatar?.activeHat && student.avatar.activeHat !== 'none' && (
+                         <div className="absolute -top-[50%] left-0 right-0 z-40 flex justify-center pointer-events-none">
+                             <span className="text-3xl drop-shadow-md filter shadow-black leading-none">
+                                {(() => {
+                                    const h = student.avatar.activeHat;
+                                    if(h === 'cowboy') return '🤠';
+                                    if(h === 'astronaut') return '👩‍🚀';
+                                    if(h === 'alien') return '👽';
+                                    if(h === 'crown') return '👑';
+                                    if(h === 'wizard') return '🧙‍♂️';
+                                    if(h === 'police') return '👮';
+                                    return '';
+                                })()}
+                             </span>
+                         </div>
+                    )}
                 </div>
                 {student.flag && (
                     <div className="absolute -top-2 -left-2 z-40 transform -rotate-12 scale-110 drop-shadow-md">
