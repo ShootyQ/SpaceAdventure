@@ -89,10 +89,11 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 }
 
 
+
 const HAT_OPTIONS = [
     { id: 'none', name: 'No Hat', src: '' },
-    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.svg' },
-    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.svg' },
+    { id: 'hat1', name: 'Hat 1', src: '/images/avatar/hats/hat1.svg' },
+    { id: 'hat2', name: 'Hat 2', src: '/images/avatar/hats/hat2.svg' },
 ];
 
 const UserAvatar = ({ userData, className = "" }: { userData: any, className?: string }) => {
@@ -101,8 +102,11 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const hat = userData?.avatar?.activeHat || userData?.avatar?.hat;
+    const hat = userData?.activeHat || userData?.avatar?.activeHat || userData?.avatar?.hat;
     const hatSrc = HAT_OPTIONS.find(h => h.id === hat)?.src;
+    
+    // Debug path
+    if (hatSrc) console.log('Hat Src:', getAssetPath(hatSrc));
 
     return (
        <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
@@ -113,6 +117,7 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
                     src={getAssetPath(hatSrc)} 
                     alt="Accessory" 
                     className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
+                    onError={(e) => console.error('Error loading hat:', hatSrc, getAssetPath(hatSrc))}
                 />
             )}
        </div>
