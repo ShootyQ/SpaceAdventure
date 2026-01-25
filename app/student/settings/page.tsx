@@ -98,8 +98,8 @@ const HAT_OPTIONS = [
 
 const getHatStyle = (id: string) => {
     switch(id) {
-        case 'helmet1': return "scale-[2.2] translate-y-[15%]"; // Helmet - Needs to be much larger to fit over head
-        case 'hat2': return "scale-[1.5] translate-y-[18%]"; // Fedora - Bigger and lower
+        case 'helmet1': return "scale-[2.8] translate-y-[28%]"; // Helmet - Needs to be much larger to fit over head
+        case 'hat2': return "scale-[1.65] translate-y-[22%]"; // Fedora - Bigger and lower
         default: return "scale-100";
     }
 };
