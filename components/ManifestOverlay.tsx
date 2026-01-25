@@ -127,7 +127,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                                 let src = '';
                                 if(h === 'hat1') src = '/images/hats/hat1.png';
                                 else if(h === 'hat2') src = '/images/hats/hat2.png';
-                                else if(h === 'hat3') src = '/images/hats/hat3.png';
+                                
                                 // Fallback for legacy ID (optional)
                                 else return null; 
                                 
@@ -361,4 +361,5 @@ ManifestOverlay.displayName = "ManifestOverlay";
 export default ManifestOverlay;
  
 // Update 1
+
 
