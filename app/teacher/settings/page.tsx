@@ -1094,3 +1094,9 @@ export default function SettingsPage() {
                     </motion.div>
                 </AnimatePresence>
 
+            </div>
+        </div>
+    );
+}
+
+
