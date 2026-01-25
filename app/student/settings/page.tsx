@@ -230,7 +230,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                      <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Pilot"}</div>
                      <div className="flex justify-center gap-4 text-[10px] uppercase font-bold tracking-widest text-cyan-400/80">
                         <span>{currentRank.name}</span>
-                        <span className="text-white/30">•</span>
+                        <span className="text-white/30"> | </span>
                         <span>{currentXP} XP</span>
                      </div>
                  </div>
@@ -384,7 +384,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                                 <div className="w-px h-full bg-black/20" />
                              </div>
                         </div>
-                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE • POWERED BY XP</div>
+                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE  |  POWERED BY XP</div>
                     </div>
                 </div>
 
@@ -831,7 +831,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                 )}
             </div>
 
-            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name} • NO FACTION</p>
+            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name}  |  NO FACTION</p>
             <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                  <div className="bg-purple-950/30 p-4 rounded-xl border border-purple-500/20 text-center">
                     <div className="text-2xl font-bold text-white">{currentXP} XP</div>
