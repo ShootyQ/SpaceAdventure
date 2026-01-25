@@ -92,14 +92,14 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
 const HAT_OPTIONS = [
     { id: 'none', name: 'No Hat', src: '' },
-    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.png' },
-    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
+    { id: 'helmet1', name: 'Helmet', src: '/images/hats/helmet1.png' },
+    { id: 'hat2', name: 'Fedora', src: '/images/hats/hat2.png' },
 ];
 
 const getHatStyle = (id: string) => {
     switch(id) {
-        case 'hat1': return "scale-[1.65] translate-y-[5%]"; // Helmet - Needs to be much larger to fit over head
-        case 'hat2': return "scale-[1.35] translate-y-[12%]"; // Fedora - Bigger and lower
+        case 'helmet1': return "scale-[2.2] translate-y-[15%]"; // Helmet - Needs to be much larger to fit over head
+        case 'hat2': return "scale-[1.5] translate-y-[18%]"; // Fedora - Bigger and lower
         default: return "scale-100";
     }
 };
@@ -110,7 +110,8 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const hat = userData?.activeHat || userData?.avatar?.activeHat || userData?.avatar?.hat;
+    const rawHat = userData?.activeHat || userData?.avatar?.activeHat || userData?.avatar?.hat;
+    const hat = rawHat === 'hat1' ? 'helmet1' : rawHat;
     const hatSrc = HAT_OPTIONS.find(h => h.id === hat)?.src;
 
     return (
@@ -497,7 +498,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             if (userData.avatar.bgHue !== undefined) setBgHue(userData.avatar.bgHue);
             if (userData.avatar.bgSat !== undefined) setBgSat(userData.avatar.bgSat);
             if (userData.avatar.bgLight !== undefined) setBgLight(userData.avatar.bgLight);
-            if (userData.avatar.activeHat !== undefined) setActiveHat(userData.avatar.activeHat);
+            if (userData.avatar.activeHat !== undefined) setActiveHat(userData.avatar.activeHat === 'hat1' ? 'helmet1' : userData.avatar.activeHat);
         }
     }, [userData]);
 
@@ -736,7 +737,8 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const hat = userData?.avatar?.hat;
+    const rawHat = userData?.avatar?.hat;
+    const hat = rawHat === 'hat1' ? 'helmet1' : rawHat;
 
     // Rank Logic
     const currentXP = userData?.xp || 0;
