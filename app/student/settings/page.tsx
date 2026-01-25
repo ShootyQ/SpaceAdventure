@@ -88,21 +88,29 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
     );
 }
 
+
+const HAT_OPTIONS = [
+    { id: 'none', name: 'No Hat', src: '' },
+    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.svg' },
+    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.svg' },
+];
+
 const UserAvatar = ({ userData, className = "" }: { userData: any, className?: string }) => {
     const hue = userData?.avatar?.hue || 0;
     const skinHue = userData?.avatar?.skinHue || 0;
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const hat = userData?.avatar?.hat;
+    const hat = userData?.avatar?.activeHat || userData?.avatar?.hat;
+    const hatSrc = HAT_OPTIONS.find(h => h.id === hat)?.src;
 
     return (
        <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
             <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
             <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
-            {hat && (
+            {hatSrc && (
                 <img 
-                    src={getAssetPath(`/images/avatar/hats/${hat}.png`)} 
+                    src={getAssetPath(hatSrc)} 
                     alt="Accessory" 
                     className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
                 />
@@ -460,11 +468,7 @@ function InventoryView() {
     );
 }
 
-const HAT_OPTIONS = [
-    { id: 'none', name: 'No Hat', src: '' },
-    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.png' },
-    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
-];
+
 
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const { userData, user } = useAuth();

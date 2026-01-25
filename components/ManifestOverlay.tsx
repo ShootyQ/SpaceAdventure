@@ -125,8 +125,8 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                              {(() => {
                                 const h = student.avatar.activeHat;
                                 let src = '';
-                                if(h === 'hat1') src = '/images/hats/hat1.png';
-                                else if(h === 'hat2') src = '/images/hats/hat2.png';
+                                if(h === 'hat1') src = '/images/hats/hat1.svg';
+                                else if(h === 'hat2') src = '/images/hats/hat2.svg';
                                 // Fallback for legacy ID (optional)
                                 else return null; 
                                 
