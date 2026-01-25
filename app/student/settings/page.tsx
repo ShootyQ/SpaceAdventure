@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -92,8 +92,8 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
 const HAT_OPTIONS = [
     { id: 'none', name: 'No Hat', src: '' },
-    { id: 'hat1', name: 'Hat 1', src: '/images/avatar/hats/hat1.svg' },
-    { id: 'hat2', name: 'Hat 2', src: '/images/avatar/hats/hat2.svg' },
+    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.png' },
+    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
 ];
 
 const UserAvatar = ({ userData, className = "" }: { userData: any, className?: string }) => {
@@ -230,7 +230,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                      <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Pilot"}</div>
                      <div className="flex justify-center gap-4 text-[10px] uppercase font-bold tracking-widest text-cyan-400/80">
                         <span>{currentRank.name}</span>
-                        <span className="text-white/30">•</span>
+                        <span className="text-white/30">�</span>
                         <span>{currentXP} XP</span>
                      </div>
                  </div>
@@ -384,7 +384,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                                 <div className="w-px h-full bg-black/20" />
                              </div>
                         </div>
-                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE • POWERED BY XP</div>
+                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE � POWERED BY XP</div>
                     </div>
                 </div>
 
@@ -689,7 +689,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                     {h.src ? (
                                         <img src={getAssetPath(h.src)} alt={h.name} className="w-12 h-12 object-contain" />
                                     ) : (
-                                       <div className="text-4xl text-gray-500">🚫</div>
+                                       <div className="text-4xl text-gray-500">??</div>
                                     )}
                                     <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
                                     
@@ -814,7 +814,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                             autoFocus
                         />
                         <button onClick={handleSaveName} className="p-2 bg-green-600 rounded-lg hover:bg-green-500 text-white"><Save size={16} /></button>
-                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white">✕</button>
+                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white">?</button>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3 group/edit">
@@ -831,7 +831,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                 )}
             </div>
 
-            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name} • NO FACTION</p>
+            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name} � NO FACTION</p>
             <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                  <div className="bg-purple-950/30 p-4 rounded-xl border border-purple-500/20 text-center">
                     <div className="text-2xl font-bold text-white">{currentXP} XP</div>
@@ -1187,4 +1187,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
 
