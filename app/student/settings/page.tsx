@@ -17,7 +17,7 @@ const Rocket = ({ size = 24, className = "" }: { size?: number, className?: stri
     <img
         src={getAssetPath("/images/ships/finalship.png")}
         alt="Rocket"
-        className={`object-contain ${className}`}
+        className={object-contain }
         style={{ width: size, height: size }}
     />
 );
@@ -34,12 +34,12 @@ const SHIP_COLORS = [
 ];
 
 const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
-    <div className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer ${active ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900/40 hover:border-cyan-500/50 hover:bg-cyan-900/20'}`}>
-        <Icon size={24} className={`mb-2 ${active ? 'text-cyan-300' : 'text-cyan-700'}`} />
-        <div className={`text-[10px] uppercase font-bold text-center tracking-wider ${active ? 'text-cyan-100' : 'text-cyan-800'}`}>{label}</div>
+    <div className={spect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer }>
+        <Icon size={24} className={mb-2 } />
+        <div className={	ext-[10px] uppercase font-bold text-center tracking-wider }>{label}</div>
         <div className="flex gap-1 mt-2">
             {[...Array(3)].map((_, i) => (
-                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-cyan-400 shadow-[0_0_5px_currentColor]' : 'bg-cyan-950'}`} />
+                <div key={i} className={w-1.5 h-1.5 rounded-full } />
             ))}
         </div>
     </div>
@@ -61,7 +61,7 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
     const c1 = getColor(config.primaryColor);
     const c2 = getColor(config.secondaryColor);
     // Simple unique ID for clipPath to avoid conflicts between multiple flags on page
-    const uniqueId = `clip-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, '');
+    const uniqueId = clip----.replace(/[^a-z0-9]/gi, '');
 
     return (
         <svg width="24" height="30" viewBox="0 0 24 30" className="drop-shadow-md">
@@ -75,7 +75,7 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
                         {config.shape === 'swallowtail' && <polygon points="0,0 20,0 20,12 10,6 0,12" />} 
                    </clipPath>
                 </defs>
-                <g clipPath={`url(#${uniqueId})`}>
+                <g clipPath={url(#)}>
                      {config.pattern === 'solid' && <rect x="0" y="0" width="20" height="12" fill={c1} />}
                      {config.pattern === 'stripe-h' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
                      {config.pattern === 'stripe-v' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
@@ -97,12 +97,12 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     const hat = userData?.avatar?.hat;
 
     return (
-       <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-            <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
-            <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
+       <div className={elative overflow-hidden } style={{ backgroundColor: hsl(, %, %) }}>
+            <div className="absolute inset-0 z-0" style={{ backgroundColor: hsl(, 70%, 50%), maskImage: url(), WebkitMaskImage: url(), maskSize: 'cover' }} />
+            <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: hue-rotate(deg) }} />
             {hat && (
                 <img 
-                    src={getAssetPath(`/images/avatar/hats/${hat}.png`)} 
+                    src={getAssetPath(/images/avatar/hats/.png)} 
                     alt="Accessory" 
                     className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
                 />
@@ -163,14 +163,14 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                             transition={{ delay: index * 0.1 }}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className={`
-                                ${item.bg} ${item.border} border rounded-2xl p-6
+                            className={
+                                  border rounded-2xl p-6
                                 flex items-center gap-6 text-left
                                 backdrop-blur-sm group relative overflow-hidden transition-all duration-300
                                 hover:bg-black/60
-                            `}
+                            }
                         >
-                            <div className={`p-4 rounded-xl bg-black/50 border ${item.border} ${item.color} shadow-[0_0_15px_rgba(0,0,0,0.5)] group-hover:scale-110 transition-transform duration-300 overflow-hidden relative flex items-center justify-center`}>
+                            <div className={p-4 rounded-xl bg-black/50 border   shadow-[0_0_15px_rgba(0,0,0,0.5)] group-hover:scale-110 transition-transform duration-300 overflow-hidden relative flex items-center justify-center}>
                                 {item.id === 'avatar' ? (
                                    <UserAvatar userData={userData} className="w-8 h-8 rounded-full border border-white/20" />
                                 ) : item.id === 'flag' && userData?.flag ? (
@@ -180,14 +180,14 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                                 )}
                             </div>
                             <div className="z-10">
-                                <h3 className={`text-xl font-bold uppercase tracking-wider ${item.color} drop-shadow-md`}>
+                                <h3 className={	ext-xl font-bold uppercase tracking-wider  drop-shadow-md}>
                                     {item.title}
                                 </h3>
                                 <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">Access System</p>
                             </div>
                             
                             {/* Decorative Corner */}
-                            <div className={`absolute top-0 right-0 w-8 h-8 ${item.color.replace('text', 'bg').replace('400', '500')}/10 rounded-bl-3xl`} />
+                            <div className={bsolute top-0 right-0 w-8 h-8 /10 rounded-bl-3xl} />
                         </motion.button>
                     ))}
                     
@@ -217,7 +217,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                      <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Pilot"}</div>
                      <div className="flex justify-center gap-4 text-[10px] uppercase font-bold tracking-widest text-cyan-400/80">
                         <span>{currentRank.name}</span>
-                        <span className="text-white/30">•</span>
+                        <span className="text-white/30"></span>
                         <span>{currentXP} XP</span>
                      </div>
                  </div>
@@ -226,9 +226,9 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                  <div className="relative h-48 flex items-center justify-center">
                       {/* Avatar Bubble */}
                       <div className="absolute left-0 w-24 h-24 rounded-full border-2 border-purple-500/50 overflow-hidden bg-black shadow-[0_0_20px_rgba(168,85,247,0.3)] z-20">
-                           <div className="w-full h-full relative" style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-                                <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
-                                <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
+                           <div className="w-full h-full relative" style={{ backgroundColor: hsl(, %, %) }}>
+                                <div className="absolute inset-0 z-0" style={{ backgroundColor: hsl(, 70%, 50%), maskImage: url(), WebkitMaskImage: url(), maskSize: 'cover' }} />
+                                <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: hue-rotate(deg) }} />
                            </div>
                       </div>
 
@@ -265,7 +265,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                              <div className="h-2 bg-black/50 rounded-full overflow-hidden border border-white/10">
                                  <motion.div 
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${progress}%` }}
+                                    animate={{ width: ${progress}% }}
                                     className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400"
                                  />
                              </div>
@@ -338,7 +338,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
              <div className="bg-black/50 border border-cyan-900/50 rounded-2xl p-8 flex flex-col items-center justify-center relative min-h-[500px]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 to-transparent pointer-events-none" />
                 <motion.div
-                    className={`relative z-10 ${selectedColor.class}`}
+                    className={elative z-10 }
                     animate={{ y: [-15, 15, -15], rotate: [0, 1, -1, 0] }}
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
@@ -361,7 +361,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                         <div className="relative h-4 bg-cyan-950/50 rounded-full overflow-hidden border border-cyan-900">
                              <div 
                                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-1000 ease-out"
-                                style={{ width: `${fuelPercentage}%` }}
+                                style={{ width: ${fuelPercentage}% }}
                              />
                              {/* Ticks */}
                              <div className="absolute inset-0 flex justify-between px-2">
@@ -371,7 +371,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                                 <div className="w-px h-full bg-black/20" />
                              </div>
                         </div>
-                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE • POWERED BY XP</div>
+                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE  POWERED BY XP</div>
                     </div>
                 </div>
 
@@ -403,10 +403,10 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                             <button
                                 key={color.name}
                                 onClick={() => setSelectedColor(color)}
-                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedColor.name === color.name ? 'bg-cyan-500/20 border-cyan-400 scale-105' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                                className={p-3 rounded border flex items-center gap-3 transition-all }
                             >
-                                <div className={`w-4 h-4 rounded-full ${color.bg} shadow-[0_0_5px_currentColor]`} />
-                                <span className={`text-xs uppercase font-bold ${selectedColor.name === color.name ? 'text-white' : 'text-gray-500'}`}>{color.name}</span>
+                                <div className={w-4 h-4 rounded-full  shadow-[0_0_5px_currentColor]} />
+                                <span className={	ext-xs uppercase font-bold }>{color.name}</span>
                             </button>
                         ))}
                     </div>
@@ -428,7 +428,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                 <button
                     onClick={handleSave}
                     disabled={loading}
-                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? 'bg-gray-700 text-gray-400 cursor-wait' : 'bg-cyan-600 hover:bg-cyan-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(8,145,178,0.4)]'}`}
+                    className={w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all }
                 >
                     <Save size={20} />
                     {loading ? "Calibrating..." : "Save Configuration"}
@@ -461,13 +461,9 @@ function InventoryView() {
 }
 
 const HAT_OPTIONS = [
-    { id: 'none', name: 'No Hat', price: 0, icon: '🚫' },
-    { id: 'cowboy', name: 'Space Cowboy', price: 100, icon: '🤠' },
-    { id: 'astronaut', name: 'Astro-Helm', price: 200, icon: '👩‍🚀' },
-    { id: 'alien', name: 'Martian Mask', price: 300, icon: '👽' },
-    { id: 'crown', name: 'Galactic Crown', price: 1000, icon: '👑' },
-    { id: 'wizard', name: 'Nebula Wizard', price: 500, icon: '🧙‍♂️' },
-    { id: 'police', name: 'Patrol Cap', price: 150, icon: '👮' },
+    { id: 'none', name: 'No Hat', src: '' },
+    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.png' },
+    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
 ];
 
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
@@ -491,28 +487,17 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
         }
     }, [userData]);
 
-    const unlockedHats = (userData?.unlockedHats as string[]) || ['none'];
-
-    const handlePurchase = async (hatId: string, price: number) => {
-        if (!user || !userData) return;
-        if ((userData.xp || 0) < price) {
-            alert("Insufficient XP for this modification.");
-            return;
-        }
-        if (!confirm(`Purchase ${hatId} accessory for ${price} XP?`)) return;
-
+    const handleSelectHat = async (hatId: string) => {
+        if (!user) return;
         setLoading(true);
+        setActiveHat(hatId);
         try {
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
-                unlockedHats: [...unlockedHats, hatId],
-                xp: increment(-price),
                 "avatar.activeHat": hatId
             });
-            setActiveHat(hatId);
         } catch (e) {
-            console.error(e);
-            alert("Transaction failed.");
+            console.error("Error setting hat", e);
         }
         setLoading(false);
     };
@@ -544,16 +529,16 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 to-transparent pointer-events-none" />
                  
                  <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-visible flex items-center justify-center transition-colors duration-300 ring-4 ring-purple-900/30 shadow-[0_0_50px_rgba(168,85,247,0.4)]"
-                      style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
+                      style={{ backgroundColor: hsl(, %, %) }}
                  >
                     {/* Skin Tint Layer - Masked to bunny shape */}
                     <div 
                         className="absolute inset-0 z-0"
                         style={{ 
-                            backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
+                            backgroundColor: hsl(, 70%, 50%),
                             opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                            maskImage: url(),
+                            WebkitMaskImage: url(),
                             maskSize: 'cover',
                             WebkitMaskSize: 'cover'
                         }} 
@@ -565,16 +550,20 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         alt="Avatar" 
                         className="w-full h-full object-cover relative z-10"
                         style={{ 
-                            filter: `hue-rotate(${hue}deg)`
+                            filter: hue-rotate(deg)
                         }}
                     />
 
                     {/* Accessories Layer */}
-                    {activeHat !== 'none' && (
+                    {activeHat !== 'none' && HAT_OPTIONS.find(h => h.id === activeHat)?.src ? (
                         <div className="absolute -top-16 left-0 right-0 z-20 flex justify-center pointer-events-none">
-                             <span className="text-9xl drop-shadow-2xl filter drop-shadow-lg">{HAT_OPTIONS.find(h => h.id === activeHat)?.icon}</span>
+                             <img 
+                                src={getAssetPath(HAT_OPTIONS.find(h => h.id === activeHat)?.src || '')} 
+                                alt="Hat" 
+                                className="w-32 h-32 object-contain filter drop-shadow-xl" 
+                             />
                         </div>
-                    )}
+                    ) : null}
                  </div>
 
                  <div className="mt-8 text-center">
@@ -672,45 +661,25 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                             <Crown size={20} className="text-yellow-400" />
                             <span className="uppercase tracking-wider">Accessory Vendor</span>
                         </h3>
-                         <div className="text-yellow-400 font-bold bg-yellow-950/40 px-3 py-1 rounded-full border border-yellow-500/30 text-sm">
-                            {userData?.xp || 0} XP
-                        </div>
                     </div>
                     
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                         {HAT_OPTIONS.map(h => {
-                             const isUnlocked = unlockedHats.includes(h.id);
                              const isActive = activeHat === h.id;
-                             const canAfford = (userData?.xp || 0) >= h.price;
 
                              return (
                                 <button 
                                     key={h.id}
-                                    onClick={() => {
-                                        if (isUnlocked) setActiveHat(h.id);
-                                        else handlePurchase(h.id, h.price);
-                                    }}
-                                    className={`relative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
-                                        isActive
-                                        ? 'bg-purple-600/30 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
-                                        : isUnlocked
-                                            ? 'bg-black/40 border-purple-500/30 hover:border-purple-400 hover:bg-purple-900/20'
-                                            : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
-                                    }`}
+                                    onClick={() => handleSelectHat(h.id)}
+                                    className={elative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all }
                                 >
-                                    <div className="text-4xl">{h.icon}</div>
+                                    {h.src ? (
+                                        <img src={getAssetPath(h.src)} alt={h.name} className="w-12 h-12 object-contain" />
+                                    ) : (
+                                       <div className="text-4xl text-gray-500"></div>
+                                    )}
                                     <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
                                     
-                                    {isUnlocked ? (
-                                        <div className="text-[9px] uppercase font-bold text-green-400 bg-green-950/50 px-2 py-0.5 rounded-full border border-green-500/30">
-                                            Owned
-                                        </div>
-                                    ) : (
-                                        <div className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border ${canAfford ? 'text-yellow-400 bg-yellow-950/30 border-yellow-500/30' : 'text-red-400 bg-red-950/30 border-red-500/30'}`}>
-                                            {h.price} XP
-                                        </div>
-                                    )}
-
                                     {isActive && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_5px_currentColor]" />}
                                 </button>
                              );
@@ -776,16 +745,16 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
         <div className="max-w-4xl mx-auto border border-purple-500/30 bg-black/40 rounded-3xl p-8 min-h-[500px] flex flex-col items-center justify-center">
             <div className="relative mb-8 group">
                 <div className="w-48 h-48 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center relative transition-colors duration-300"
-                     style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
+                     style={{ backgroundColor: hsl(, %, %) }}
                 >
                     {/* Skin Tint Layer - Masked */}
                     <div
                         className="absolute inset-0 z-0"
                         style={{
-                            backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
+                            backgroundColor: hsl(, 70%, 50%),
                             opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                            maskImage: url(),
+                            WebkitMaskImage: url(),
                             maskSize: 'cover',
                             WebkitMaskSize: 'cover'
                         }}
@@ -796,14 +765,14 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                         alt="Pilot Avatar"
                         className="w-full h-full object-cover relative z-10 transition-transform duration-500 group-hover:scale-110"
                         style={{
-                            filter: `hue-rotate(${hue}deg)`
+                            filter: hue-rotate(deg)
                         }}
                     />
 
                     {/* Accessories Layer */}
                     {hat && (
                         <img 
-                            src={getAssetPath(`/images/avatar/hats/${hat}.png`)}
+                            src={getAssetPath(/images/avatar/hats/.png)}
                             alt="Accessory" 
                             className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-110" 
                         />
@@ -824,7 +793,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
             <div className="flex items-center gap-3 mb-2 relative">
                 {isEditingName ? (
                     <div className="flex items-center gap-2">
-                        <input 
+                        <input
                             type="text" 
                             value={newName} 
                             onChange={(e) => setNewName(e.target.value)}
@@ -832,7 +801,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                             autoFocus
                         />
                         <button onClick={handleSaveName} className="p-2 bg-green-600 rounded-lg hover:bg-green-500 text-white"><Save size={16} /></button>
-                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white">✕</button>
+                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white"></button>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3 group/edit">
@@ -849,7 +818,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                 )}
             </div>
 
-            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name} • NO FACTION</p>
+            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name}  NO FACTION</p>
             <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                  <div className="bg-purple-950/30 p-4 rounded-xl border border-purple-500/20 text-center">
                     <div className="text-2xl font-bold text-white">{currentXP} XP</div>
@@ -1028,7 +997,7 @@ function FlagDesigner() {
                                  <button
                                     key={p.id}
                                     onClick={() => setPole(p.id)}
-                                    className={`flex-1 p-2 rounded text-xs uppercase font-bold border transition-all ${pole === p.id ? 'bg-red-500 text-black border-red-400' : 'bg-black/40 border-red-900/50 text-gray-500 hover:text-red-400'}`}
+                                    className={lex-1 p-2 rounded text-xs uppercase font-bold border transition-all }
                                  >
                                     {p.name}
                                  </button>
@@ -1042,9 +1011,9 @@ function FlagDesigner() {
                         <div className="grid grid-cols-4 gap-2">
                              {FLAG_COLORS.map(c => (
                                  <button
-                                     key={`p-${c.id}`}
+                                     key={p-}
                                      onClick={() => setPrimaryColor(c.id)}
-                                     className={`h-10 rounded border transition-all ${primaryColor === c.id ? 'scale-110 border-white ring-2 ring-red-500 ring-offset-2 ring-offset-black' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                     className={h-10 rounded border transition-all }
                                      style={{ backgroundColor: c.hex }}
                                  />
                              ))}
@@ -1057,9 +1026,9 @@ function FlagDesigner() {
                         <div className="grid grid-cols-4 gap-2">
                              {FLAG_COLORS.map(c => (
                                  <button
-                                     key={`s-${c.id}`}
+                                     key={s-}
                                      onClick={() => setSecondaryColor(c.id)}
-                                     className={`h-10 rounded border transition-all ${secondaryColor === c.id ? 'scale-110 border-white ring-2 ring-red-500 ring-offset-2 ring-offset-black' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                     className={h-10 rounded border transition-all }
                                      style={{ backgroundColor: c.hex }}
                                  />
                              ))}
@@ -1074,7 +1043,7 @@ function FlagDesigner() {
                                 <button
                                     key={p.id}
                                     onClick={() => setPattern(p.id)}
-                                    className={`p-3 rounded border text-left text-xs uppercase font-bold transition-all ${pattern === p.id ? 'bg-red-500/20 border-red-400 text-white' : 'bg-black/30 border-red-900/30 text-gray-500 hover:bg-red-900/20'}`}
+                                    className={p-3 rounded border text-left text-xs uppercase font-bold transition-all }
                                 >
                                     {p.name}
                                 </button>
@@ -1090,7 +1059,7 @@ function FlagDesigner() {
                                 <button
                                     key={s}
                                     onClick={() => setShape(s)}
-                                    className={`flex-1 p-2 rounded border text-[10px] uppercase font-bold transition-all ${shape === s ? 'bg-white text-black' : 'bg-black/50 border-white/20 text-gray-400 hover:bg-white/10'}`}
+                                    className={lex-1 p-2 rounded border text-[10px] uppercase font-bold transition-all }
                                 >
                                     {s === 'swallowtail' ? 'Tail' : s}
                                 </button>
@@ -1102,7 +1071,7 @@ function FlagDesigner() {
                 <button
                     onClick={handleSave}
                     disabled={loading}
-                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? 'bg-gray-700 text-gray-400 cursor-wait' : 'bg-red-600 hover:bg-red-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(220,38,38,0.4)]'}`}
+                    className={w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all }
                 >
                     <Save size={20} />
                     {loading ? "Forging..." : "Fabricate Flag"}

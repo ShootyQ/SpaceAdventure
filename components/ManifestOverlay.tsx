@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,12 +7,6 @@ import { Ship, Rank, Behavior } from "@/types";
 import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
-
-// Reuse TinyFlag - We should probably export this too, but for now I'll duplicate quickly or check if I can export it from SolarSystem (not easy).
-// I will define it locally here or better yet make a shared component later. For now, local is fine to avoid circular deps.
-// Actually, extracting TinyFlag to components/TinyFlag.tsx would be best.
-// I'll assume I can just copy it for this step to save tool calls, or render a placeholder.
-// Wait, I should make TinyFlag a component.
 
 const TinyFlag = memo(({ config }: { config: any }) => {
     const getColor = (id: string) => {
@@ -29,8 +23,7 @@ const TinyFlag = memo(({ config }: { config: any }) => {
 
     const c1 = getColor(config.primaryColor);
     const c2 = getColor(config.secondaryColor);
-    // Deterministic ID logic
-    const uniqueId = `mf-clip-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, '');
+    const uniqueId = "mf-clip-" + config.primaryColor + "-" + config.secondaryColor + "-" + config.pattern + "-" + config.shape;
 
     return (
         <svg width="24" height="30" viewBox="0 0 24 30" className="drop-shadow-md">
@@ -44,7 +37,7 @@ const TinyFlag = memo(({ config }: { config: any }) => {
                         {config.shape === 'swallowtail' && <polygon points="0,0 20,0 20,12 10,6 0,12" />} 
                    </clipPath>
                 </defs>
-                <g clipPath={`url(#${uniqueId})`}>
+                <g clipPath={"url(#" + uniqueId + ")"}>
                      {config.pattern === 'solid' && <rect x="0" y="0" width="20" height="12" fill={c1} />}
                      {config.pattern === 'stripe-h' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
                      {config.pattern === 'stripe-v' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
@@ -70,31 +63,23 @@ interface ManifestOverlayProps {
 }
 
 const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void }) => {
-    // Memoize rank reset per card to avoid array operations
     const rank = React.useMemo(() => ranks.find(r => student.xp >= r.minXP), [ranks, student.xp]);
 
     return (
         <div 
             onClick={onToggle}
-            className={`relative group cursor-pointer transition-all hover:scale-105 p-4 rounded-2xl border flex flex-col items-center
-                ${isSelected 
-                    ? 'bg-cyan-900/40 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-cyan-500/50'
-                }`}
+            className={"relative group cursor-pointer transition-all hover:scale-105 p-4 rounded-2xl border flex flex-col items-center " + (isSelected ? 'bg-cyan-900/40 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-cyan-500/50')}
         >
-            {/* Selection Checkbox Visual */}
-            <div className={`absolute top-2 left-2 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-cyan-500 border-cyan-500 text-black' : 'border-white/30 group-hover:border-cyan-400'}`}>
+            <div className={"absolute top-2 left-2 w-5 h-5 rounded border flex items-center justify-center transition-colors " + (isSelected ? 'bg-cyan-500 border-cyan-500 text-black' : 'border-white/30 group-hover:border-cyan-400')}>
                 {isSelected && <Check size={14} strokeWidth={4} />}
             </div>
 
-            {/* XP Badge */}
             <div className="absolute top-2 right-2 flex flex-col items-end">
                 <div className="bg-green-500 text-black text-xs font-bold px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]">
                     {student.xp} XP
                 </div>
             </div>
 
-            {/* Avatar */}
             <div className="relative w-32 h-32 mb-4">
                 <img
                     src={getAssetPath("/images/ships/finalship.png")}
@@ -106,10 +91,10 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                          <div 
                             className="absolute inset-0 z-0"
                             style={{ 
-                                backgroundColor: `hsl(${student?.avatar?.skinHue || 0}, 70%, 50%)`,
+                                backgroundColor: "hsl(" + (student?.avatar?.skinHue || 0) + ", 70%, 50%)",
                                 opacity: (student?.avatar?.skinHue || 0) === 0 ? 0 : 0.6,
-                                maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                                WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
+                                maskImage: "url(" + getAssetPath('/images/avatar/spacebunny.png') + ")",
+                                WebkitMaskImage: "url(" + getAssetPath('/images/avatar/spacebunny.png') + ")",
                                 maskSize: 'cover',
                                 WebkitMaskSize: 'cover'
                             }} 
@@ -117,23 +102,26 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                         <img 
                             src={getAssetPath("/images/avatar/spacebunny.png")} 
                             className="w-full h-full object-cover scale-[1.35] translate-y-1 relative z-10"
-                            style={{ filter: `hue-rotate(${student?.avatar?.hue || 0}deg)` }} 
+                            style={{ filter: "hue-rotate(" + (student?.avatar?.hue || 0) + "deg)" }} 
                         />
                     </div>
                     {student?.avatar?.activeHat && student.avatar.activeHat !== 'none' && (
                          <div className="absolute -top-[50%] left-0 right-0 z-40 flex justify-center pointer-events-none">
-                             <span className="text-3xl drop-shadow-md filter shadow-black leading-none">
-                                {(() => {
-                                    const h = student.avatar.activeHat;
-                                    if(h === 'cowboy') return '🤠';
-                                    if(h === 'astronaut') return '👩‍🚀';
-                                    if(h === 'alien') return '👽';
-                                    if(h === 'crown') return '👑';
-                                    if(h === 'wizard') return '🧙‍♂️';
-                                    if(h === 'police') return '👮';
-                                    return '';
-                                })()}
-                             </span>
+                             {(() => {
+                                const h = student.avatar.activeHat;
+                                let src = '';
+                                if(h === 'hat1') src = '/images/hats/hat1.png';
+                                else if(h === 'hat2') src = '/images/hats/hat2.png';
+                                else return null; 
+                                
+                                return (
+                                    <img 
+                                        src={getAssetPath(src)} 
+                                        alt="Hat"
+                                        className="w-8 h-8 object-contain filter drop-shadow-md"
+                                    />
+                                );
+                             })()}
                          </div>
                     )}
                 </div>
@@ -144,26 +132,19 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                 )}
             </div>
 
-            {/* Name */}
             <div className="text-center w-full mb-4">
                 <h3 className="text-white font-bold truncate w-full mb-1">{student.cadetName}</h3>
                 <div className="flex flex-col items-center justify-center gap-1">
                     {rank?.image && <img src={rank.image} alt={rank.name} className="w-24 h-24 object-contain drop-shadow-md" />}
                     
-                    {/* Dynamic Rank Styling */}
-                    <div className={`text-xs uppercase tracking-wider font-bold ${
-                        (rank?.minXP || 0) > 3000 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)] text-sm' :
-                        (rank?.minXP || 0) > 1000 ? 'text-cyan-300 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]' :
-                        'text-cyan-400/70'
-                    }`}>
+                    <div className={"text-xs uppercase tracking-wider font-bold " + ((rank?.minXP || 0) > 3000 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)] text-sm' : (rank?.minXP || 0) > 1000 ? 'text-cyan-300 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]' : 'text-cyan-400/70')}>
                         {rank?.name || 'Recruit'}
                     </div>
                 </div>
             </div>
             
-            {/* Status Indicator */}
             <div className="mt-4 flex items-center gap-2 text-[10px] text-gray-400 uppercase tracking-widest bg-black/30 px-2 py-1 rounded">
-                <div className={`w-2 h-2 rounded-full ${student.status === 'traveling' ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
+                <div className={"w-2 h-2 rounded-full " + (student.status === 'traveling' ? 'bg-orange-400 animate-pulse' : 'bg-green-400')} />
                 {student.status === 'traveling' ? 'In Transit' : 'Docked'}
             </div>
         </div>
@@ -173,15 +154,12 @@ ShipCard.displayName = "ShipCard";
 
 const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, setSelectedIds, behaviors }: ManifestOverlayProps) => {
     
-    // 1. Optimize Ranks (Sort once)
     const sortedRanks = React.useMemo(() => ranks.slice().sort((a,b) => b.minXP - a.minXP), [ranks]);
     
-    // 2. Optimize Ships List
     const visibleShips = React.useMemo(() => {
         return ships.filter(s => s.role !== 'teacher').sort((a,b) => b.xp - a.xp);
     }, [ships]);
 
-    // Handler for toggling selection (memoized to prevent prop churn)
     const handleToggle = React.useCallback((id: string) => {
         const newSet = new Set(selectedIds);
         if (newSet.has(id)) newSet.delete(id);
@@ -223,128 +201,6 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                             />
                         ))}
                     </div>
-                    
-                    {/* BULK ACTION FOOTER */}
-                     <AnimatePresence>
-                        {selectedIds.size > 0 && (
-                            <motion.div 
-                                initial={{ y: 100 }}
-                                animate={{ y: 0 }}
-                                exit={{ y: 100 }}
-                                className="fixed bottom-0 left-0 right-0 bg-black/95 border-t border-cyan-500/30 p-6 z-[60] flex items-center justify-center gap-6 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]"
-                            >
-                                <div className="text-white font-bold uppercase tracking-widest text-sm bg-cyan-900/30 px-4 py-2 rounded">
-                                    {selectedIds.size} Cadets Selected
-                                </div>
-                                
-                                <div className="h-8 w-px bg-white/20" />
-
-                                <div className="flex items-center gap-2">
-                                     {/* Behavior Selector */}
-                                     <div className="relative group">
-                                         <select 
-                                            id="bulk-protocol"
-                                            onChange={(e) => {
-                                                const xpInput = document.getElementById('bulk-xp') as HTMLInputElement;
-                                                const reasonInput = document.getElementById('bulk-reason') as HTMLInputElement;
-                                                const selected = behaviors.find(b => b.id === e.target.value);
-                                                
-                                                if (selected && xpInput && reasonInput) {
-                                                    xpInput.value = selected.xp.toString();
-                                                    reasonInput.value = selected.label;
-                                                }
-                                            }}
-                                            className="bg-black border border-white/20 text-white pl-4 pr-10 py-2 rounded w-48 focus:border-cyan-500 outline-none appearance-none cursor-pointer hover:border-cyan-500/50"
-                                         >
-                                             <option value="">Select Protocol...</option>
-                                             {behaviors.map(b => (
-                                                 <option key={b.id} value={b.id}>{b.label} ({b.xp > 0 ? '+' : ''}{b.xp} XP)</option>
-                                             ))}
-                                         </select>
-                                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-500">
-                                              <Crown size={12} />
-                                          </div>
-                                     </div>
-
-                                    <input type="number" id="bulk-xp" placeholder="XP" className="bg-black border border-white/20 text-white px-4 py-2 rounded w-24 text-center font-bold focus:border-cyan-500 outline-none" />
-                                    <input type="text" id="bulk-reason" placeholder="Reason (Optional)" className="bg-black border border-white/20 text-white px-4 py-2 rounded w-64 focus:border-cyan-500 outline-none" />
-                                </div>
-
-                                <button 
-                                    onClick={async () => {
-                                        const xpInput = parseInt((document.getElementById('bulk-xp') as HTMLInputElement).value) || 0;
-                                        const reasonInput = (document.getElementById('bulk-reason') as HTMLInputElement).value || "Command Award";
-                                        
-                                        if (xpInput === 0) return;
-
-                                        // Apply to all selected using atomic transactions
-                                        const promises = Array.from(selectedIds).map(async (id) => {
-                                            const studentRef = doc(db, "users", id);
-                                            
-                                            try {
-                                                await runTransaction(db, async (transaction) => {
-                                                    const sfDoc = await transaction.get(studentRef);
-                                                    if (!sfDoc.exists()) return; // Skip if user deleted
-                                                    
-                                                    const data = sfDoc.data();
-                                                    
-                                                    // 1. Calculate Fuel Logic
-                                                    const fuelLevel = data.upgrades?.fuel || 0;
-                                                    const maxFuel = 500 + (fuelLevel * 250);
-                                                    const currentFuel = data.fuel !== undefined ? data.fuel : 500;
-                                                    
-                                                    let newFuel = currentFuel + xpInput;
-                                                    if (newFuel > maxFuel) newFuel = maxFuel;
-                                                    if (newFuel < 0) newFuel = 0;
-
-                                                    // 2. Queue User Update
-                                                    transaction.update(studentRef, {
-                                                        xp: increment(xpInput),
-                                                        fuel: newFuel,
-                                                        lastAward: {
-                                                            reason: reasonInput,
-                                                            xpGained: xpInput,
-                                                            timestamp: Date.now()
-                                                        },
-                                                        // Ensure legacy field is updated too for compatibility
-                                                        lastXpReason: reasonInput
-                                                    });
-
-                                                    // 3. Queue Planet Update (Atomic)
-                                                    const rawLocation = data.location;
-                                                    if (rawLocation && xpInput > 0) {
-                                                        const planetId = rawLocation.toLowerCase();
-                                                        const planetRef = doc(db, "planets", planetId);
-                                                        
-                                                        transaction.set(planetRef, { 
-                                                            currentXP: increment(xpInput),
-                                                            id: planetId 
-                                                        }, { merge: true });
-                                                    }
-                                                });
-                                            } catch (e) {
-                                                console.error(`Failed to update student ${id}:`, e);
-                                            }
-                                        });
-
-                                        await Promise.all(promises);
-                                        
-                                        setSelectedIds(new Set());
-                                        (document.getElementById('bulk-xp') as HTMLInputElement).value = '';
-                                        (document.getElementById('bulk-reason') as HTMLInputElement).value = '';
-                                        // (document.getElementById('bulk-protocol') as HTMLSelectElement).value = '';
-                                    }}
-                                    className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-8 rounded uppercase tracking-wider shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all"
-                                >
-                                    Award XP
-                                </button>
-
-                                <button onClick={() => setSelectedIds(new Set())} className="text-red-400 hover:text-white text-sm uppercase font-bold tracking-wider ml-4">
-                                    Clear Selection
-                                </button>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
                 </div>
             </motion.div>
         </AnimatePresence>
@@ -352,7 +208,4 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
 });
 
 ManifestOverlay.displayName = "ManifestOverlay";
-
 export default ManifestOverlay;
- 
-// Update 1
