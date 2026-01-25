@@ -96,6 +96,14 @@ const HAT_OPTIONS = [
     { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
 ];
 
+const getHatStyle = (id: string) => {
+    switch(id) {
+        case 'hat1': return "scale-[1.65] translate-y-[5%]"; // Helmet - Needs to be much larger to fit over head
+        case 'hat2': return "scale-[1.35] translate-y-[12%]"; // Fedora - Bigger and lower
+        default: return "scale-100";
+    }
+};
+
 const UserAvatar = ({ userData, className = "" }: { userData: any, className?: string }) => {
     const hue = userData?.avatar?.hue || 0;
     const skinHue = userData?.avatar?.skinHue || 0;
@@ -104,15 +112,6 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
     const hat = userData?.activeHat || userData?.avatar?.activeHat || userData?.avatar?.hat;
     const hatSrc = HAT_OPTIONS.find(h => h.id === hat)?.src;
-    
-        // Hat Styles Configuration
-    const getHatStyle = (id: string) => {
-        switch(id) {
-            case 'hat1': return "scale-[1.65] translate-y-[5%]"; // Helmet - Needs to be much larger to fit over head
-            case 'hat2': return "scale-[1.35] translate-y-[12%]"; // Fedora - Bigger and lower
-            default: return "scale-100";
-        }
-    };
 
     return (
        <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
@@ -571,11 +570,11 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
                     {/* Accessories Layer */}
                     {activeHat !== 'none' && HAT_OPTIONS.find(h => h.id === activeHat)?.src ? (
-                        <div className="absolute -top-16 left-0 right-0 z-20 flex justify-center pointer-events-none">
+                        <div className="absolute inset-0 z-20 flex justify-center pointer-events-none">
                              <img 
                                 src={getAssetPath(HAT_OPTIONS.find(h => h.id === activeHat)?.src || '')} 
                                 alt="Hat" 
-                                className="w-32 h-32 object-contain filter drop-shadow-xl" 
+                                className={`w-32 h-32 object-contain filter drop-shadow-xl absolute top-[-4rem] ${getHatStyle(activeHat)}`}
                              />
                         </div>
                     ) : null}
@@ -789,11 +788,11 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                     />
 
                     {/* Accessories Layer */}
-                    {hat && (
+                    {hat && HAT_OPTIONS.find(h => h.id === hat)?.src && (
                         <img 
-                            src={getAssetPath(`/images/avatar/hats/${hat}.png`)}
+                            src={getAssetPath(HAT_OPTIONS.find(h => h.id === hat)?.src || '')}
                             alt="Accessory" 
-                            className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-110" 
+                            className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-110 ${getHatStyle(hat)}`} 
                         />
                     )}
                     
