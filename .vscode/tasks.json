@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "abort-rebase",
+			"type": "shell",
+			"command": "git rebase --abort"
+		}
+	]
+}
