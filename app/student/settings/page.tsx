@@ -94,11 +94,19 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
+    const hat = userData?.avatar?.hat;
 
     return (
        <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
             <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
             <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
+            {hat && (
+                <img 
+                    src={getAssetPath(`/images/avatar/hats/${hat}.png`)} 
+                    alt="Accessory" 
+                    className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
+                />
+            )}
        </div>
     );
 }
@@ -459,7 +467,13 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [bgHue, setBgHue] = useState(260); // Default purple
     const [bgSat, setBgSat] = useState(50);
     const [bgLight, setBgLight] = useState(20);
+    const [hat, setHat] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+
+    const HATS = [
+        { id: 'fedora', name: 'Detective Fedora' },
+        { id: 'spacehelmet', name: 'Void Helmet' }
+    ];
 
     useEffect(() => {
         if (userData?.avatar) {
@@ -468,6 +482,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             if (userData.avatar.bgHue !== undefined) setBgHue(userData.avatar.bgHue);
             if (userData.avatar.bgSat !== undefined) setBgSat(userData.avatar.bgSat);
             if (userData.avatar.bgLight !== undefined) setBgLight(userData.avatar.bgLight);
+            if (userData.avatar.hat !== undefined) setHat(userData.avatar.hat);
         }
     }, [userData]);
 
@@ -481,7 +496,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.skinHue": skinHue,
                 "avatar.bgHue": bgHue,
                 "avatar.bgSat": bgSat,
-                "avatar.bgLight": bgLight
+                "avatar.bgLight": bgLight,
+                "avatar.hat": hat
             });
             onBack();
         } catch (e) {
@@ -521,6 +537,15 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                             filter: `hue-rotate(${hue}deg)`
                         }}
                     />
+
+                    {/* Accessories Layer */}
+                    {hat && (
+                        <img 
+                            src={getAssetPath(`/images/avatar/hats/${hat}.png`)}
+                            alt="Accessory" 
+                            className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none" 
+                        />
+                    )}
                  </div>
 
                  <div className="mt-8 text-center">
@@ -611,14 +636,37 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     </div>
                 </div>
 
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20 opacity-50 pointer-events-none">
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <Sparkles size={20} className="text-purple-400" />
                         <span className="uppercase tracking-wider">Accessories</span>
                     </h3>
-                    <p className="text-sm text-purple-400 font-mono border border-purple-500/30 p-4 rounded bg-black/30">
-                        MODULE OFFLINE. Requires Level 5 security clearance.
-                    </p>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                        <button 
+                            onClick={() => setHat(null)}
+                            className={`p-3 rounded-lg border text-xs font-bold uppercase transition-all ${
+                                !hat 
+                                ? 'bg-purple-500 border-purple-400 text-white' 
+                                : 'bg-black/40 border-purple-500/30 text-purple-400 hover:bg-purple-900/20'
+                            }`}
+                        >
+                            None
+                        </button>
+                        {HATS.map(h => (
+                             <button 
+                                key={h.id}
+                                onClick={() => setHat(h.id)}
+                                className={`p-3 rounded-lg border text-xs font-bold uppercase transition-all ${
+                                    hat === h.id
+                                    ? 'bg-purple-500 border-purple-400 text-white' 
+                                    : 'bg-black/40 border-purple-500/30 text-purple-400 hover:bg-purple-900/20'
+                                }`}
+                             >
+                                {h.name}
+                             </button>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="flex gap-4">
@@ -652,6 +700,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
+    const hat = userData?.avatar?.hat;
 
     // Rank Logic
     const currentXP = userData?.xp || 0;
@@ -701,6 +750,15 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                             filter: `hue-rotate(${hue}deg)`
                         }}
                     />
+
+                    {/* Accessories Layer */}
+                    {hat && (
+                        <img 
+                            src={getAssetPath(`/images/avatar/hats/${hat}.png`)}
+                            alt="Accessory" 
+                            className="absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-110" 
+                        />
+                    )}
                     
                     {/* Scan effect overlay */}
                     <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20" />

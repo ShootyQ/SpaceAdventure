@@ -40,6 +40,7 @@ export interface AvatarConfig {
     bgHue?: number;
     bgSat?: number;
     bgLight?: number;
+    hat?: string;
 }
 
 export interface UserData {
