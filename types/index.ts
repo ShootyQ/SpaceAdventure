@@ -70,6 +70,8 @@ export interface UserData {
     travelEnd?: number;
     lastAward?: any;
     visitedPlanets?: string[];
+    unlockedHats?: string[];
+    completedMissions?: string[];
 }
   
 export interface Planet {
