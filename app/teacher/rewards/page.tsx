@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
 import { UserData, Rank } from "@/types";
+import { UserAvatar } from '@/components/UserAvatar';
 import { Star, Plus, Trash2, Save, X, Zap, Award } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -298,7 +299,7 @@ export default function RewardsPage() {
                                                         alt="Rocket"
                                                     />
                                                     <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20 scale-75 origin-center">
-                                                        <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                                                        <UserAvatar userData={student} className="w-full h-full scale-[1.35] translate-y-1" />
                                                     </div>
                                                 </div>
                                                 <div className="text-center w-full">

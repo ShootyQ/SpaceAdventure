@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath } from "@/lib/utils";
+import { UserAvatar, HAT_OPTIONS, getHatStyle } from "@/components/UserAvatar";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -90,37 +91,7 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
 
 
-const HAT_OPTIONS = [
-    { id: 'none', name: 'No Hat', src: '' },
-    { id: 'helmet1', name: 'Helmet', src: '/images/hats/helmet1.png' },
-    { id: 'hat2', name: 'Fedora', src: '/images/hats/hat2.png' },
-];
-
-const getHatStyle = (id: string) => {
-    switch(id) {
-        case 'helmet1': return "scale-[2.5] translate-y-[45%]"; // Helmet - Drastically lower
-        case 'hat2': return "scale-[1.65] translate-y-[22%]"; // Fedora - Bigger and lower
-        default: return "scale-100";
-    }
-};
-
-const UserAvatar = ({ userData, className = "" }: { userData: any, className?: string }) => {
-    const hue = userData?.avatar?.hue || 0;
-    const skinHue = userData?.avatar?.skinHue || 0;
-    const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
-    const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
-    const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const rawHat = userData?.activeHat || userData?.avatar?.activeHat || userData?.avatar?.hat;
-    const hat = rawHat === 'hat1' ? 'helmet1' : rawHat;
-    const hatSrc = HAT_OPTIONS.find(h => h.id === hat)?.src;
-
-    return (
-       <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-            <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
-            <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
-            {hatSrc && (
-                <img 
-                    src={getAssetPath(hatSrc)} 
+// UserAvatar replaced by import from '@/components/UserAvatar' 
                     alt="Accessory" 
                     className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform ${getHatStyle(hat)}`} 
                     onError={(e) => console.error('Error loading hat:', hatSrc, getAssetPath(hatSrc))}
@@ -130,6 +101,7 @@ const UserAvatar = ({ userData, className = "" }: { userData: any, className?: s
     );
 }
 
+>>>>>>> 2d5669997eed51f359435ef8fd806bfe6b6ece96
 // --- Subviews ---
 
 function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void, ranks: Rank[] }) {
@@ -540,42 +512,16 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             <div className="border border-purple-500/30 bg-black/40 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[400px] relative">
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 to-transparent pointer-events-none" />
                  
-                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-visible flex items-center justify-center transition-colors duration-300 ring-4 ring-purple-900/30 shadow-[0_0_50px_rgba(168,85,247,0.4)]"
-                      style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
-                 >
-                    {/* Skin Tint Layer - Masked to bunny shape */}
-                    <div 
-                        className="absolute inset-0 z-0"
-                        style={{ 
-                            backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
-                            opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            maskSize: 'cover',
-                            WebkitMaskSize: 'cover'
-                        }} 
+                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-visible flex items-center justify-center transition-colors duration-300 ring-4 ring-purple-900/30 shadow-[0_0_50px_rgba(168,85,247,0.4)]">
+                    <UserAvatar
+                        hue={hue}
+                        skinHue={skinHue}
+                        bgHue={bgHue}
+                        bgSat={bgSat}
+                        bgLight={bgLight}
+                        hat={activeHat}
+                        className="w-full h-full rounded-full"
                     />
-                    
-                    {/* Avatar Image */}
-                    <img 
-                        src={getAssetPath("/images/avatar/spacebunny.png")}
-                        alt="Avatar" 
-                        className="w-full h-full object-cover relative z-10"
-                        style={{ 
-                            filter: `hue-rotate(${hue}deg)`
-                        }}
-                    />
-
-                    {/* Accessories Layer */}
-                    {activeHat !== 'none' && HAT_OPTIONS.find(h => h.id === activeHat)?.src ? (
-                        <div className="absolute inset-0 z-20 flex justify-center pointer-events-none">
-                             <img 
-                                src={getAssetPath(HAT_OPTIONS.find(h => h.id === activeHat)?.src || '')} 
-                                alt="Hat" 
-                                className={`w-32 h-32 object-contain filter drop-shadow-xl absolute top-[-4rem] ${getHatStyle(activeHat)}`}
-                             />
-                        </div>
-                    ) : null}
                  </div>
 
                  <div className="mt-8 text-center">
@@ -787,11 +733,12 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                     />
 
                     {/* Accessories Layer */}
+                    {/* Corrected Hat Rendering with Scaling */}
                     {hat && HAT_OPTIONS.find(h => h.id === hat)?.src && (
                         <img 
                             src={getAssetPath(HAT_OPTIONS.find(h => h.id === hat)?.src || '')}
                             alt="Accessory" 
-                            className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-110 ${getHatStyle(hat)}`} 
+                            className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 ${getHatStyle(hat)}`} 
                         />
                     )}
                     

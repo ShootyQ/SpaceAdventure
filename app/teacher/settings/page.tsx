@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath } from "@/lib/utils";
+import { UserAvatar, HAT_OPTIONS, getHatStyle } from "@/components/UserAvatar";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -88,20 +89,7 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
     );
 }
 
-const UserAvatar = ({ userData, className = "" }: { userData: any, className?: string }) => {
-    const hue = userData?.avatar?.hue || 0;
-    const skinHue = userData?.avatar?.skinHue || 0;
-    const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
-    const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
-    const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-
-    return (
-       <div className={`relative overflow-hidden ${className}`} style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-            <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
-            <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
-       </div>
-    );
-}
+// UserAvatar replaced by import from '@/components/UserAvatar'
 
 // --- Subviews ---
 
@@ -218,10 +206,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                  <div className="relative h-48 flex items-center justify-center">
                       {/* Avatar Bubble */}
                       <div className="absolute left-0 w-24 h-24 rounded-full border-2 border-purple-500/50 overflow-hidden bg-black shadow-[0_0_20px_rgba(168,85,247,0.3)] z-20">
-                           <div className="w-full h-full relative" style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}>
-                                <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${skinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'cover' }} />
-                                <img src={getAssetPath("/images/avatar/spacebunny.png")} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${hue}deg)` }} />
-                           </div>
+                           <UserAvatar userData={userData} className="w-full h-full" />
                       </div>
 
                       {/* Connection Line */}
@@ -496,30 +481,14 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             <div className="border border-purple-500/30 bg-black/40 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[400px] relative">
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 to-transparent pointer-events-none" />
                  
-                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center transition-colors duration-300"
-                      style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
-                 >
-                    {/* Skin Tint Layer - Masked to bunny shape */}
-                    <div 
-                        className="absolute inset-0 z-0"
-                        style={{ 
-                            backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
-                            opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            maskSize: 'cover',
-                            WebkitMaskSize: 'cover'
-                        }} 
-                    />
-                    
-                    {/* Avatar Image */}
-                    <img 
-                        src={getAssetPath("/images/avatar/spacebunny.png")}
-                        alt="Avatar" 
-                        className="w-full h-full object-cover relative z-10"
-                        style={{ 
-                            filter: `hue-rotate(${hue}deg)`
-                        }}
+                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center transition-colors duration-300">
+                    <UserAvatar 
+                        hue={hue} 
+                        skinHue={skinHue} 
+                        bgHue={bgHue} 
+                        bgSat={bgSat} 
+                        bgLight={bgLight} 
+                        className="w-full h-full rounded-full" 
                     />
                  </div>
 

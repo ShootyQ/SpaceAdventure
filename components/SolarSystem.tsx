@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS } from "@/types";
+import { UserAvatar } from "@/components/UserAvatar";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -668,7 +669,7 @@ export default function SolarSystem() {
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                            <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                                            <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
                                       </div>
                                   </div>
                               </div>
@@ -811,7 +812,7 @@ export default function SolarSystem() {
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
                                                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                                    <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-cover scale-[1.35] translate-y-1" />
+                                                    <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
                                                 </div>
                                             </div>
                                         </div>
@@ -1269,8 +1270,7 @@ export default function SolarSystem() {
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">
                                <div className="w-full h-full relative overflow-visible">
-                                    <div className="absolute inset-0" style={{ backgroundColor: `hsl(${userData.avatar?.skinHue || 0}, 70%, 50%)`, maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`, maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center', WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'center' }} />
-                                    <img src={getAssetPath("/images/avatar/spacebunny.png")} className="w-full h-full object-contain relative z-10" style={{ filter: `hue-rotate(${userData.avatar?.hue || 0}deg)` }} />
+                                    <UserAvatar userData={userData} className="w-full h-full" />
                                </div>
                          </div>
                      </motion.div>
