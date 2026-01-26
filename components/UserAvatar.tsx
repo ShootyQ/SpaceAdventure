@@ -1,17 +1,28 @@
 import { getAssetPath } from "@/lib/utils";
 
 export const HAT_OPTIONS = [
-    { id: 'none', name: 'No Hat', src: '' },
-    { id: 'hat1', name: 'Helmet', src: '/images/hats/helmet1.png' },
-    { id: 'hat2', name: 'Fedora', src: '/images/hats/hat2.png' },
+    { 
+        id: 'none', 
+        name: 'No Hat', 
+        src: '', 
+        style: '' 
+    },
+    { 
+        id: 'hat1', 
+        name: 'Helmet', 
+        src: '/images/hats/helmet1.png', 
+        style: 'scale-[2.5] translate-y-[45%]' // Helmet positioning
+    },
+    { 
+        id: 'hat2', 
+        name: 'Fedora', 
+        src: '/images/hats/hat2.png', 
+        style: 'scale-[1.65] translate-y-0' // Fedora positioning
+    },
 ];
 
 export const getHatStyle = (id: string) => {
-    switch(id) {
-        case 'hat1': return "scale-[2.5] translate-y-[45%]"; // Helmet - Drastically lower
-        case 'hat2': return "scale-[1.65] translate-y-0"; // Fedora - Higher up on ears/head
-        default: return "scale-100";
-    }
+    return HAT_OPTIONS.find(h => h.id === id)?.style || "scale-100";
 };
 
 interface UserAvatarProps {
@@ -49,7 +60,9 @@ export const UserAvatar = ({
     // Hat logic: check direct prop, then userData locations
     const finalHat = hat ?? userData?.activeHat ?? userData?.avatar?.activeHat ?? userData?.avatar?.hat ?? 'none';
     
-    const hatSrc = HAT_OPTIONS.find(h => h.id === finalHat)?.src;
+    const hatOption = HAT_OPTIONS.find(h => h.id === finalHat);
+    const hatSrc = hatOption?.src;
+    const hatStyle = hatOption?.style || "scale-100";
     
     return (
        <div className={`relative ${className}`} style={{ backgroundColor: `hsl(${finalBgHue}, ${finalBgSat}%, ${finalBgLight}%)` }}>
@@ -59,7 +72,7 @@ export const UserAvatar = ({
                 <img 
                     src={getAssetPath(hatSrc)} 
                     alt="Accessory" 
-                    className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform ${getHatStyle(finalHat)}`}
+                    className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform ${hatStyle}`}
                     onError={(e) => console.error('Error loading hat:', hatSrc, getAssetPath(hatSrc))}
                 />
             )}
