@@ -463,6 +463,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [bgSat, setBgSat] = useState(50);
     const [bgLight, setBgLight] = useState(20);
     const [activeHat, setActiveHat] = useState<string>('none');
+    const [activeCategory, setActiveCategory] = useState<'hats' | 'capes' | 'suits' | 'glasses'>('hats');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -626,32 +627,56 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         </h3>
                     </div>
                     
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                        {HAT_OPTIONS.map(h => {
-                             const isActive = activeHat === h.id;
-
-                             return (
-                                <button 
-                                    key={h.id}
-                                    onClick={() => handleSelectHat(h.id)}
-                                    className={`relative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
-                                        isActive
-                                        ? 'bg-purple-600/30 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
-                                        : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
-                                    }`}
-                                >
-                                    {h.src ? (
-                                        <img src={getAssetPath(h.src)} alt={h.name} className="w-12 h-12 object-contain" />
-                                    ) : (
-                                       <div className="text-4xl text-gray-500">??</div>
-                                    )}
-                                    <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
-                                    
-                                    {isActive && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_5px_currentColor]" />}
-                                </button>
-                             );
-                        })}
+                    {/* Category Tabs */}
+                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-none">
+                       {['hats', 'capes', 'suits', 'glasses'].map(cat => (
+                           <button 
+                               key={cat}
+                               onClick={() => setActiveCategory(cat as any)}
+                               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border whitespace-nowrap ${
+                                   activeCategory === cat 
+                                   ? 'bg-purple-600 text-white border-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.4)]' 
+                                   : 'bg-black/40 text-purple-400 border-purple-500/20 hover:bg-purple-900/20'
+                               }`}
+                           >
+                              {cat === 'hats' ? 'Hats & Helms' : cat}
+                           </button>
+                       ))}
                     </div>
+
+                    {activeCategory === 'hats' ? (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                            {HAT_OPTIONS.map(h => {
+                                 const isActive = activeHat === h.id;
+
+                                 return (
+                                    <button 
+                                        key={h.id}
+                                        onClick={() => handleSelectHat(h.id)}
+                                        className={`relative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
+                                            isActive
+                                            ? 'bg-purple-600/30 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
+                                            : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
+                                        }`}
+                                    >
+                                        {h.src ? (
+                                            <img src={getAssetPath(h.src)} alt={h.name} className="w-12 h-12 object-contain" />
+                                        ) : (
+                                           <div className="text-4xl text-gray-500">??</div>
+                                        )}
+                                        <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
+                                        
+                                        {isActive && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_5px_currentColor]" />}
+                                    </button>
+                                 );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center border-2 border-dashed border-purple-500/20 rounded-xl bg-black/20">
+                             <div className="text-purple-400 font-bold mb-2 uppercase tracking-widest text-xs">Out of Stock</div>
+                             <p className="text-[10px] text-purple-500/60 uppercase tracking-widest font-mono">Shipment Arriving Soon</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex gap-4">
