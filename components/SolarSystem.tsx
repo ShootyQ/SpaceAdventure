@@ -544,7 +544,7 @@ export default function SolarSystem() {
     if (!asteroidEvent || !asteroidEvent.active) return null;
     
     // Safety check just in case ships isn't populated yet
-    if (ships.length === 0) return { progress: 0, timeLeft: 0, totalXP: 0 };
+    if (ships.length === 0) return { progress: 0, timeLeft: 0, totalXP: 0, gained: 0 };
 
     // Calculate sum of XP from all ships
     // Optimization: In a real large app we'd aggregate server-side or in the event doc, but client-side sum works for <50 students
