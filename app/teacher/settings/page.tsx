@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import {
@@ -992,44 +992,51 @@ function FlagDesigner() {
 }
 
 function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => void }) {
-    const [duration, setDuration] = useState(60); // seconds
-    const [xpTarget, setXpTarget] = useState(500);
+    const [durationMinutes, setDurationMinutes] = useState(30);
+    const [xpTarget, setXpTarget] = useState(1000); // Increased default target
     const [reward, setReward] = useState("5 Minutes of Extra Recess");
     const [penalty, setPenalty] = useState("No Penalty");
     const [status, setStatus] = useState<'idle' | 'active' | 'success' | 'failed'>('idle');
-    const [currentProgress, setCurrentProgress] = useState(0); 
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
             if (d.exists()) {
                 const data = d.data() as AsteroidEvent;
                 setStatus(data.active ? 'active' : data.status);
-                // In a real app we'd calculate live progress here
             }
         });
         return () => unsub();
     }, []);
 
     const launchEvent = async () => {
-        // Fetch current total XP of class to set baseline ?
-        // For simplicity, we just trigger it and let SolarSystem handle logic or just start empty
-        // We'll rely on SolarSystem to effectively "Monitor" it, or we rely on just setting active.
+        setLoading(true);
         try {
-           // We need to snapshot all users to get baseline XP
-           // This logic might be heavy for a button click, but let's try
-           // Just set start time and active.
+           // Fetch current total XP of class to set baseline
+           const shipsRef = collection(db, "ships");
+           const snapshot = await getDocs(shipsRef);
+           let startTotal = 0;
+           snapshot.forEach(doc => {
+               const data = doc.data();
+               startTotal += (data.xp || 0);
+           });
+
+           // Duration in seconds
+           const durationSeconds = durationMinutes * 60;
+
            await setDoc(doc(db, "game-config", "asteroidEvent"), {
                active: true,
                startTime: Date.now(),
-               duration,
+               duration: durationSeconds,
                targetXP: xpTarget,
-               startClassXP: 0, // Placeholder, listener will fill or delta
+               startClassXP: startTotal, 
                reward,
                penalty,
                status: 'active'
            });
            setStatus('active');
         } catch(e) { console.error(e); }
+        setLoading(false);
     };
 
     const stopEvent = async () => {
@@ -1058,18 +1065,22 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                  <div className="grid grid-cols-2 gap-8">
                      <div className="space-y-4">
                          <div>
-                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">Event Duration</label>
+                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">Event Duration (Minutes)</label>
                              <div className="flex gap-2">
-                                 {[60, 120, 300].map(s => (
-                                     <button key={s} onClick={() => setDuration(s)} className={`px-4 py-2 rounded border border-orange-500/30 ${duration === s ? 'bg-orange-500 text-black' : 'text-orange-500'}`}>
-                                         {s / 60} Min
-                                     </button>
-                                 ))}
+                                 <input 
+                                    type="number" 
+                                    min="1"
+                                    max="120"
+                                    value={durationMinutes} 
+                                    onChange={e => setDurationMinutes(Math.max(1, Number(e.target.value)))} 
+                                    className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" 
+                                 />
                              </div>
                          </div>
                          <div>
-                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">XP Target (Class Total)</label>
+                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">XP Target (Incremental)</label>
                              <input type="number" value={xpTarget} onChange={e => setXpTarget(Number(e.target.value))} className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" />
+                             <p className="text-[10px] text-orange-500/60 mt-1">Amount of NEW XP the class must earn collectively.</p>
                          </div>
                      </div>
                      <div className="space-y-4">
@@ -1077,8 +1088,8 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                              <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">Victory Reward</label>
                              <input type="text" value={reward} onChange={e => setReward(e.target.value)} className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" />
                          </div>
-                         <button onClick={launchEvent} className="w-full h-full bg-orange-600 hover:bg-orange-500 text-black font-bold rounded-xl text-xl uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.4)]">
-                              ⚠️ Initiate Alert
+                         <button onClick={launchEvent} disabled={loading} className="w-full h-full bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-black font-bold rounded-xl text-xl uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all">
+                              {loading ? "Initializing Sensors..." : "⚠️ Initiate Alert"}
                          </button>
                      </div>
                  </div>
