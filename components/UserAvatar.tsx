@@ -2,14 +2,14 @@ import { getAssetPath } from "@/lib/utils";
 
 export const HAT_OPTIONS = [
     { id: 'none', name: 'No Hat', src: '' },
-    { id: 'hat1', name: 'Hat 1', src: '/images/hats/hat1.png' },
-    { id: 'hat2', name: 'Hat 2', src: '/images/hats/hat2.png' },
+    { id: 'helmet1', name: 'Helmet', src: '/images/hats/helmet1.png' },
+    { id: 'hat2', name: 'Fedora', src: '/images/hats/hat2.png' },
 ];
 
 export const getHatStyle = (id: string) => {
     switch(id) {
-        case 'hat1': return "scale-[1.65] translate-y-[5%]"; // Helmet - Needs to be much larger to fit over head
-        case 'hat2': return "scale-[1.35] translate-y-[12%]"; // Fedora - Bigger and lower
+        case 'helmet1': return "scale-[2.5] translate-y-[45%]"; // Helmet - Drastically lower
+        case 'hat2': return "scale-[1.65] translate-y-0"; // Fedora - Higher up on ears/head
         default: return "scale-100";
     }
 };
@@ -47,7 +47,8 @@ export const UserAvatar = ({
     const finalBgLight = bgLight ?? userData?.avatar?.bgLight ?? 20;
     
     // Hat logic: check direct prop, then userData locations
-    const finalHat = hat ?? userData?.activeHat ?? userData?.avatar?.activeHat ?? userData?.avatar?.hat ?? 'none';
+    const rawHat = hat ?? userData?.activeHat ?? userData?.avatar?.activeHat ?? userData?.avatar?.hat ?? 'none';
+    const finalHat = (rawHat === 'hat1') ? 'helmet1' : rawHat;
     
     const hatSrc = HAT_OPTIONS.find(h => h.id === finalHat)?.src;
     
