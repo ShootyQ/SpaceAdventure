@@ -21,10 +21,6 @@ export const HAT_OPTIONS = [
     },
 ];
 
-export const getHatStyle = (id: string) => {
-    return HAT_OPTIONS.find(h => h.id === id)?.style || "scale-100";
-};
-
 interface UserAvatarProps {
     userData?: any;
     hue?: number;

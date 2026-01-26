@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, getHatStyle } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -696,43 +696,19 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     return (
         <div className="max-w-4xl mx-auto border border-purple-500/30 bg-black/40 rounded-3xl p-8 min-h-[500px] flex flex-col items-center justify-center">
             <div className="relative mb-8 group">
-                <div className="w-48 h-48 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center relative transition-colors duration-300"
-                     style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
-                >
-                    {/* Skin Tint Layer - Masked */}
-                    <div
-                        className="absolute inset-0 z-0"
-                        style={{
-                            backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
-                            opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            maskSize: 'cover',
-                            WebkitMaskSize: 'cover'
-                        }}
+                <div className="w-48 h-48 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center relative transition-colors duration-300">
+                    <UserAvatar 
+                         bgHue={bgHue} 
+                         bgSat={bgSat} 
+                         bgLight={bgLight} 
+                         skinHue={skinHue} 
+                         hue={hue} 
+                         hat={hat}
+                         className="w-full h-full"
                     />
-
-                    <img
-                        src={getAssetPath("/images/avatar/spacebunny.png")}
-                        alt="Pilot Avatar"
-                        className="w-full h-full object-cover relative z-10 transition-transform duration-500 group-hover:scale-110"
-                        style={{
-                            filter: `hue-rotate(${hue}deg)`
-                        }}
-                    />
-
-                    {/* Accessories Layer */}
-                    {/* Corrected Hat Rendering with Scaling */}
-                    {hat && HAT_OPTIONS.find(h => h.id === hat)?.src && (
-                        <img 
-                            src={getAssetPath(HAT_OPTIONS.find(h => h.id === hat)?.src || '')}
-                            alt="Accessory" 
-                            className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform duration-500 ${getHatStyle(hat)}`} 
-                        />
-                    )}
                     
                     {/* Scan effect overlay */}
-                    <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20" />
+                    <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none" />
                 </div>
                 <button
                     onClick={() => onNavigate('avatar-config')}

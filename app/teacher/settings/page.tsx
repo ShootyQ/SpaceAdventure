@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, getHatStyle } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
