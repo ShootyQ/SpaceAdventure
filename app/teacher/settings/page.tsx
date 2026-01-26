@@ -1034,10 +1034,11 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
 
     const launchEvent = async () => {
         setLoading(true);
+        setError(null);
         try {
            // Fetch current total XP of class to set baseline
-           const shipsRef = collection(db, "ships");
-           const snapshot = await getDocs(shipsRef);
+           const usersRef = collection(db, "users");
+           const snapshot = await getDocs(usersRef);
            let startTotal = 0;
            snapshot.forEach(doc => {
                const data = doc.data();
