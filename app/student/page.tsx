@@ -1,10 +1,27 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Map, Settings, Power, Shield, Activity, Star } from 'lucide-react';
 import SolarSystem from '@/components/SolarSystem';
 import { getAssetPath } from '@/lib/utils';
+import { Rank } from '@/types';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+const DEFAULT_RANKS: Rank[] = [
+    { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
+    { id: '2', name: "Rookie Pilot", minXP: 100, image: "/images/badges/RookiePilot.png" },
+    { id: '3', name: "Star Scout", minXP: 300, image: "/images/badges/StarScout.png" },
+    { id: '4', name: "Nebula Navigator", minXP: 600, image: "/images/badges/NebulaNavigator.png" },
+    { id: '5', name: "Solar Specialist", minXP: 1000, image: "/images/badges/SolarSpecialist.png" },
+    { id: '6', name: "Comet Captain", minXP: 1500, image: "/images/badges/CometCaptain.png" },
+    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: "/images/badges/GalaxyGuardian.png" },
+    { id: '8', name: "Cosmic Commander", minXP: 3000, image: "/images/badges/CosmicCommander.png" },
+    { id: '9', name: "Void Admiral", minXP: 4000, image: "/images/badges/VoidAdmiral.png" },
+    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: "/images/badges/GrandStarAdmiral.png" }
+];
 
 // Custom Icon
 const Rocket = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
@@ -18,6 +35,19 @@ const Rocket = ({ size = 20, className = "" }: { size?: number, className?: stri
 
 export default function StudentConsole() {
   const { user, userData, logout } = useAuth();
+  const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "game-config", "ranks"), (doc) => {
+        if (doc.exists() && doc.data().list) {
+            setRanks(doc.data().list);
+        }
+    });
+    return () => unsub();
+  }, []);
+
+  const currentXP = userData?.xp || 0;
+  const currentRank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => currentXP >= r.minXP) || ranks[0];
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono bg-black">
@@ -36,8 +66,12 @@ export default function StudentConsole() {
           </div>
           <div className="flex gap-4">
              <div className="flex items-center gap-2 px-4 py-2 border border-yellow-500/30 bg-yellow-900/10 rounded-full">
-                 <Star size={16} className="text-yellow-400" />
-                 <span className="font-bold text-yellow-100">rank 1</span>
+                 {currentRank.image ? (
+                     <img src={getAssetPath(currentRank.image)} alt="Badge" className="w-6 h-6 object-contain" />
+                 ) : (
+                     <Star size={16} className="text-yellow-400" />
+                 )}
+                 <span className="font-bold text-yellow-100">{currentRank.name}</span>
              </div>
              
              <button 
@@ -57,15 +91,9 @@ export default function StudentConsole() {
           
           {/* Overlay Controls for Student */}
           <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-              <Link href="/student/missions" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2 group">
-                  <div className="bg-cyan-500/20 p-1 rounded group-hover:bg-cyan-500/40 transition-colors">
-                    <Activity size={20} className="text-cyan-300" />
-                  </div>
-                  <span className="hidden md:inline font-bold text-cyan-100">Mission Log</span>
-              </Link>
               <Link href="/student/settings" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
                   <Settings size={20} />
-                  <span className="hidden md:inline font-bold">Ship Config</span>
+                  <span className="hidden md:inline font-bold">Cockpit</span>
               </Link>
           </div>
        </main>

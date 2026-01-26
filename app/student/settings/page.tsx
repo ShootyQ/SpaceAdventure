@@ -171,6 +171,22 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                         </motion.button>
                     ))}
                     
+                    {/* Mission Log Link */}
+                    <Link href="/student/missions" className="md:col-span-2">
+                        <motion.div
+                             whileHover={{ scale: 1.01 }}
+                             className="border border-green-500/30 bg-green-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-green-900/10 transition-colors group cursor-pointer"
+                        >
+                             <div className="p-4 rounded-xl bg-black/50 border border-green-500 text-green-400">
+                                <Activity size={32} />
+                             </div>
+                             <div>
+                                <h3 className="text-xl font-bold uppercase tracking-wider text-green-400">Mission Log</h3>
+                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">View Active Assignments</p>
+                             </div>
+                        </motion.div>
+                    </Link>
+
                     {/* Placeholder for future Solar Map Link */}
                     <Link href="/student" className="md:col-span-2">
                         <motion.div

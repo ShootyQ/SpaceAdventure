@@ -840,14 +840,16 @@ export default function SolarSystem() {
                </button>
            )}
 
-           {/* Class Grid Toggle */}
-           <button 
-                onClick={() => setIsGridVisible(!isGridVisible)}
-                className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isGridVisible ? 'bg-cyan-500 text-white border-cyan-400' : 'bg-black/50 border-white/20 text-cyan-400 hover:bg-white/10'}`}
-                title="Class Manifest"
-           >
-               <LayoutGrid size={24} />
-           </button>
+           {/* Class Grid Toggle - Teacher Only */}
+           {userData?.role === 'teacher' && (
+               <button 
+                    onClick={() => setIsGridVisible(!isGridVisible)}
+                    className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isGridVisible ? 'bg-cyan-500 text-white border-cyan-400' : 'bg-black/50 border-white/20 text-cyan-400 hover:bg-white/10'}`}
+                    title="Class Manifest"
+               >
+                   <LayoutGrid size={24} />
+               </button>
+           )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
                <button onClick={() => setZoom(z => Math.min(z + 0.1, 2))} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
