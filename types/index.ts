@@ -131,4 +131,15 @@ export interface Behavior {
       label: string;
       xp: number; 
       color: string;
+}
+
+export interface AsteroidEvent {
+  active: boolean;
+  startTime: number;
+  duration: number;
+  targetXP: number;
+  startClassXP: number;
+  reward: string;
+  penalty: string;
+  status: 'active' | 'success' | 'failed' | 'idle';
 }  

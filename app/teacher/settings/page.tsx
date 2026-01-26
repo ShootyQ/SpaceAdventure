@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
 import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getAssetPath } from "@/lib/utils";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle
@@ -12,6 +13,7 @@ import {
 import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
