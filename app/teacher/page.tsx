@@ -55,6 +55,12 @@ export default function TeacherConsole() {
              <NavButton icon={<Award />} label="Rewards" href="/teacher/rewards" isActive={pathname === '/teacher/rewards'} />
              <div className="mt-auto">
                 <NavButton icon={<Settings />} label="Config" href="/teacher/settings" isActive={pathname === '/teacher/settings'} />
+                {/* Asteroid Quick Launch */}
+                <Link href="/teacher/settings?mode=asteroids" className="mt-2 flex items-center justify-center p-3 rounded-xl border border-orange-500/50 bg-orange-950/30 text-orange-400 hover:bg-orange-900/50 hover:text-orange-200 transition-all text-sm font-bold uppercase tracking-wider group">
+                    <Shield size={18} className="mr-2 group-hover:animate-pulse" />
+                    Reset Shields
+                </Link>
+
                 <button
                     onClick={logout}
                     className="w-full mt-4 flex items-center gap-3 p-4 rounded-xl border border-red-500/30 bg-red-900/10 hover:bg-red-900/30 text-red-400 transition-all hover:scale-105 group text-left"
