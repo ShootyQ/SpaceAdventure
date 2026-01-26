@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
 import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs } from "firebase/firestore";
@@ -14,6 +14,7 @@ import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useSearchParams } from 'next/navigation';
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -998,16 +999,38 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
     const [penalty, setPenalty] = useState("No Penalty");
     const [status, setStatus] = useState<'idle' | 'active' | 'success' | 'failed'>('idle');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [activeEventData, setActiveEventData] = useState<AsteroidEvent | null>(null);
+    const [timeLeft, setTimeLeft] = useState(0);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
             if (d.exists()) {
                 const data = d.data() as AsteroidEvent;
                 setStatus(data.active ? 'active' : data.status);
+                setActiveEventData(data);
+                if(data.active && data.startTime) {
+                    const end = data.startTime + (data.duration * 1000);
+                    const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+                    setTimeLeft(left);
+                }
             }
         });
         return () => unsub();
     }, []);
+
+    // Timer Interval
+    useEffect(() => {
+        if(status !== 'active') return;
+        const interval = setInterval(() => {
+             if(activeEventData?.startTime) {
+                 const end = activeEventData.startTime + (activeEventData.duration * 1000);
+                 const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+                 setTimeLeft(left);
+             }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [status, activeEventData]);
 
     const launchEvent = async () => {
         setLoading(true);
@@ -1035,12 +1058,19 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                status: 'active'
            });
            setStatus('active');
-        } catch(e) { console.error(e); }
+        } catch(e: any) { 
+            console.error(e); 
+            setError("Launch Failed: " + e.message);
+        }
         setLoading(false);
     };
 
     const stopEvent = async () => {
-        await updateDoc(doc(db, "game-config", "asteroidEvent"), { active: false, status: 'failed' }); // Force stop
+        setLoading(true);
+        try {
+            await updateDoc(doc(db, "game-config", "asteroidEvent"), { active: false, status: 'failed' }); 
+        } catch(e: any) { setError(e.message); }
+        setLoading(false);
     };
 
     return (
@@ -1055,11 +1085,27 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                  </div>
              </div>
 
+             {error && (
+                 <div className="p-4 bg-red-900/50 border border-red-500 text-red-200 rounded-xl font-bold flex items-center gap-2">
+                     <AlertTriangle size={20} />
+                     {error}
+                 </div>
+             )}
+
              {status === 'active' ? (
-                 <div className="bg-red-900/20 border border-red-500/50 p-8 rounded-xl text-center animate-pulse">
-                     <h3 className="text-3xl font-bold text-red-500 uppercase tracking-widest mb-4">Event in Progress</h3>
-                     <p className="text-white mb-6">The class is currently defending against the asteroid!</p>
-                     <button onClick={stopEvent} className="bg-red-600 px-8 py-3 rounded text-black font-bold uppercase hover:bg-red-500">Abort Event</button>
+                 <div className="bg-red-900/20 border border-red-500/50 p-8 rounded-xl text-center flex flex-col items-center">
+                     <div className="animate-pulse mb-6 p-4 bg-red-500/20 rounded-full border border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.4)]">
+                        <AlertTriangle size={64} className="text-red-500" />
+                     </div>
+                     <h3 className="text-3xl font-bold text-red-500 uppercase tracking-widest mb-2">Event in Progress</h3>
+                     <div className="text-4xl font-mono text-white mb-6 font-bold tabular-nums tracking-widest">
+                         {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                     </div>
+                     <p className="text-white/60 mb-8 max-w-md">The class is currently defending against the asteroid. Monitor student XP gains on the dashboard.</p>
+                     
+                     <button onClick={stopEvent} disabled={loading} className="bg-red-600 px-8 py-4 rounded-xl text-black font-bold uppercase tracking-wider hover:bg-red-500 transition-all hover:scale-105 shadow-lg">
+                         {loading ? "Aborting..." : "Abort Mission"}
+                     </button>
                  </div>
              ) : (
                  <div className="grid grid-cols-2 gap-8">
@@ -1114,9 +1160,25 @@ const DEFAULT_RANKS: Rank[] = [
 // --- Main Component ---
 
 export default function SettingsPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-space-950 flex items-center justify-center text-cyan-500">Loading Systems...</div>}>
+            <SettingsContent />
+        </Suspense>
+    );
+}
+
+function SettingsContent() {
     const { userData, user } = useAuth();
+    const searchParams = useSearchParams();
     const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
+
+    useEffect(() => {
+        const mode = searchParams.get('mode');
+        if (mode === 'asteroids') {
+            setView('asteroids');
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "ranks"), (d) => {
