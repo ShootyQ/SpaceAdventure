@@ -2,13 +2,13 @@ import { getAssetPath } from "@/lib/utils";
 
 export const HAT_OPTIONS = [
     { id: 'none', name: 'No Hat', src: '' },
-    { id: 'helmet1', name: 'Helmet', src: '/images/hats/helmet1.png' },
+    { id: 'hat1', name: 'Helmet', src: '/images/hats/helmet1.png' },
     { id: 'hat2', name: 'Fedora', src: '/images/hats/hat2.png' },
 ];
 
 export const getHatStyle = (id: string) => {
     switch(id) {
-        case 'helmet1': return "scale-[2.5] translate-y-[45%]"; // Helmet - Drastically lower
+        case 'hat1': return "scale-[2.5] translate-y-[45%]"; // Helmet - Drastically lower
         case 'hat2': return "scale-[1.65] translate-y-0"; // Fedora - Higher up on ears/head
         default: return "scale-100";
     }
@@ -47,8 +47,7 @@ export const UserAvatar = ({
     const finalBgLight = bgLight ?? userData?.avatar?.bgLight ?? 20;
     
     // Hat logic: check direct prop, then userData locations
-    const rawHat = hat ?? userData?.activeHat ?? userData?.avatar?.activeHat ?? userData?.avatar?.hat ?? 'none';
-    const finalHat = (rawHat === 'hat1') ? 'helmet1' : rawHat;
+    const finalHat = hat ?? userData?.activeHat ?? userData?.avatar?.activeHat ?? userData?.avatar?.hat ?? 'none';
     
     const hatSrc = HAT_OPTIONS.find(h => h.id === finalHat)?.src;
     
