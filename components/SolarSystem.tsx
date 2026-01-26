@@ -1379,28 +1379,35 @@ export default function SolarSystem() {
                     <div className="absolute inset-0 bg-red-500/10 animate-pulse" />
                     
                     {/* Header Alert */}
-                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-red-600/90 text-white px-8 py-4 rounded-xl shadow-[0_0_50px_rgba(220,38,38,0.8)] border border-red-400 backdrop-blur pointer-events-auto">
-                        <div className="flex items-center gap-4">
-                             <div className="animate-bounce text-4xl">⚠️</div>
-                             <div>
-                                 <h2 className="text-2xl font-black uppercase tracking-widest drop-shadow-md">Asteroid Impact Imminent</h2>
-                                 <div className="flex items-center gap-4 text-xs font-mono uppercase tracking-wider mt-1">
-                                     <span>Integrity: {Math.max(0, 100 - asteroidStatus.progress).toFixed(1)}%</span>
-                                     <span>Time: {Math.max(0, asteroidStatus.timeLeft).toFixed(0)}s</span>
-                                 </div>
+                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-red-600/90 text-white p-6 rounded-2xl shadow-[0_0_50px_rgba(220,38,38,0.8)] border-2 border-red-400 backdrop-blur pointer-events-auto min-w-[400px] text-center">
+                        <div className="flex flex-col items-center gap-2 mb-4">
+                             <div className="flex items-center gap-3 text-red-200">
+                                <div className="animate-bounce text-2xl">⚠️</div>
+                                <h2 className="text-lg font-bold uppercase tracking-[0.2em] drop-shadow-md">Asteroid Impact Imminent</h2>
+                                <div className="animate-bounce text-2xl">⚠️</div>
+                             </div>
+                             
+                             {/* BIG URGENT TIMER */}
+                             <div className="text-7xl font-black font-mono tracking-widest tabular-nums leading-none my-2 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                                 {Math.floor(Math.max(0, asteroidStatus.timeLeft) / 60)}:{(Math.floor(Math.max(0, asteroidStatus.timeLeft)) % 60).toString().padStart(2, '0')}
+                             </div>
+
+                             <div className="text-xs font-mono uppercase tracking-wider opacity-80">
+                                 Integrity: {Math.max(0, 100 - asteroidStatus.progress).toFixed(1)}%
                              </div>
                         </div>
+
                         {/* HP Bar */}
-                        <div className="w-full h-4 bg-black/50 rounded-full mt-2 border border-white/20 overflow-hidden">
+                        <div className="w-full h-6 bg-black/50 rounded-full border border-white/20 overflow-hidden relative">
+                           <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold z-10 uppercase tracking-widest shadow-black drop-shadow-md">
+                               Needed: {(asteroidEvent.targetXP - asteroidStatus.gained)} XP
+                           </div>
                            <motion.div 
-                              className="h-full bg-red-500" // Not green because it's enemy HP
+                              className="h-full bg-gradient-to-r from-red-600 to-red-400" 
                               initial={{ width: '100%' }}
                               animate={{ width: `${Math.max(0, 100 - asteroidStatus.progress)}%` }}
                               transition={{ duration: 0.5 }}
                            />
-                        </div>
-                        <div className="text-center text-[10px] uppercase font-bold mt-1 text-red-200">
-                             Needed: {(asteroidEvent.targetXP - asteroidStatus.gained)} XP
                         </div>
                     </div>
 
