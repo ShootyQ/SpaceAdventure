@@ -1,5 +1,18 @@
 // Shared Type Definitions
 
+export interface Planet {
+    id: string;
+    name: string;
+    color: string;
+    size: string;
+    pixelSize: number;
+    orbitSize: number;
+    orbitDuration: number;
+    startAngle: number;
+    description: string;
+    xpRequired: number;
+}
+
 export const PLANETS: Planet[] = [
     { id: "sun", name: "The Sun", color: "bg-yellow-500 shadow-[0_0_100px_#eab308]", size: "w-32 h-32", pixelSize: 128, orbitSize: 0, orbitDuration: 0, startAngle: 0, description: "The burning core of our system.", xpRequired: 0 },
     { id: "mercury", name: "Mercury", color: "bg-gray-400", size: "w-6 h-6", pixelSize: 24, orbitSize: 300, orbitDuration: 3888, startAngle: 45, description: "Hot, fast, and rocky.", xpRequired: 100 },

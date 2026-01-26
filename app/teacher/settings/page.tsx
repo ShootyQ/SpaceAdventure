@@ -7,12 +7,10 @@ import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
-    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity
+    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle
 } from "lucide-react";
-
-import { getAssetPath } from "@/lib/utils";
 import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
-import Link from "next/link";
+import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Custom Icon for Ship
@@ -137,6 +135,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                     {MENU_ITEMS.map((item, index) => (
                         <motion.button
                             key={item.id}
+                            /* ...existing code... */
                             onClick={() => onNavigate(item.id)}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
@@ -170,6 +169,22 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                             <div className={`absolute top-0 right-0 w-8 h-8 ${item.color.replace('text', 'bg').replace('400', '500')}/10 rounded-bl-3xl`} />
                         </motion.button>
                     ))}
+
+                    {/* Asteroid Launcher */}
+                     <Link href="/teacher/settings?mode=asteroids" onClick={(e) => { e.preventDefault(); onNavigate('asteroids'); }}>
+                        <motion.div
+                             whileHover={{ scale: 1.01 }}
+                             className="border border-orange-500/30 bg-orange-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-orange-900/10 transition-colors group cursor-pointer h-full"
+                        >
+                             <div className="p-4 rounded-xl bg-black/50 border border-orange-500 text-orange-400">
+                                <AlertTriangle size={32} className="animate-pulse" />
+                             </div>
+                             <div>
+                                <h3 className="text-xl font-bold uppercase tracking-wider text-orange-400">Asteroid Defense</h3>
+                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Global Event</p>
+                             </div>
+                        </motion.div>
+                    </Link>
                     
                     {/* Placeholder for future Solar Map Link */}
                     <Link href="/teacher/map" className="md:col-span-2">
@@ -974,6 +989,102 @@ function FlagDesigner() {
     );
 }
 
+function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const [duration, setDuration] = useState(60); // seconds
+    const [xpTarget, setXpTarget] = useState(500);
+    const [reward, setReward] = useState("5 Minutes of Extra Recess");
+    const [penalty, setPenalty] = useState("No Penalty");
+    const [status, setStatus] = useState<'idle' | 'active' | 'success' | 'failed'>('idle');
+    const [currentProgress, setCurrentProgress] = useState(0); 
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
+            if (d.exists()) {
+                const data = d.data() as AsteroidEvent;
+                setStatus(data.active ? 'active' : data.status);
+                // In a real app we'd calculate live progress here
+            }
+        });
+        return () => unsub();
+    }, []);
+
+    const launchEvent = async () => {
+        // Fetch current total XP of class to set baseline ?
+        // For simplicity, we just trigger it and let SolarSystem handle logic or just start empty
+        // We'll rely on SolarSystem to effectively "Monitor" it, or we rely on just setting active.
+        try {
+           // We need to snapshot all users to get baseline XP
+           // This logic might be heavy for a button click, but let's try
+           // Just set start time and active.
+           await setDoc(doc(db, "game-config", "asteroidEvent"), {
+               active: true,
+               startTime: Date.now(),
+               duration,
+               targetXP: xpTarget,
+               startClassXP: 0, // Placeholder, listener will fill or delta
+               reward,
+               penalty,
+               status: 'active'
+           });
+           setStatus('active');
+        } catch(e) { console.error(e); }
+    };
+
+    const stopEvent = async () => {
+        await updateDoc(doc(db, "game-config", "asteroidEvent"), { active: false, status: 'failed' }); // Force stop
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto border border-orange-500/30 bg-black/40 rounded-3xl p-8 flex flex-col gap-6">
+             <div className="flex items-center gap-4 border-b border-orange-500/30 pb-4">
+                 <div className="p-3 bg-orange-500/20 rounded-xl border border-orange-500 text-orange-400">
+                     <AlertTriangle size={32} />
+                 </div>
+                 <div>
+                     <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Planetary Defense</h2>
+                     <p className="text-orange-400 text-xs font-mono uppercase">Emergency Override System</p>
+                 </div>
+             </div>
+
+             {status === 'active' ? (
+                 <div className="bg-red-900/20 border border-red-500/50 p-8 rounded-xl text-center animate-pulse">
+                     <h3 className="text-3xl font-bold text-red-500 uppercase tracking-widest mb-4">Event in Progress</h3>
+                     <p className="text-white mb-6">The class is currently defending against the asteroid!</p>
+                     <button onClick={stopEvent} className="bg-red-600 px-8 py-3 rounded text-black font-bold uppercase hover:bg-red-500">Abort Event</button>
+                 </div>
+             ) : (
+                 <div className="grid grid-cols-2 gap-8">
+                     <div className="space-y-4">
+                         <div>
+                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">Event Duration</label>
+                             <div className="flex gap-2">
+                                 {[60, 120, 300].map(s => (
+                                     <button key={s} onClick={() => setDuration(s)} className={`px-4 py-2 rounded border border-orange-500/30 ${duration === s ? 'bg-orange-500 text-black' : 'text-orange-500'}`}>
+                                         {s / 60} Min
+                                     </button>
+                                 ))}
+                             </div>
+                         </div>
+                         <div>
+                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">XP Target (Class Total)</label>
+                             <input type="number" value={xpTarget} onChange={e => setXpTarget(Number(e.target.value))} className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" />
+                         </div>
+                     </div>
+                     <div className="space-y-4">
+                         <div>
+                             <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">Victory Reward</label>
+                             <input type="text" value={reward} onChange={e => setReward(e.target.value)} className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" />
+                         </div>
+                         <button onClick={launchEvent} className="w-full h-full bg-orange-600 hover:bg-orange-500 text-black font-bold rounded-xl text-xl uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.4)]">
+                              ⚠️ Initiate Alert
+                         </button>
+                     </div>
+                 </div>
+             )}
+        </div>
+    );
+}
+
 const DEFAULT_RANKS: Rank[] = [
     { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
     { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
@@ -991,7 +1102,7 @@ const DEFAULT_RANKS: Rank[] = [
 
 export default function SettingsPage() {
     const { userData, user } = useAuth();
-    const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag'>('cockpit');
+    const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
 
     useEffect(() => {
@@ -1011,6 +1122,7 @@ export default function SettingsPage() {
             case 'avatar': return 'Pilot Profile';
             case 'avatar-config': return 'DNA Sequencer';
             case 'flag': return 'Flag Fabricator';
+            case 'asteroids': return 'Defense Systems';
             default: return 'Main Cockpit';
         }
     };
@@ -1060,6 +1172,7 @@ export default function SettingsPage() {
                         {view === 'avatar' && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
                         {view === 'avatar-config' && <AvatarConfigView onBack={() => setView('avatar')} />}
                         {view === 'flag' && <FlagDesigner />}
+                        {view === 'asteroids' && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
                     </motion.div>
                 </AnimatePresence>
 

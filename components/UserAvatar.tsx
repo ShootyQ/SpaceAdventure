@@ -35,7 +35,7 @@ export const HAT_OPTIONS = [
         id: 'hat5', 
         name: 'Dungan Doves Cap', 
         src: '/images/hats/dungandoves.png', 
-        style: 'scale-[1.1] -translate-y-[40%]' 
+        style: 'scale-[0.9] -translate-y-[40%]' 
     },
 ];
 

@@ -8,7 +8,7 @@ import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, o
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
-import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS } from "@/types";
+import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
 
 // Note: Removed local interface definitions in favor of @/types
@@ -99,6 +99,17 @@ export default function SolarSystem() {
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
+  const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
+
+  useEffect(() => {
+    // Asteroid Event Listener
+    const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
+        if (d.exists()) {
+             setAsteroidEvent(d.data() as AsteroidEvent);
+        }
+    });
+    return () => unsub();
+  }, []);
 
   const [isSoundOn, setIsSoundOn] = useState(true); // Default on for Map View
   const toggleSound = () => {
@@ -527,6 +538,37 @@ export default function SolarSystem() {
         recordVisit();
     }
   }, [isLanded, selectedPlanet, userData]);
+
+  // Asteroid Logic Calcs
+  const getAsteroidStatus = () => {
+    if (!asteroidEvent || !asteroidEvent.active) return null;
+    
+    // Safety check just in case ships isn't populated yet
+    if (ships.length === 0) return { progress: 0, timeLeft: 0, totalXP: 0 };
+
+    // Calculate sum of XP from all ships
+    // Optimization: In a real large app we'd aggregate server-side or in the event doc, but client-side sum works for <50 students
+    const currentClassXP = ships.reduce((sum, ship) => sum + (ship.xp || 0), 0);
+    
+    // Progress calculation
+    // We assume startClassXP was captured when event started.
+    // Progress is (CurrentTotal - StartTotal) / Target
+    const gained = Math.max(0, currentClassXP - (asteroidEvent.startClassXP || 0));
+    const progress = Math.min(100, (gained / (asteroidEvent.targetXP || 1)) * 100);
+
+    // Time Calc
+    const elapsed = (Date.now() - asteroidEvent.startTime) / 1000;
+    const timeLeft = Math.max(0, asteroidEvent.duration - elapsed);
+    
+    return { progress, timeLeft, gained, totalXP: currentClassXP };
+  };
+
+  const asteroidStatus = getAsteroidStatus();
+
+  // If status changes to success/fail locally based on calc, we assume teacher or cloud function updates doc. 
+  // But for visuals we can use local derivation
+  const isAsteroidDestroyed = asteroidStatus && asteroidStatus.gained >= asteroidEvent!.targetXP;
+  const isAsteroidTimeOut = asteroidStatus && asteroidStatus.timeLeft <= 0 && !isAsteroidDestroyed;
 
   // Handle mouse wheel zoom
   const handleWheel = (e: React.WheelEvent) => {
@@ -1327,6 +1369,104 @@ export default function SolarSystem() {
 
             </motion.div>
          )}
+       </AnimatePresence>
+
+       {/* ASTEROID OVERLAY */}
+       <AnimatePresence>
+            {asteroidStatus && asteroidEvent && asteroidEvent.active && (
+                <div className="absolute inset-0 z-[150] pointer-events-none overflow-hidden">
+                    {/* Warning Flash */}
+                    <div className="absolute inset-0 bg-red-500/10 animate-pulse" />
+                    
+                    {/* Header Alert */}
+                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-red-600/90 text-white px-8 py-4 rounded-xl shadow-[0_0_50px_rgba(220,38,38,0.8)] border border-red-400 backdrop-blur pointer-events-auto">
+                        <div className="flex items-center gap-4">
+                             <div className="animate-bounce text-4xl">⚠️</div>
+                             <div>
+                                 <h2 className="text-2xl font-black uppercase tracking-widest drop-shadow-md">Asteroid Impact Imminent</h2>
+                                 <div className="flex items-center gap-4 text-xs font-mono uppercase tracking-wider mt-1">
+                                     <span>Integrity: {Math.max(0, 100 - asteroidStatus.progress).toFixed(1)}%</span>
+                                     <span>Time: {Math.max(0, asteroidStatus.timeLeft).toFixed(0)}s</span>
+                                 </div>
+                             </div>
+                        </div>
+                        {/* HP Bar */}
+                        <div className="w-full h-4 bg-black/50 rounded-full mt-2 border border-white/20 overflow-hidden">
+                           <motion.div 
+                              className="h-full bg-red-500" // Not green because it's enemy HP
+                              initial={{ width: '100%' }}
+                              animate={{ width: `${Math.max(0, 100 - asteroidStatus.progress)}%` }}
+                              transition={{ duration: 0.5 }}
+                           />
+                        </div>
+                        <div className="text-center text-[10px] uppercase font-bold mt-1 text-red-200">
+                             Needed: {(asteroidEvent.targetXP - asteroidStatus.gained)} XP
+                        </div>
+                    </div>
+
+                    {/* The Asteroid Itself - Moving across screen */}
+                    {!isAsteroidDestroyed && (
+                        <motion.div
+                            initial={{ x: '-20vw', y: '20vh', rotate: 0 }}
+                            animate={{ x: '120vw', y: '60vh', rotate: 360 }}
+                            transition={{ duration: asteroidEvent.duration, ease: "linear" }}
+                            className="absolute top-0 left-0"
+                        >
+                            <div className="w-64 h-64 relative">
+                                {/* Rock shape via CSS since we might not have png yet */}
+                                <div className="w-full h-full bg-gray-700 rounded-full blur-sm" style={{ clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)' }}>
+                                    <div className="absolute inset-2 bg-gray-600 rounded-full" style={{ clipPath: 'polygon(92% 0, 100% 25%, 100% 100%, 8% 100%, 0% 25%, 0 0)' }}></div>
+                                    <div className="absolute top-1/4 left-1/4 w-8 h-8 bg-black/20 rounded-full blur-sm"></div>
+                                    <div className="absolute bottom-1/3 right-1/4 w-12 h-12 bg-black/30 rounded-full blur-sm"></div>
+                                </div>
+                                {/* Fire trail */}
+                                <div className="absolute top-1/2 left-0 -translate-x-full -translate-y-1/2 w-96 h-32 bg-gradient-to-l from-orange-500/50 to-transparent blur-xl" />
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Victory / Defeat Overlays */}
+                    {isAsteroidDestroyed && (
+                         <motion.div 
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-[200]"
+                        >
+                             <div className="text-center">
+                                 <h1 className="text-8xl font-black text-green-400 uppercase tracking-tighter drop-shadow-[0_0_50px_rgba(74,222,128,0.8)]">
+                                     Victory!
+                                 </h1>
+                                 <p className="text-2xl text-white font-mono mt-4 uppercase tracking-widest">Asteroid Destroyed</p>
+                                 <div className="mt-8 p-6 bg-green-500/20 rounded-2xl border border-green-500/50 inline-block">
+                                     <div className="text-xs text-green-300 uppercase font-bold mb-2">Reward Unlocked</div>
+                                     <div className="text-3xl font-bold text-white">{asteroidEvent.reward}</div>
+                                 </div>
+                             </div>
+                         </motion.div>
+                    )}
+                    
+                    {isAsteroidTimeOut && (
+                         <motion.div 
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-[200]"
+                        >
+                             <div className="text-center">
+                                 <h1 className="text-8xl font-black text-red-600 uppercase tracking-tighter drop-shadow-[0_0_50px_rgba(220,38,38,0.8)]">
+                                     Impact!
+                                 </h1>
+                                 <p className="text-2xl text-white font-mono mt-4 uppercase tracking-widest">Shields Failed</p>
+                                 {asteroidEvent.penalty && (
+                                     <div className="mt-8 p-6 bg-red-500/20 rounded-2xl border border-red-500/50 inline-block">
+                                         <div className="text-xs text-red-300 uppercase font-bold mb-2">Systems Critical</div>
+                                         <div className="text-3xl font-bold text-white">{asteroidEvent.penalty}</div>
+                                     </div>
+                                 )}
+                             </div>
+                         </motion.div>
+                    )}
+                </div>
+            )}
        </AnimatePresence>
 
     </div>
