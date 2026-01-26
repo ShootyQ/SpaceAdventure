@@ -17,7 +17,7 @@ export const HAT_OPTIONS = [
         id: 'hat2', 
         name: 'Fedora', 
         src: '/images/hats/hat2.png', 
-        style: 'scale-[1.1] -translate-y-[35%]' // Fedora positioning
+        style: 'scale-[0.85] -translate-y-[45%]' // Fedora positioning
     },
 ];
 
