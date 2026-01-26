@@ -91,17 +91,6 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
 
 
-// UserAvatar replaced by import from '@/components/UserAvatar' 
-                    alt="Accessory" 
-                    className={`absolute inset-0 z-20 w-full h-full object-cover pointer-events-none transition-transform ${getHatStyle(hat)}`} 
-                    onError={(e) => console.error('Error loading hat:', hatSrc, getAssetPath(hatSrc))}
-                />
-            )}
-       </div>
-    );
-}
-
->>>>>>> 2d5669997eed51f359435ef8fd806bfe6b6ece96
 // --- Subviews ---
 
 function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void, ranks: Rank[] }) {
