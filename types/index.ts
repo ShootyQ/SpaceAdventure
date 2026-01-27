@@ -82,6 +82,7 @@ export interface UserData {
     travelStart?: number;
     travelEnd?: number;
     lastAward?: any;
+    lastXpReason?: string;
     visitedPlanets?: string[];
     unlockedHats?: string[];
     completedMissions?: string[];
