@@ -84,6 +84,7 @@ export default function SolarSystem() {
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
   const [zoom, setZoom] = useState(0.25); // Start zoomed out to see more
+  const [isAutoFit, setIsAutoFit] = useState(true); // Auto-scale to screen
   const [isLanded, setIsLanded] = useState(false); // New Landing State
   const [isOrbiting, setIsOrbiting] = useState(true); // Default active
   const [mounted, setMounted] = useState(false);
@@ -170,6 +171,38 @@ export default function SolarSystem() {
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+  // Auto-fit Logic
+  useEffect(() => {
+    if (!isAutoFit) return;
+
+    const handleResize = () => {
+        // Find largest orbit (Neptune usually)
+        const maxOrbit = PLANETS.reduce((max, p) => Math.max(max, p.orbitSize), 0) || 4400;
+        const padding = 200; // Extra padding for UI and planet size
+        const requiredSize = maxOrbit + padding;
+        
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        
+        // Calculate scale to fit
+        const scaleX = w / requiredSize;
+        const scaleY = h / requiredSize;
+        
+        // Use the smaller scale to ensure it fits both dimensions
+        let newZoom = Math.min(scaleX, scaleY);
+        
+        // Clamp bounds
+        newZoom = Math.min(Math.max(newZoom, 0.05), 1.5);
+        
+        setZoom(newZoom);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isAutoFit]);
+
 
   useEffect(() => {
     setMounted(true);
@@ -572,12 +605,14 @@ export default function SolarSystem() {
 
   // Handle mouse wheel zoom
   const handleWheel = (e: React.WheelEvent) => {
+    setIsAutoFit(false);
     const newZoom = zoom - e.deltaY * 0.001;
     setZoom(Math.min(Math.max(0.05, newZoom), 2));
   };
 
   // Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+      setIsAutoFit(false);
       setIsDragging(true);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
   };
@@ -611,7 +646,7 @@ export default function SolarSystem() {
 
   return (
     <div 
-        className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center min-h-[800px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -894,10 +929,10 @@ export default function SolarSystem() {
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
-               <button onClick={() => setZoom(z => Math.min(z + 0.1, 2))} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
-               <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.05))} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 2)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, 0.05)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
                <div className="w-full h-px bg-white/20 my-1" />
-               <button onClick={() => { setPan({x:0, y:0}); setZoom(0.25); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
+               <button onClick={() => { setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
            </div>
            
            <button 

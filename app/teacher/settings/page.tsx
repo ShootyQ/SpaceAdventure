@@ -11,6 +11,7 @@ import {
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle
 } from "lucide-react";
 import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
+import RankEditor from "@/components/RankEditor";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -94,7 +95,7 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
 // --- Subviews ---
 
-function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void, ranks: Rank[] }) {
+function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (view: string) => void, ranks: Rank[], onOpenRankEditor: () => void }) {
     const { userData } = useAuth();
     const MENU_ITEMS = [
         { id: 'ship', title: 'Hangar Bay', icon: Rocket, color: 'text-cyan-400', border: 'border-cyan-500', bg: 'bg-cyan-950/30' },
@@ -188,6 +189,23 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                              </div>
                         </motion.div>
                     </Link>
+
+                    {/* Rank Editor (Teacher Only) */}
+                    {(userData?.role === 'teacher' || userData?.email === 'andrewpcarlson85@gmail.com') && (
+                         <motion.button
+                             onClick={onOpenRankEditor}
+                             whileHover={{ scale: 1.01 }}
+                             className="border border-purple-500/30 bg-purple-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-purple-900/10 transition-colors group cursor-pointer text-left w-full"
+                        >
+                             <div className="p-4 rounded-xl bg-black/50 border border-purple-500 text-purple-400">
+                                <Shield size={32} />
+                             </div>
+                             <div>
+                                <h3 className="text-xl font-bold uppercase tracking-wider text-purple-400">Rank Protocols</h3>
+                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Edit Clearance Levels</p>
+                             </div>
+                        </motion.button>
+                    )}
                     
                     {/* Placeholder for future Solar Map Link */}
                     <Link href="/teacher/map" className="md:col-span-2">
@@ -1173,6 +1191,7 @@ function SettingsContent() {
     const searchParams = useSearchParams();
     const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
+    const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
     useEffect(() => {
         const mode = searchParams.get('mode');
@@ -1242,7 +1261,7 @@ function SettingsContent() {
                         exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
                         transition={{ duration: 0.3 }}
                     >
-                        {view === 'cockpit' && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
+                        {view === 'cockpit' && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
                         {view === 'ship' && <ShipSettings userData={userData} user={user} />}
                         {view === 'inventory' && <InventoryView />}
                         {view === 'avatar' && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
@@ -1251,6 +1270,8 @@ function SettingsContent() {
                         {view === 'asteroids' && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
                     </motion.div>
                 </AnimatePresence>
+                
+                <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />
 
             </div>
         </div>

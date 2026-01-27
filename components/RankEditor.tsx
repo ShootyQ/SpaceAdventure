@@ -99,6 +99,22 @@ export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClo
                                            }}
                                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white/90 text-sm focus:border-cyan-500 focus:outline-none"
                                        />
+                                       {DEFAULT_RANKS.find(r => r.id === rank.id) && rank.name !== DEFAULT_RANKS.find(r => r.id === rank.id)?.name && (
+                                           <div 
+                                                className="text-[10px] text-cyan-600/70 mt-1 italic cursor-pointer hover:text-cyan-400 decoration-dotted underline"
+                                                onClick={() => {
+                                                    const newRanks = [...draftRanks];
+                                                    const index = newRanks.findIndex(r => r.id === rank.id);
+                                                    const def = DEFAULT_RANKS.find(r => r.id === rank.id);
+                                                    if(def) {
+                                                        newRanks[index] = { ...newRanks[index], name: def.name };
+                                                        setDraftRanks(newRanks);
+                                                    }
+                                                }}
+                                           >
+                                               (Reset to Default: {DEFAULT_RANKS.find(r => r.id === rank.id)?.name})
+                                           </div>
+                                       )}
                                    </div>
                                    <div>
                                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1 block">Min XP Required</label>
