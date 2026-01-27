@@ -1153,7 +1153,7 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                              <label className="text-orange-400 text-xs font-bold uppercase mb-2 block">Victory Reward</label>
                              <input type="text" value={reward} onChange={e => setReward(e.target.value)} className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" />
                          </div>
-                         <button onClick={launchEvent} disabled={loading} className="w-full h-full bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-black font-bold rounded-xl text-xl uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all">
+                         <button onClick={launchEvent} disabled={loading} className="w-full py-4 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-black font-bold rounded-xl text-xl uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all">
                               {loading ? "Initializing Sensors..." : "⚠️ Initiate Alert"}
                          </button>
                      </div>

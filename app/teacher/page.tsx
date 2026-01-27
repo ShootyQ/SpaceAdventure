@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import RankEditor from '@/components/RankEditor';
+import CommsFeed from '@/components/CommsFeed';
 import { getAssetPath } from '@/lib/utils';
 
 export default function TeacherConsole() {
@@ -88,19 +89,8 @@ export default function TeacherConsole() {
                     <p className="text-cyan-300/80">Classroom systems functional. Warp drive ready.</p>
                 </div>
 
-                {/* Comms Feed (Moved from Right) */}
-                <div className="flex-1 flex flex-col border border-cyan-500/20 bg-black/40 rounded-xl p-6 overflow-hidden">
-                    <div className="flex items-center gap-2 mb-4 text-cyan-300 border-b border-cyan-500/20 pb-4">
-                        <Radio size={20} />
-                        <span className="text-sm font-bold tracking-widest uppercase">Comms Feed</span>
-                    </div>
-                    <div className="space-y-4 text-sm text-cyan-200/80 font-mono overflow-y-auto pr-2 custom-scrollbar">
-                        <p className="flex gap-3"><span className="text-cyan-500 opacity-50">10:42</span> <span>{'>'} Student A reached Rank 3</span></p>
-                        <p className="flex gap-3"><span className="text-cyan-500 opacity-50">10:35</span> <span>{'>'} Mission "Homework" issued</span></p>
-                        <p className="flex gap-3"><span className="text-cyan-500 opacity-50">09:15</span> <span>{'>'} System check complete...</span></p>
-                        <p className="flex gap-3 animate-pulse"><span className="text-cyan-500 opacity-50">NOW</span> <span>{'>'} Awaiting input_</span></p>
-                    </div>
-                </div>
+                {/* Comms Feed (Real-time) */}
+                <CommsFeed />
              </div>
           </div>
 
