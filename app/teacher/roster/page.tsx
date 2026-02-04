@@ -136,7 +136,26 @@ export default function RosterPage() {
           xp: student.xp || 0,
           fuel: student.fuel || 500,
           location: student.location || 'earth',
-          status: student.status
+          status: student.status,
+          avatar: student.avatar
+      });
+  };
+
+  const handleCycleAvatar = () => {
+      if (!editForm.avatar) return;
+      const currentId = editForm.avatar.avatarId || 'bunny';
+      const currentIndex = AVATAR_PRESETS.findIndex(p => p.config.avatarId === currentId);
+      // Actually AVATAR_PRESETS are "Identity Presets" which include colors. 
+      // If we just cycle through presets, we might lose custom colors if the student customized them?
+      // But for the roster, picking a preset is a safe "Reset/assignment". 
+      // Let's cycle through presets.
+      
+      const nextIndex = (currentIndex + 1) % AVATAR_PRESETS.length;
+      const nextPreset = AVATAR_PRESETS[nextIndex];
+      
+      setEditForm({
+          ...editForm,
+          avatar: nextPreset.config
       });
   };
 
@@ -364,7 +383,16 @@ export default function RosterPage() {
                             {/* Editing Overlay */}
                             {editingId === student.uid ? (
                                 <>
-                                    <div className="col-span-3">
+                                    <div className="col-span-3 flex items-center gap-2">
+                                        {/* Avatar Cycler */}
+                                        <button 
+                                            onClick={handleCycleAvatar}
+                                            className="w-10 h-10 rounded-full border-2 border-cyan-500 overflow-hidden relative shrink-0 hover:scale-110 transition-transform bg-cyan-900/30"
+                                            title="Click to change identity"
+                                        >
+                                            <UserAvatar userData={{ avatar: editForm.avatar }} className="w-full h-full" />
+                                        </button>
+
                                         <input 
                                             value={editForm.displayName || ""} 
                                             onChange={e => setEditForm({...editForm, displayName: e.target.value})}
@@ -425,8 +453,8 @@ export default function RosterPage() {
                                 <>
                                     {/* Display Mode */}
                                     <div className="col-span-12 md:col-span-3 flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${student.status === 'pending_approval' ? 'bg-yellow-900 text-yellow-500' : 'bg-cyan-900/30 text-cyan-400'}`}>
-                                            <UserIcon size={20} />
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden border ${student.status === 'pending_approval' ? 'bg-yellow-900 border-yellow-500' : 'bg-cyan-900/30 border-cyan-500/30'}`}>
+                                            <UserAvatar userData={student} className="w-full h-full" />
                                         </div>
                                         <div>
                                             <div className="font-bold text-white text-lg md:text-base">{student.displayName}</div>

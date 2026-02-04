@@ -7,6 +7,7 @@ import { Ship, Rank, Behavior } from "@/types";
 import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
+import { UserAvatar } from "./UserAvatar";
 
 // Reuse TinyFlag - We should probably export this too, but for now I'll duplicate quickly or check if I can export it from SolarSystem (not easy).
 // I will define it locally here or better yet make a shared component later. For now, local is fine to avoid circular deps.
@@ -101,46 +102,11 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                     alt="Ship"
                     className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] relative z-20"
                 />
-                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-visible flex items-center justify-center bg-cyan-900/20">
-                    <div className="relative w-full h-full overflow-hidden rounded-full">
-                         <div 
-                            className="absolute inset-0 z-0"
-                            style={{ 
-                                backgroundColor: `hsl(${student?.avatar?.skinHue || 0}, 70%, 50%)`,
-                                opacity: (student?.avatar?.skinHue || 0) === 0 ? 0 : 0.6,
-                                maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                                WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                                maskSize: 'cover',
-                                WebkitMaskSize: 'cover'
-                            }} 
-                        />
-                        <img 
-                            src={getAssetPath("/images/avatar/spacebunny.png")} 
-                            className="w-full h-full object-cover scale-[1.35] translate-y-1 relative z-10"
-                            style={{ filter: `hue-rotate(${student?.avatar?.hue || 0}deg)` }} 
-                        />
-                    </div>
-                    {student?.avatar?.activeHat && student.avatar.activeHat !== 'none' && (
-                         <div className="absolute -top-[50%] left-0 right-0 z-40 flex justify-center pointer-events-none">
-                             {(() => {
-                                const h = student.avatar.activeHat;
-                                let src = '';
-                                if(h === 'hat1' || h === 'helmet1') src = '/images/hats/helmet1.png';
-                                else if(h === 'hat2') src = '/images/hats/hat2.png';
-                                
-                                // Fallback for legacy ID (optional)
-                                else return null; 
-                                
-                                return (
-                                    <img 
-                                        src={getAssetPath(src)} 
-                                        alt="Hat"
-                                        className="w-8 h-8 object-contain filter drop-shadow-md"
-                                    />
-                                );
-                             })()}
-                         </div>
-                    )}
+                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
+                    <UserAvatar 
+                        userData={student as any} 
+                        className="w-full h-full scale-[1.35] translate-y-1" 
+                    />
                 </div>
                 {student.flag && (
                     <div className="absolute -top-2 -left-2 z-40 transform -rotate-12 scale-110 drop-shadow-md">
