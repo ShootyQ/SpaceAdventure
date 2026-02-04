@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -456,40 +456,29 @@ function InventoryView() {
 
 
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
-    const { userData, user } = useAuth();
-    const [hue, setHue] = useState(0);
-    const [skinHue, setSkinHue] = useState(0);
-    const [bgHue, setBgHue] = useState(260); // Default purple
-    const [bgSat, setBgSat] = useState(50);
-    const [bgLight, setBgLight] = useState(20);
-    const [activeHat, setActiveHat] = useState<string>('none');
-    const [activeCategory, setActiveCategory] = useState<'hats' | 'capes' | 'suits' | 'glasses'>('hats');
+    const { user, userData } = useAuth();
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (userData?.avatar) {
-            if (userData.avatar.hue !== undefined) setHue(userData.avatar.hue);
-            if (userData.avatar.skinHue !== undefined) setSkinHue(userData.avatar.skinHue);
-            if (userData.avatar.bgHue !== undefined) setBgHue(userData.avatar.bgHue);
-            if (userData.avatar.bgSat !== undefined) setBgSat(userData.avatar.bgSat);
-            if (userData.avatar.bgLight !== undefined) setBgLight(userData.avatar.bgLight);
-            if (userData.avatar.activeHat !== undefined) setActiveHat(userData.avatar.activeHat === 'hat1' ? 'helmet1' : userData.avatar.activeHat);
-        }
-    }, [userData]);
+    // State for visual properties
+    const [hue, setHue] = useState(userData?.avatar?.hue || 0);
+    const [skinHue, setSkinHue] = useState(userData?.avatar?.skinHue || 0);
+    const [bgHue, setBgHue] = useState(userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 240);
+    const [bgSat, setBgSat] = useState(userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50);
+    const [bgLight, setBgLight] = useState(userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20);
+    const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
+    const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
 
-    const handleSelectHat = async (hatId: string) => {
-        if (!user) return;
-        setLoading(true);
-        setActiveHat(hatId);
-        try {
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, {
-                "avatar.activeHat": hatId
-            });
-        } catch (e) {
-            console.error("Error setting hat", e);
+    const handleSelectPreset = (presetId: string) => {
+        const preset = AVATAR_PRESETS.find(p => p.id === presetId);
+        if (preset) {
+            setHue(preset.config.hue);
+            setSkinHue(preset.config.skinHue);
+            setBgHue(preset.config.bgHue);
+            setBgSat(preset.config.bgSat);
+            setBgLight(preset.config.bgLight);
+            setActiveHat(preset.config.activeHat);
+            setAvatarId(preset.config.avatarId);
         }
-        setLoading(false);
     };
 
     const handleSave = async () => {
@@ -503,7 +492,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.bgHue": bgHue,
                 "avatar.bgSat": bgSat,
                 "avatar.bgLight": bgLight,
-                "avatar.activeHat": activeHat
+                "avatar.activeHat": activeHat,
+                "avatar.avatarId": avatarId
             });
             onBack();
         } catch (e) {
@@ -526,6 +516,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         bgSat={bgSat}
                         bgLight={bgLight}
                         hat={activeHat}
+                        avatarId={avatarId}
                         className="w-full h-full rounded-full"
                     />
                  </div>
@@ -540,143 +531,32 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <Palette size={20} className="text-purple-400" />
-                        <span className="uppercase tracking-wider">Appearance</span>
+                        <span className="uppercase tracking-wider">Select Identity</span>
                     </h3>
 
-                    <div className="space-y-6">
-                         {/* Background Slider */}
-                         <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Background Tint
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={bgHue}
-                                onChange={(e) => setBgHue(parseInt(e.target.value))}
-                                className="w-full accent-blue-500 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                         <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Background Saturation
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={bgSat}
-                                onChange={(e) => setBgSat(parseInt(e.target.value))}
-                                className="w-full accent-blue-400 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                         <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Background Lightness
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={bgLight}
-                                onChange={(e) => setBgLight(parseInt(e.target.value))}
-                                className="w-full accent-blue-200 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                        {/* Skin Slider */}
-                        <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Suit / Skin Tone
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={skinHue}
-                                onChange={(e) => setSkinHue(parseInt(e.target.value))}
-                                className="w-full accent-pink-500 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                        {/* Aura Slider */}
-                        <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Suit Outline / Visor
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={hue}
-                                onChange={(e) => setHue(parseInt(e.target.value))}
-                                className="w-full accent-purple-500 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        {AVATAR_PRESETS.map(preset => (
+                            <button
+                                key={preset.id}
+                                onClick={() => handleSelectPreset(preset.id)}
+                                className="group relative p-4 rounded-xl border border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50 transition-all flex flex-col items-center gap-3"
+                            >
+                                <div className="w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden relative group-hover:scale-110 transition-transform">
+                                    <UserAvatar
+                                        hue={preset.config.hue}
+                                        skinHue={preset.config.skinHue}
+                                        bgHue={preset.config.bgHue}
+                                        bgSat={preset.config.bgSat}
+                                        bgLight={preset.config.bgLight}
+                                        hat={preset.config.activeHat}
+                                        avatarId={preset.config.avatarId}
+                                        className="w-full h-full"
+                                    />
+                                </div>
+                                <span className="text-xs font-bold uppercase tracking-wider text-purple-300 group-hover:text-white">{preset.name}</span>
+                            </button>
+                        ))}
                     </div>
-                </div>
-
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <Crown size={20} className="text-yellow-400" />
-                            <span className="uppercase tracking-wider">Accessory Vendor</span>
-                        </h3>
-                    </div>
-                    
-                    {/* Category Tabs */}
-                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-none">
-                       {['hats', 'capes', 'suits', 'glasses'].map(cat => (
-                           <button 
-                               key={cat}
-                               onClick={() => setActiveCategory(cat as any)}
-                               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border whitespace-nowrap ${
-                                   activeCategory === cat 
-                                   ? 'bg-purple-600 text-white border-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.4)]' 
-                                   : 'bg-black/40 text-purple-400 border-purple-500/20 hover:bg-purple-900/20'
-                               }`}
-                           >
-                              {cat === 'hats' ? 'Hats & Helms' : cat}
-                           </button>
-                       ))}
-                    </div>
-
-                    {activeCategory === 'hats' ? (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                            {HAT_OPTIONS.map(h => {
-                                 const isActive = activeHat === h.id;
-
-                                 return (
-                                    <button 
-                                        key={h.id}
-                                        onClick={() => handleSelectHat(h.id)}
-                                        className={`relative p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
-                                            isActive
-                                            ? 'bg-purple-600/30 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
-                                            : 'bg-black/60 border-white/10 opacity-70 hover:opacity-100'
-                                        }`}
-                                    >
-                                        {h.src ? (
-                                            <img src={getAssetPath(h.src)} alt={h.name} className="w-12 h-12 object-contain" />
-                                        ) : (
-                                           <div className="text-4xl text-gray-500">??</div>
-                                        )}
-                                        <div className="text-[10px] font-bold uppercase text-center w-full truncate">{h.name}</div>
-                                        
-                                        {isActive && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_5px_currentColor]" />}
-                                    </button>
-                                 );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="p-8 text-center border-2 border-dashed border-purple-500/20 rounded-xl bg-black/20">
-                             <div className="text-purple-400 font-bold mb-2 uppercase tracking-widest text-xs">Out of Stock</div>
-                             <p className="text-[10px] text-purple-500/60 uppercase tracking-widest font-mono">Shipment Arriving Soon</p>
-                        </div>
-                    )}
                 </div>
 
                 <div className="flex gap-4">
@@ -692,7 +572,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         disabled={loading}
                         className="flex-1 py-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-black uppercase tracking-widest font-bold transition-all shadow-[0_0_20px_rgba(147,51,234,0.4)]"
                     >
-                        {loading ? "Saving..." : "Save Look"}
+                        {loading ? "Saving..." : "Confirm Identity"}
                     </button>
                 </div>
             </div>
@@ -710,8 +590,8 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
     const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const rawHat = userData?.avatar?.hat;
-    const hat = rawHat === 'hat1' ? 'helmet1' : rawHat;
+    const hat = userData?.avatar?.activeHat || (userData?.avatar?.hat === 'hat1' ? 'helmet1' : userData?.avatar?.hat);
+    const avatarId = userData?.avatar?.avatarId || 'bunny';
 
     // Rank Logic
     const currentXP = userData?.xp || 0;
@@ -745,6 +625,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                          skinHue={skinHue} 
                          hue={hue} 
                          hat={hat}
+                         avatarId={avatarId}
                          className="w-full h-full"
                     />
                     

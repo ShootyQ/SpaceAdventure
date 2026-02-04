@@ -10,6 +10,14 @@ import { UserData, PLANETS } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
+import { UserAvatar, AVATAR_PRESETS } from "@/components/UserAvatar";
+import { getAssetPath } from "@/lib/utils";
+
+const SHIP_OPTIONS = [
+    { id: 'scout', name: 'Stellar Scout', src: '/images/ships/finalship.png', type: 'scout' },
+    { id: 'interceptor', name: 'Void Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
+    { id: 'cruiser', name: 'Star Cruiser', src: '/images/ships/finalship.png', type: 'cruiser' },
+];
 
 export default function RosterPage() {
   const { user, userData } = useAuth();
@@ -19,6 +27,8 @@ export default function RosterPage() {
   // Student Creation State
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
+  const [selectedPresetId, setSelectedPresetId] = useState(AVATAR_PRESETS[0].id);
+  const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
 
@@ -68,6 +78,10 @@ export default function RosterPage() {
           
           // 2. Create Auth User
           const uid = await createStudentAuthAccount(email, newStudentData.password);
+
+          // Get the selected configs
+          const selectedPreset = AVATAR_PRESETS.find(p => p.id === selectedPresetId) || AVATAR_PRESETS[0];
+          const selectedShip = SHIP_OPTIONS.find(s => s.id === selectedShipId) || SHIP_OPTIONS[0];
           
           // 3. Create Firestore Document
           const newStudent: UserData = {
@@ -85,11 +99,13 @@ export default function RosterPage() {
               fuel: 500,
               travelStatus: 'idle',
               spaceship: {
-                  name: 'SS ' + newStudentData.name.split(' ')[0],
+                  name: `SS ${newStudentData.name.split(' ')[0]}`,
                   color: 'text-blue-400',
-                  type: 'scout',
-                  speed: 1
+                  type: selectedShip.type,
+                  speed: 1,
+                  modelId: selectedShip.id // Store the ship model ID if needed later
               },
+              avatar: selectedPreset.config,
               // Store simpler credentials for reference? NO, security risk.
               // But maybe username for display?
           };
@@ -98,6 +114,8 @@ export default function RosterPage() {
           
           setStudents(prev => [...prev, newStudent]);
           setNewStudentData({ name: "", username: "", password: "" });
+          setSelectedPresetId(AVATAR_PRESETS[0].id);
+          setSelectedShipId(SHIP_OPTIONS[0].id);
           setIsAddingStudent(false);
       } catch (e: any) {
           console.error("Error creating student:", e);
@@ -235,6 +253,67 @@ export default function RosterPage() {
                                     className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
                                     placeholder="Set Password"
                                 />
+                            </div>
+
+                            {/* Avatar Selection */}
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Identity</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {AVATAR_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset.id}
+                                            type="button" // Prevent form submission
+                                            onClick={() => setSelectedPresetId(preset.id)}
+                                            className={`
+                                                relative aspect-square rounded-lg border-2 overflow-hidden bg-black/50 transition-all
+                                                ${selectedPresetId === preset.id ? 'border-cyan-400 ring-2 ring-cyan-500/20 scale-105' : 'border-white/10 hover:border-white/30'}
+                                            `}
+                                        >
+                                            <UserAvatar 
+                                                hue={preset.config.hue}
+                                                skinHue={preset.config.skinHue}
+                                                bgHue={preset.config.bgHue}
+                                                bgSat={preset.config.bgSat}
+                                                bgLight={preset.config.bgLight}
+                                                hat={preset.config.activeHat}
+                                                avatarId={preset.config.avatarId}
+                                                className="w-full h-full"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="text-center mt-1 text-xs text-cyan-300 font-bold uppercase tracking-widest">
+                                    {AVATAR_PRESETS.find(p => p.id === selectedPresetId)?.name}
+                                </div>
+                            </div>
+
+                            {/* Ship Selection */}
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Vessel</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {SHIP_OPTIONS.map((ship) => (
+                                        <button
+                                            key={ship.id}
+                                            type="button"
+                                            onClick={() => setSelectedShipId(ship.id)}
+                                            className={`
+                                                relative p-2 rounded-lg border-2 flex flex-col items-center gap-1 bg-black/50 transition-all
+                                                ${selectedShipId === ship.id ? 'border-cyan-400 ring-2 ring-cyan-500/20 bg-cyan-900/10' : 'border-white/10 hover:border-white/30'}
+                                            `}
+                                        >
+                                            <div className="w-12 h-12 relative flex items-center justify-center">
+                                                <img 
+                                                    src={getAssetPath(ship.src)} 
+                                                    alt={ship.name}
+                                                    className="object-contain max-w-full max-h-full"
+                                                />
+                                            </div>
+                                            <div className="text-[10px] uppercase font-bold text-center leading-tight text-gray-300">
+                                                {ship.name}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 

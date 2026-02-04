@@ -10,7 +10,7 @@ import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle
 } from "lucide-react";
-import { UserAvatar, HAT_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
 import RankEditor from "@/components/RankEditor";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -474,23 +474,30 @@ function InventoryView() {
 }
 
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
-    const { userData, user } = useAuth();
-    const [hue, setHue] = useState(0);
-    const [skinHue, setSkinHue] = useState(0);
-    const [bgHue, setBgHue] = useState(260); // Default purple
-    const [bgSat, setBgSat] = useState(50);
-    const [bgLight, setBgLight] = useState(20);
+    const { user, userData } = useAuth();
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (userData?.avatar) {
-            if (userData.avatar.hue !== undefined) setHue(userData.avatar.hue);
-            if (userData.avatar.skinHue !== undefined) setSkinHue(userData.avatar.skinHue);
-            if (userData.avatar.bgHue !== undefined) setBgHue(userData.avatar.bgHue);
-            if (userData.avatar.bgSat !== undefined) setBgSat(userData.avatar.bgSat);
-            if (userData.avatar.bgLight !== undefined) setBgLight(userData.avatar.bgLight);
+    // State for visual properties
+    const [hue, setHue] = useState(userData?.avatar?.hue || 0);
+    const [skinHue, setSkinHue] = useState(userData?.avatar?.skinHue || 0);
+    const [bgHue, setBgHue] = useState(userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 240);
+    const [bgSat, setBgSat] = useState(userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50);
+    const [bgLight, setBgLight] = useState(userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20);
+    const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
+    const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
+
+    const handleSelectPreset = (presetId: string) => {
+        const preset = AVATAR_PRESETS.find(p => p.id === presetId);
+        if (preset) {
+            setHue(preset.config.hue);
+            setSkinHue(preset.config.skinHue);
+            setBgHue(preset.config.bgHue);
+            setBgSat(preset.config.bgSat);
+            setBgLight(preset.config.bgLight);
+            setActiveHat(preset.config.activeHat);
+            setAvatarId(preset.config.avatarId);
         }
-    }, [userData]);
+    };
 
     const handleSave = async () => {
         if (!user) return;
@@ -502,7 +509,9 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.skinHue": skinHue,
                 "avatar.bgHue": bgHue,
                 "avatar.bgSat": bgSat,
-                "avatar.bgLight": bgLight
+                "avatar.bgLight": bgLight,
+                "avatar.activeHat": activeHat,
+                "avatar.avatarId": avatarId
             });
             onBack();
         } catch (e) {
@@ -513,117 +522,59 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     };
 
     return (
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="border border-purple-500/30 bg-black/40 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[400px] relative">
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 to-transparent pointer-events-none" />
                  
-                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center transition-colors duration-300">
-                    <UserAvatar 
-                        hue={hue} 
-                        skinHue={skinHue} 
-                        bgHue={bgHue} 
-                        bgSat={bgSat} 
-                        bgLight={bgLight} 
-                        className="w-full h-full rounded-full" 
+                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-visible flex items-center justify-center transition-colors duration-300 ring-4 ring-purple-900/30 shadow-[0_0_50px_rgba(168,85,247,0.4)]">
+                    <UserAvatar
+                        hue={hue}
+                        skinHue={skinHue}
+                        bgHue={bgHue}
+                        bgSat={bgSat}
+                        bgLight={bgLight}
+                        hat={activeHat}
+                        avatarId={avatarId}
+                        className="w-full h-full rounded-full"
                     />
                  </div>
 
                  <div className="mt-8 text-center">
-                    <h3 className="text-xl font-bold text-purple-400 uppercase tracking-widest">Preview</h3>
+                    <h3 className="text-xl font-bold text-purple-400 uppercase tracking-widest mb-1">Preview</h3>
+                    <p className="text-purple-300/60 text-sm font-mono">{activeHat !== 'none' ? HAT_OPTIONS.find(h => h.id === activeHat)?.name : 'Standard Uniform'}</p>
                  </div>
             </div>
 
-            <div className="space-y-6">
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20 max-h-[500px] overflow-y-auto custom-scrollbar">
+            <div className="space-y-6 max-h-[700px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <Palette size={20} className="text-purple-400" />
-                        <span className="uppercase tracking-wider">Appearance</span>
+                        <span className="uppercase tracking-wider">Select Identity</span>
                     </h3>
 
-                    <div className="space-y-6">
-                         {/* Background Slider */}
-                         <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Background Tint
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={bgHue}
-                                onChange={(e) => setBgHue(parseInt(e.target.value))}
-                                className="w-full accent-blue-500 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                         <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Background Saturation
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={bgSat}
-                                onChange={(e) => setBgSat(parseInt(e.target.value))}
-                                className="w-full accent-blue-400 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                         <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Background Lightness
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={bgLight}
-                                onChange={(e) => setBgLight(parseInt(e.target.value))}
-                                className="w-full accent-blue-200 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                        {/* Skin Slider */}
-                        <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Suit / Skin Tone
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={skinHue}
-                                onChange={(e) => setSkinHue(parseInt(e.target.value))}
-                                className="w-full accent-pink-500 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                        {/* Aura Slider */}
-                        <div className="space-y-2">
-                            <label className="block text-sm text-purple-400 uppercase tracking-wide">
-                                Suit Outline / Visor
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={hue}
-                                onChange={(e) => setHue(parseInt(e.target.value))}
-                                className="w-full accent-purple-500 h-2 bg-purple-900/50 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        {AVATAR_PRESETS.map(preset => (
+                            <button
+                                key={preset.id}
+                                onClick={() => handleSelectPreset(preset.id)}
+                                className="group relative p-4 rounded-xl border border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50 transition-all flex flex-col items-center gap-3"
+                            >
+                                <div className="w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden relative group-hover:scale-110 transition-transform">
+                                    <UserAvatar
+                                        hue={preset.config.hue}
+                                        skinHue={preset.config.skinHue}
+                                        bgHue={preset.config.bgHue}
+                                        bgSat={preset.config.bgSat}
+                                        bgLight={preset.config.bgLight}
+                                        hat={preset.config.activeHat}
+                                        avatarId={preset.config.avatarId}
+                                        className="w-full h-full"
+                                    />
+                                </div>
+                                <span className="text-xs font-bold uppercase tracking-wider text-purple-300 group-hover:text-white">{preset.name}</span>
+                            </button>
+                        ))}
                     </div>
-                </div>
-
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20 opacity-50 pointer-events-none">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Sparkles size={20} className="text-purple-400" />
-                        <span className="uppercase tracking-wider">Accessories</span>
-                    </h3>
-                    <p className="text-sm text-purple-400 font-mono border border-purple-500/30 p-4 rounded bg-black/30">
-                        MODULE OFFLINE. Requires Level 5 security clearance.
-                    </p>
                 </div>
 
                 <div className="flex gap-4">
@@ -639,7 +590,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         disabled={loading}
                         className="flex-1 py-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-black uppercase tracking-widest font-bold transition-all shadow-[0_0_20px_rgba(147,51,234,0.4)]"
                     >
-                        {loading ? "Saving..." : "Save Look"}
+                        {loading ? "Saving..." : "Confirm Identity"}
                     </button>
                 </div>
             </div>
@@ -682,33 +633,14 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     return (
         <div className="max-w-4xl mx-auto border border-purple-500/30 bg-black/40 rounded-3xl p-8 min-h-[500px] flex flex-col items-center justify-center">
             <div className="relative mb-8 group">
-                <div className="w-48 h-48 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center relative transition-colors duration-300"
-                     style={{ backgroundColor: `hsl(${bgHue}, ${bgSat}%, ${bgLight}%)` }}
-                >
-                    {/* Skin Tint Layer - Masked */}
-                    <div
-                        className="absolute inset-0 z-0"
-                        style={{
-                            backgroundColor: `hsl(${skinHue}, 70%, 50%)`,
-                            opacity: skinHue === 0 ? 0 : 0.6,
-                            maskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            WebkitMaskImage: `url(${getAssetPath('/images/avatar/spacebunny.png')})`,
-                            maskSize: 'cover',
-                            WebkitMaskSize: 'cover'
-                        }}
-                    />
-
-                    <img
-                        src={getAssetPath("/images/avatar/spacebunny.png")}
-                        alt="Pilot Avatar"
-                        className="w-full h-full object-cover relative z-10 transition-transform duration-500 group-hover:scale-110"
-                        style={{
-                            filter: `hue-rotate(${hue}deg)`
-                        }}
+                <div className="w-48 h-48 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center relative transition-colors duration-300">
+                    <UserAvatar 
+                        userData={userData}
+                        className="w-full h-full" 
                     />
                     
                     {/* Scan effect overlay */}
-                    <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20" />
+                    <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none" />
                 </div>
                 <button
                     onClick={() => onNavigate('avatar-config')}

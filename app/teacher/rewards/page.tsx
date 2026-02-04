@@ -61,11 +61,12 @@ export default function RewardsPage() {
         // 2. Fetch Behaviors
         const qBehaviors = query(
             collection(db, "behaviors"), 
-            where("teacherId", "==", user.uid),
-            orderBy("xp", "desc")
+            where("teacherId", "==", user.uid)
         );
         const unsubBehaviors = onSnapshot(qBehaviors, (snapshot) => {
-            setBehaviors(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior)));
+            const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior));
+            items.sort((a, b) => b.xp - a.xp); // Client-side sort
+            setBehaviors(items);
         });
 
         // 3. Fetch Ranks
