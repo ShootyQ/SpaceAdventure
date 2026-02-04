@@ -70,7 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     displayName: currentUser.displayName,
                     photoURL: currentUser.photoURL,
                     role: 'teacher', // Default new Google signups to Teacher
-                    status: 'active
                     status: isSuperAdmin ? 'active' : 'pending_approval',
                     location: 'earth',
                     spaceship: {

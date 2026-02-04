@@ -151,16 +151,16 @@ export default function RewardsPage() {
             alert(`Award Transaction Failed!\n\n${error}`);
         }
     };
-if (!user) return;
+
+    const handleAddBehavior = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user) return;
         try {
             await addDoc(collection(db, "behaviors"), {
                 label: newLabel,
                 xp: Number(newXp),
                 color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600",
                 teacherId: user.uid
-                label: newLabel,
-                xp: Number(newXp),
-                color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600"
             });
             setNewLabel("");
             setNewXp(50);

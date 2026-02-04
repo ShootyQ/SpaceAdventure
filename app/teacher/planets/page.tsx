@@ -88,13 +88,6 @@ export default function PlanetManagementPage() {
             setSaving(null);
         }
     };
-            }, { merge: true });
-        } catch (e) {
-            console.error(e);
-            alert("Error saving planet settings");
-        }
-        setSaving(null);
-    };
 
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">

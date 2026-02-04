@@ -55,7 +55,8 @@ export default function CreateMissionPage() {
         e.preventDefault();
         setLoading(true);
 
-        try if (!user) throw new Error("Not authenticated");
+        try {
+            if (!user) throw new Error("Not authenticated");
             await addDoc(collection(db, "missions"), {
                 title,
                 description,
@@ -64,8 +65,7 @@ export default function CreateMissionPage() {
                 contentText: type === 'read' ? contentText : null,
                 questions,
                 xpReward: Number(xpReward),
-                teacherId: user.uid
-                xpReward: Number(xpReward),
+                teacherId: user.uid,
                 createdAt: serverTimestamp()
             });
             router.push("/teacher/missions");
