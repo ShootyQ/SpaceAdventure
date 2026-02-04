@@ -55,6 +55,7 @@ export interface AvatarConfig {
     bgLight?: number;
     activeHat?: string;
     hat?: string; // Legacy support if needed
+    avatarId?: string;
 }
 
 export interface UserData {
