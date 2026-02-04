@@ -64,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Students should have been pre-created by teachers and signing in via Email/Pass, 
                 // so they would already exist in DB.
                 
+                const isSuperAdmin = currentUser.email === "andrewpcarlson85@gmail.com";
                 const newUserData: UserData = {
                     uid: currentUser.uid,
                     email: currentUser.email,
