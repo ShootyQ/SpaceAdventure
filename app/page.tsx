@@ -43,8 +43,9 @@ export default function Home() {
       }
   };
 
+  // Rendering the main entry point
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between relative overflow-hidden bg-slate-950 text-white">
+    <div className="flex min-h-screen flex-col items-center justify-between relative overflow-hidden bg-slate-950 text-white">
       
       {/* Background Star Layers */}
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -208,7 +209,7 @@ export default function Home() {
         Mission Control Systems &copy; {new Date().getFullYear()}
       </footer>
 
-    </main>
+    </div>
   );
 }
 
