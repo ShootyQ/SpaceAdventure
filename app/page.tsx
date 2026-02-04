@@ -126,7 +126,7 @@ export default function Home() {
                                  <ArrowLeft className="w-5 h-5" />
                              </button>
                         </div>
-                         className="flex gap-4">
+                        <div className="flex gap-4">
                             <div className="flex-1">
                                 <label className="block text-xs uppercase tracking-wider font-medium text-slate-400 mb-1.5">Class Code</label>
                                 <input 
@@ -149,8 +149,7 @@ export default function Home() {
                                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 transition-all"
                                     placeholder="cadet"
                                 />
-                            </div   placeholder="cadet@class.local"
-                            />
+                            </div>
                         </div>
 
                         <div>
