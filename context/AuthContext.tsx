@@ -11,6 +11,7 @@ import {
 import { doc, getDoc, setDoc, collection, getDocs, query, limit } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { generateClassCode } from "@/lib/utils";
 
 import { UserData, SpaceshipConfig, FlagConfig, Rank } from "@/types";
 
@@ -46,21 +47,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 // Auto-correct Admin Role
                 const isAdminEmail = currentUser.email === "andrewpcarlson85@gmail.com";
+                let updates: Partial<UserData> = {};
+
                 if (isAdminEmail && data.role !== 'teacher') {
                     console.log("Fixing Admin Role for Legacy User");
                     data.role = 'teacher';
-                    // Try to write, but if it fails (permissions), we still set local state to teacher
-                    // so the UI works!
-                    try {
-                        await setDoc(userRef, { role: 'teacher' }, { merge: true });
+                    updates.role = 'teacher';
+                }
+
+                if (data.role === 'teacher' && !data.classCode) {
+                    console.log("Generating Class Code for existing teacher");
+                    const newCode = generateClassCode();
+                    data.classCode = newCode;
+                    updates.classCode = newCode;
+                }
+
+                if (Object.keys(updates).length > 0) {
+                     try {
+                        await setDoc(userRef, updates, { merge: true });
                     } catch (e) {
-                        console.warn("Could not update role in DB, but forcing local admin state", e);
+                        console.warn("Could not update user profile in DB", e);
                     }
                 }
                 
                 setUserData(data);
             } else {
-                // If the user signed in with Google, we assume they are a potential Teacher signing up.
+                // IclassCode: generateClassCode(),
+                    f the user signed in with Google, we assume they are a potential Teacher signing up.
                 // Students should have been pre-created by teachers and signing in via Email/Pass, 
                 // so they would already exist in DB.
                 

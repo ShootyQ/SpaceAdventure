@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 
 export default function RosterPage() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -61,8 +61,10 @@ export default function RosterPage() {
       
       try {
           // 1. Generate Email
-          // We use a fake domain. Ensure username is unique enough or handle error.
-          const email = `${newStudentData.username}@class.local`; // simplistic for now
+          // Format: username.classCode@spaceadventure.local
+          const cleanUsername = newStudentData.username.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const classCode = userData?.classCode || 'default';
+          const email = `${cleanUsername}.${classCode}@spaceadventure.local`; 
           
           // 2. Create Auth User
           const uid = await createStudentAuthAccount(email, newStudentData.password);
@@ -75,6 +77,7 @@ export default function RosterPage() {
               photoURL: null,
               role: 'student',
               teacherId: user!.uid,
+              classCode: classCode,
               status: 'active',
               xp: 0,
               level: 1,
@@ -161,7 +164,15 @@ export default function RosterPage() {
         <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between gap-4 mb-8">
                  <div className="flex items-center gap-4">
-                     <Link href="/teacher" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                     <div>
+                        <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Cadet Roster</h1>
+                        {userData?.classCode && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-sm text-cyan-600">CLASS CODE:</span>
+                                <span className="text-lg font-bold text-yellow-400 font-mono tracking-widest">{userData.classCode}</span>
+                            </div>
+                        )}
+                     </divn-900/20 text-cyan-500">
                         <ArrowLeft size={20} />
                      </Link>
                      <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Cadet Roster</h1>

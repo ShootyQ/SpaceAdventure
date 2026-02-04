@@ -64,6 +64,7 @@ export interface UserData {
     photoURL: string | null;
     role: 'teacher' | 'student' | 'pending' | 'admin';
     teacherId?: string; // Links student to a teacher
+    classCode?: string; // For teachers, unique code for students to join
     classId?: string;   // Optional grouping
     status: 'active' | 'pending_approval' | 'rejected';
     spaceship?: SpaceshipConfig;

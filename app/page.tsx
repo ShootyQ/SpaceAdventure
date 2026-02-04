@@ -11,7 +11,7 @@ export default function Home() {
   const { user, userData, signInWithGoogle, signInStudent, loading } = useAuth();
   const router = useRouter();
   const [loginMode, setLoginMode] = useState<'selection' | 'student'>('selection');
-  const [studentCreds, setStudentCreds] = useState({ email: '', password: '' });
+  const [studentCreds, setStudentCreds] = useState({ username: '', classCode: '', password: '' });
   const [error, setError] = useState('');
   const [studentLoading, setStudentLoading] = useState(false);
 
@@ -33,10 +33,11 @@ export default function Home() {
       setError('');
       setStudentLoading(true);
       try {
-          await signInStudent(studentCreds.email, studentCreds.password);
+          const email = `${studentCreds.username}.${studentCreds.classCode}@spaceadventure.local`;
+          await signInStudent(email, studentCreds.password);
       } catch (err) {
           console.error(err);
-          setError('Invalid username or password.');
+          setError('Invalid login credentials.');
       } finally {
           setStudentLoading(false);
       }
@@ -125,16 +126,30 @@ export default function Home() {
                                  <ArrowLeft className="w-5 h-5" />
                              </button>
                         </div>
-                        
-                        <div>
-                            <label className="block text-xs uppercase tracking-wider font-medium text-slate-400 mb-1.5">Username (Email)</label>
-                            <input 
-                                type="text"
-                                required
-                                value={studentCreds.email}
-                                onChange={(e) => setStudentCreds({...studentCreds, email: e.target.value})}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 transition-all"
-                                placeholder="cadet@class.local"
+                         className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="block text-xs uppercase tracking-wider font-medium text-slate-400 mb-1.5">Class Code</label>
+                                <input 
+                                    type="text"
+                                    required
+                                    value={studentCreds.classCode}
+                                    onChange={(e) => setStudentCreds({...studentCreds, classCode: e.target.value.toUpperCase()})}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 font-mono transition-all"
+                                    placeholder="ABCD12"
+                                    maxLength={6}
+                                />
+                            </div>
+                            <div className="flex-[2]">
+                                <label className="block text-xs uppercase tracking-wider font-medium text-slate-400 mb-1.5">Username</label>
+                                <input 
+                                    type="text"
+                                    required
+                                    value={studentCreds.username}
+                                    onChange={(e) => setStudentCreds({...studentCreds, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')})}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 transition-all"
+                                    placeholder="cadet"
+                                />
+                            </div   placeholder="cadet@class.local"
                             />
                         </div>
 

@@ -9,3 +9,12 @@ export const getAssetPath = (path: string) => {
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     return `${basePath}${cleanPath}`;
 };
+
+export const generateClassCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I, O, 1, 0 to avoid confusion
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+};
