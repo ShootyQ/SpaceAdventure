@@ -164,6 +164,9 @@ export default function RosterPage() {
         <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between gap-4 mb-8">
                  <div className="flex items-center gap-4">
+                     <Link href="/teacher" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                        <ArrowLeft size={20} />
+                     </Link>
                      <div>
                         <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Cadet Roster</h1>
                         {userData?.classCode && (
@@ -172,10 +175,7 @@ export default function RosterPage() {
                                 <span className="text-lg font-bold text-yellow-400 font-mono tracking-widest">{userData.classCode}</span>
                             </div>
                         )}
-                     </divn-900/20 text-cyan-500">
-                        <ArrowLeft size={20} />
-                     </Link>
-                     <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Cadet Roster</h1>
+                     </div>
                  </div>
                  
                  <div className="flex gap-2">

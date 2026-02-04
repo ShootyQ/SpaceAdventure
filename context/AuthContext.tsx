@@ -72,9 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 setUserData(data);
             } else {
-                // IclassCode: generateClassCode(),
-                    f the user signed in with Google, we assume they are a potential Teacher signing up.
-                // Students should have been pre-created by teachers and signing in via Email/Pass, 
+                // If the user signed in with Google, we assume they are a potential Teacher signing up.
+                // Students should have been pre-created by teachers and signing in via Email/Pass,  
                 // so they would already exist in DB.
                 
                 const isSuperAdmin = currentUser.email === "andrewpcarlson85@gmail.com";
@@ -84,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     displayName: currentUser.displayName,
                     photoURL: currentUser.photoURL,
                     role: 'teacher', // Default new Google signups to Teacher
+                    classCode: generateClassCode(),
                     status: isSuperAdmin ? 'active' : 'pending_approval',
                     location: 'earth',
                     spaceship: {
