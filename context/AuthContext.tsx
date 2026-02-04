@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { 
     signInWithPopup, 
+    signInWithEmailAndPassword,
     signOut, 
     onAuthStateChanged, 
     User 
@@ -18,6 +19,7 @@ interface AuthContextType {
   userData: UserData | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInStudent: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -58,17 +60,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 setUserData(data);
             } else {
-                // New user logic
-                const isSuperAdmin = currentUser.email === "andrewpcarlson85@gmail.com";
-
+                // If the user signed in with Google, we assume they are a potential Teacher signing up.
+                // Students should have been pre-created by teachers and signing in via Email/Pass, 
+                // so they would already exist in DB.
+                
                 const newUserData: UserData = {
                     uid: currentUser.uid,
                     email: currentUser.email,
                     displayName: currentUser.displayName,
                     photoURL: currentUser.photoURL,
-                    role: isSuperAdmin ? 'teacher' : 'student',
-                    xp: 0,
-                    level: 1,
+                    role: 'teacher', // Default new Google signups to Teacher
+                    status: 'active
                     status: isSuperAdmin ? 'active' : 'pending_approval',
                     location: 'earth',
                     spaceship: {
@@ -123,6 +125,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInStudent = async (email: string, pass: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error) {
+       console.error("Student Login Failed", error);
+       throw error;
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
     setUserData(null);
@@ -130,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, userData, loading, signInWithGoogle, signInStudent, logout }}>
       {children}
     </AuthContext.Provider>
   );

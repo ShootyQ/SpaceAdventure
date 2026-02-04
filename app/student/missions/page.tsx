@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, getDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
@@ -42,10 +42,18 @@ export default function StudentMissions() {
     // Fetch Missions
     useEffect(() => {
         const fetchData = async () => {
-            if (!user) return;
+            if (!user || !userData) return;
             try {
                 // Get Missions
-                const q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
+                // Filter by teacher if student has a teacher
+                let q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
+                
+                if (userData.teacherId) {
+                    q = query(collection(db, "missions"), where("teacherId", "==", userData.teacherId), orderBy("createdAt", "desc"));
+                } else {
+                     // If no teacher likely show global or none? For now global for legacy support
+                }
+
                 const snapshot = await getDocs(q);
                 const missionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
                 setMissions(missionData);

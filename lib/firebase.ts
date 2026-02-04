@@ -5,7 +5,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // @ts-ignore
 import { getAnalytics, isSupported } from "firebase/analytics";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDVHiiCHkP-RFOI26cIrD_OijLnw1r3B8Q",
   authDomain: "spaceadventure-7d540.firebaseapp.com",
   projectId: "spaceadventure-7d540",

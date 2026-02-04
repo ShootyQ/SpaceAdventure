@@ -2,20 +2,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && (request.auth.uid == userId || resource.data.teacherId == request.auth.uid || request.auth.token.email == 'andrewpcarlson85@gmail.com');
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && (request.auth.uid == userId || resource.data.teacherId == request.auth.uid || request.auth.token.email == 'andrewpcarlson85@gmail.com');
     }
 
     match /missions/{missionId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.teacherId == request.auth.uid;
     }
+    
     match /behaviors/{behaviorId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.teacherId == request.auth.uid;
     }
+    
     match /planets/{planetId} {
-      allow read, write: if request.auth != null;
+      // Planet IDs are often composite "teacherId_planetId" or just "planetId" (legacy)
+      // Allow read for everyone (students need to see planets)
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      // Only allow updates if:
+      // 1. You are the teacher owner (teacherId field matches)
+      // 2. OR you are adding XP via transaction (complicated to check rules for incremental updates without cloud functions, but basic write check works)
+      allow update, delete: if request.auth != null && (
+          resource.data.teacherId == request.auth.uid || 
+          // Allow students to "touch" planets? No, students update their own user record, and transactions might update planets?
+          // Actually, handleAward (Teacher side) updates planet.
+          // Students don't update planets directly usually.
+          false
+      ) || isAdmin();
     }
+    
     match /game-config/{configId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null; // For now open, or check teacherId in doc ID if possible.
     }
     match /ships/{shipId} {
       allow read, write: if request.auth != null;

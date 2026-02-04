@@ -1,15 +1,19 @@
 "use client";
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Star, Map, Trophy, Users, LogIn } from 'lucide-react';
+import { Star, Map, Trophy, Users, LogIn, School, GraduationCap, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { getAssetPath } from "@/lib/utils";
 
 export default function Home() {
-  const { user, userData, signInWithGoogle, loading } = useAuth();
+  const { user, userData, signInWithGoogle, signInStudent, loading } = useAuth();
   const router = useRouter();
+  const [loginMode, setLoginMode] = useState<'selection' | 'student'>('selection');
+  const [studentCreds, setStudentCreds] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [studentLoading, setStudentLoading] = useState(false);
 
   // Redirect based on role if logged in
   useEffect(() => {
@@ -24,11 +28,25 @@ export default function Home() {
     }
   }, [userData, loading, router]);
 
+  const handleStudentLogin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError('');
+      setStudentLoading(true);
+      try {
+          await signInStudent(studentCreds.email, studentCreds.password);
+      } catch (err) {
+          console.error(err);
+          setError('Invalid username or password.');
+      } finally {
+          setStudentLoading(false);
+      }
+  };
+
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between relative overflow-hidden">
+    <main className="flex min-h-screen flex-col items-center justify-between relative overflow-hidden bg-slate-950 text-white">
       
-      {/* Background Star Layers (CSS based) */}
+      {/* Background Star Layers */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div id="stars" className="stars"></div>
         <div id="stars2" className="stars2"></div>
@@ -36,7 +54,7 @@ export default function Home() {
       </div>
 
       {/* Hero Section */}
-      <div className="z-10 flex flex-col items-center justify-center w-full min-h-screen text-center px-4">
+      <div className="z-10 flex flex-col items-center justify-center w-full min-h-screen text-center px-4 py-12">
         
         <div className="animate-float mb-8">
             <div className="relative">
@@ -44,13 +62,13 @@ export default function Home() {
                 <img 
                   src={getAssetPath("/images/ships/finalship.png")} 
                   alt="Space Adventure" 
-                  className="w-24 h-24 object-contain relative z-10 transform -rotate-45" 
+                  className="w-32 h-32 object-contain relative z-10 transform -rotate-45" 
                 />
             </div>
         </div>
 
         <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-blue-200 mb-6 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-          The Classroom Space Adventure
+          Space Adventure
         </h1>
         
         <p className="text-blue-100 text-xl md:text-2xl max-w-2xl mb-12">
@@ -58,24 +76,93 @@ export default function Home() {
         </p>
 
         {loading ? (
-            <div className="text-blue-300 animate-pulse">Scanning Bio-metrics...</div>
-        ) : !user ? (
-            <div className="flex flex-col gap-4 w-full max-w-md">
-                <button 
-                    onClick={signInWithGoogle}
-                    className="flex items-center justify-center gap-3 w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-100 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105"
-                >
-                    <div className="w-6 h-6 relative">
-                        {/* Simple Google G Icon replacement for now */}
-                        <svg viewBox="0 0 24 24" className="w-full h-full"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                    </div>
-                    <span>Sign in with Google</span>
-                </button>
-            </div>
-        ) : (
-             <div className="text-xl text-green-400 font-mono">
-                 Files loaded. Redirecting...
+            <div className="text-blue-300 animate-pulse text-lg">Initializing Navigation Systems...</div>
+        ) : userData ? (
+             <div className="text-xl text-green-400 font-mono animate-pulse">
+                 Credentials Verified. Launching...
              </div>
+        ) : (
+            <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-2xl transition-all">
+                
+                {loginMode === 'selection' ? (
+                    <div className="space-y-6">
+                        <div className="text-left mb-2">
+                             <h3 className="text-lg font-semibold text-slate-200">Identify Yourself</h3>
+                        </div>
+                        
+                        <button 
+                            onClick={signInWithGoogle}
+                            className="w-full group relative flex items-center justify-between bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white p-4 rounded-xl font-semibold transition-all hover:scale-[1.02] shadow-lg shadow-indigo-500/25"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-white/20 rounded-lg"><School className="w-5 h-5" /></div>
+                                <span className="text-lg">Teacher Access</span>
+                            </div>
+                            <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
+                        </button>
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
+                            <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="px-2 bg-slate-900 text-slate-500">or</span></div>
+                        </div>
+
+                        <button 
+                            onClick={() => setLoginMode('student')}
+                            className="w-full group relative flex items-center justify-between bg-slate-800 hover:bg-slate-700 text-white p-4 rounded-xl font-semibold transition-all hover:scale-[1.02] border border-slate-700 hover:border-slate-600"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-slate-700 group-hover:bg-slate-600 rounded-lg"><GraduationCap className="w-5 h-5 text-green-400" /></div>
+                                <span className="text-lg">Student Access</span>
+                            </div>
+                            <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
+                        </button>
+                    </div>
+                ) : (
+                    <form onSubmit={handleStudentLogin} className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                             <h2 className="text-xl font-semibold text-white">Student Login</h2>
+                             <button type="button" onClick={() => setLoginMode('selection')} className="text-slate-400 hover:text-white transition-colors">
+                                 <ArrowLeft className="w-5 h-5" />
+                             </button>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-xs uppercase tracking-wider font-medium text-slate-400 mb-1.5">Username (Email)</label>
+                            <input 
+                                type="text"
+                                required
+                                value={studentCreds.email}
+                                onChange={(e) => setStudentCreds({...studentCreds, email: e.target.value})}
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 transition-all"
+                                placeholder="cadet@class.local"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs uppercase tracking-wider font-medium text-slate-400 mb-1.5">Password</label>
+                            <input 
+                                type="password" 
+                                required
+                                value={studentCreds.password}
+                                onChange={(e) => setStudentCreds({...studentCreds, password: e.target.value})}
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 transition-all"
+                                placeholder="••••••••"
+                            />
+                        </div>
+
+                        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center animate-shake">{error}</div>}
+
+                        <button 
+                            type="submit"
+                            disabled={studentLoading}
+                            className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl font-bold transition-all mt-4 hover:shadow-lg hover:shadow-green-500/20 text-lg"
+                        >
+                            {studentLoading ? 'Authenticating...' : 'Launch Mission'}
+                        </button>
+                    </form>
+                )}
+
+            </div>
         )}
       </div>
 

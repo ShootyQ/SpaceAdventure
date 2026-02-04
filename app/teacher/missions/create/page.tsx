@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, Video, BookOpen, GripVertical, Loader2 } from "lucide-react";
 
 export default function CreateMissionPage() {
     const router = useRouter();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     
     // Mission State
@@ -53,7 +55,7 @@ export default function CreateMissionPage() {
         e.preventDefault();
         setLoading(true);
 
-        try {
+        try if (!user) throw new Error("Not authenticated");
             await addDoc(collection(db, "missions"), {
                 title,
                 description,
@@ -61,6 +63,8 @@ export default function CreateMissionPage() {
                 contentUrl: type === 'watch' ? contentUrl : null,
                 contentText: type === 'read' ? contentText : null,
                 questions,
+                xpReward: Number(xpReward),
+                teacherId: user.uid
                 xpReward: Number(xpReward),
                 createdAt: serverTimestamp()
             });

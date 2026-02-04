@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, doc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
@@ -23,15 +24,23 @@ interface PlanetState extends PlanetData {
 }
 
 export default function PlanetManagementPage() {
+    const { user } = useAuth();
     const [planets, setPlanets] = useState<PlanetState[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
 
     // Initial Load & Subscription
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, "planets"), (snapshot) => {
+        if (!user) return;
+        const q = query(collection(db, "planets"), where("teacherId", "==", user.uid));
+        
+        const unsub = onSnapshot(q, (snapshot) => {
              const dynamicMap = new Map<string, PlanetData>();
-             snapshot.forEach(d => dynamicMap.set(d.id, d.data() as PlanetData));
+             snapshot.forEach(d => {
+                 // The docId is likely teacherId_planetId, but the internal id field is planetId
+                 const data = d.data() as PlanetData;
+                 dynamicMap.set(data.id, data);
+             });
 
              const merged = PLANETS.map(staticPlanet => {
                  const dynamic = dynamicMap.get(staticPlanet.id) || {
@@ -59,16 +68,26 @@ export default function PlanetManagementPage() {
     };
 
     const handleSave = async (planet: PlanetState) => {
+        if (!user) return;
         setSaving(planet.id);
         try {
-            await setDoc(doc(db, "planets", planet.id), {
+            const docId = `${user.uid}_${planet.id}`;
+            await setDoc(doc(db, "planets", docId), {
                 id: planet.id,
                 xpGoal: Number(planet.xpGoal),
-                currentXP: Number(planet.currentXP), // Ensure we don't lose this on overwrite? setDoc merges if we use merge:true, or overwrites.
-                // Wait, setDoc overwrites unless {merge:true}. But we want to ensure fields exist.
-                // Let's use setDoc with merge.
+                // We don't save currentXP here usually, as that's transactional from rewards, 
+                // but if we are "Setting up" the planet, we might want to preserve it or init it.
+                // Using merge: true protects us.
                 rewardName: planet.rewardName,
-                rewardDescription: planet.rewardDescription
+                rewardDescription: planet.rewardDescription,
+                teacherId: user.uid
+            }, { merge: true });
+            setSaving(null);
+        } catch (e) {
+            console.error("Error saving planet:", e);
+            setSaving(null);
+        }
+    };
             }, { merge: true });
         } catch (e) {
             console.error(e);

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { Plus, BookOpen, Video, Trash2, Edit2, Loader2, ArrowLeft } from "lucide-react";
 
@@ -27,13 +28,19 @@ export interface Mission {
 }
 
 export default function MissionsPage() {
+    const { user } = useAuth();
     const [missions, setMissions] = useState<Mission[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchMissions = async () => {
+            if (!user) return;
             try {
-                const q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
+                const q = query(
+                    collection(db, "missions"), 
+                    where("teacherId", "==", user.uid),
+                    orderBy("createdAt", "desc")
+                );
                 const snapshot = await getDocs(q);
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
                 setMissions(data);
@@ -45,7 +52,7 @@ export default function MissionsPage() {
         };
 
         fetchMissions();
-    }, []);
+    }, [user]);
 
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">

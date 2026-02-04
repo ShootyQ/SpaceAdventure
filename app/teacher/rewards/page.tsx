@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
@@ -42,24 +42,39 @@ export default function RewardsPage() {
     // Forms
     const [newLabel, setNewLabel] = useState("");
     const [newXp, setNewXp] = useState(50);
+    const { user } = useAuth();
 
     useEffect(() => {
+        if (!user) return;
+
         // 1. Fetch Students
-        const qStudents = query(collection(db, "users"), where("role", "==", "student"), where("status", "==", "active"));
+        const qStudents = query(
+            collection(db, "users"), 
+            where("role", "==", "student"), 
+            where("status", "==", "active"),
+            where("teacherId", "==", user.uid)
+        );
         const unsubStudents = onSnapshot(qStudents, (snapshot) => {
             setStudents(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserData)));
         });
 
         // 2. Fetch Behaviors
-        const qBehaviors = query(collection(db, "behaviors"), orderBy("xp", "desc"));
+        const qBehaviors = query(
+            collection(db, "behaviors"), 
+            where("teacherId", "==", user.uid),
+            orderBy("xp", "desc")
+        );
         const unsubBehaviors = onSnapshot(qBehaviors, (snapshot) => {
             setBehaviors(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior)));
         });
 
         // 3. Fetch Ranks
-        const unsubRanks = onSnapshot(doc(db, "game-config", "ranks"), (d) => {
+        const unsubRanks = onSnapshot(doc(db, "game-config", `ranks_${user.uid}`), async (d) => {
             if (d.exists() && d.data().list) {
                 setRanks(d.data().list);
+            } else {
+                const g = await getDoc(doc(db, "game-config", "ranks"));
+                if (g && g.exists() && g.data().list) setRanks(g.data().list);
             }
         });
 
@@ -68,10 +83,10 @@ export default function RewardsPage() {
             unsubBehaviors();
             unsubRanks();
         };
-    }, []);
+    }, [user]);
 
     const handleAward = async (behavior: Behavior) => {
-        if (!selectedStudent) return;
+        if (!selectedStudent || !user) return;
         
         // Ensure atomic number handling
         const xpAmount = Number(behavior.xp);
@@ -115,12 +130,15 @@ export default function RewardsPage() {
                  
                  if (rawLocation && xpAmount > 0) {
                      const planetId = rawLocation.toLowerCase();
-                     const planetRef = doc(db, "planets", planetId);
+                     // Use composite key for Planet Progress: teacherId_planetName
+                     const planetDocId = `${user.uid}_${planetId}`;
+                     const planetRef = doc(db, "planets", planetDocId);
                      
                      // Use set with merge to ensure doc exists and update safely
                      transaction.set(planetRef, { 
                          currentXP: increment(xpAmount),
-                         id: planetId 
+                         id: planetId,
+                         teacherId: user.uid
                      }, { merge: true });
                  }
             });
@@ -133,11 +151,13 @@ export default function RewardsPage() {
             alert(`Award Transaction Failed!\n\n${error}`);
         }
     };
-
-    const handleAddBehavior = async (e: React.FormEvent) => {
-        e.preventDefault();
+if (!user) return;
         try {
             await addDoc(collection(db, "behaviors"), {
+                label: newLabel,
+                xp: Number(newXp),
+                color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600",
+                teacherId: user.uid
                 label: newLabel,
                 xp: Number(newXp),
                 color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600"

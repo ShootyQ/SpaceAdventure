@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Save, Trash2, Plus } from "lucide-react";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import { Rank } from "@/types";
 
 const DEFAULT_RANKS: Rank[] = [
@@ -21,24 +22,38 @@ const DEFAULT_RANKS: Rank[] = [
 ];
 
 export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+    const { user } = useAuth();
     const [draftRanks, setDraftRanks] = useState<Rank[]>(DEFAULT_RANKS);
 
     useEffect(() => {
-        if (isOpen) {
-            // Load current config when opened
-            const unsub = onSnapshot(doc(db, "game-config", "ranks"), (d) => {
+        if (isOpen && user) {
+            // Load current config: Try teacher specific first, then global
+            const teacherConfigRef = doc(db, "game-config", `ranks_${user.uid}`);
+            
+            // We use snapshot on the teacher config
+            const unsub = onSnapshot(teacherConfigRef, async (d) => {
                 if (d.exists() && d.data().list) {
                     setDraftRanks(d.data().list);
+                } else {
+                    // Fallback fetch global if teacher config doesn't exist yet
+                    const globalRef = doc(db, "game-config", "ranks");
+                    const globalSnap = await getDoc(globalRef);
+                    if (globalSnap.exists() && globalSnap.data().list) {
+                        setDraftRanks(globalSnap.data().list);
+                    }
                 }
             });
             return () => unsub();
         }
-    }, [isOpen]);
+    }, [isOpen, user]);
 
     const handleSaveRanks = async () => {
+        if (!user) return;
         try {
-            await setDoc(doc(db, "game-config", "ranks"), {
-                list: draftRanks
+            // Save to teacher specific config
+            await setDoc(doc(db, "game-config", `ranks_${user.uid}`), {
+                list: draftRanks,
+                teacherId: user.uid
             });
             onClose();
         } catch (e) {

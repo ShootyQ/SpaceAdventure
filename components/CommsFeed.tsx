@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, where, orderBy, limit, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
 import { UserData, AsteroidEvent, PLANETS } from '@/types';
 import { Radio, ShieldAlert, UserPlus, Rocket, Star, CheckCircle } from 'lucide-react';
 
@@ -34,9 +35,19 @@ export default function CommsFeed() {
         return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const { userData } = useAuth();
+
     // 1. Listen for User Changes (Real-time feed)
     useEffect(() => {
-        const q = query(collection(db, "users"));
+        if (!userData) return;
+        let q = query(collection(db, "users"));
+        
+        if (userData.role === 'teacher') {
+             q = query(collection(db, "users"), where("teacherId", "==", userData.uid));
+        } else if (userData.role === 'student' && userData.teacherId) {
+             q = query(collection(db, "users"), where("teacherId", "==", userData.teacherId));
+        }
+
         const unsub = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 const data = change.doc.data() as UserData;

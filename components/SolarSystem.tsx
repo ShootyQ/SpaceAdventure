@@ -148,22 +148,45 @@ export default function SolarSystem() {
 
   // Load Ranks Configuration
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "game-config", "ranks"), (doc) => {
-        if (doc.exists() && doc.data().list) {
-            setRanks(doc.data().list);
+    if (!userData) return;
+    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    if (!teacherId && userData.role !== 'admin') return;
+
+    // Try teacher config
+    const teacherRef = doc(db, "game-config", `ranks_${teacherId}`);
+    const unsub = onSnapshot(teacherRef, async (d) => {
+        if (d.exists() && d.data().list) {
+            setRanks(d.data().list);
+        } else {
+             // Fallback to global
+             const globalRef = doc(db, "game-config", "ranks");
+             const globalSnap = await getDoc(globalRef);
+             if (globalSnap.exists() && globalSnap.data().list) {
+                setRanks(globalSnap.data().list);
+             }
         }
     });
     return () => unsub();
-  }, []);
+  }, [userData]);
 
   // Load Behaviors
   useEffect(() => {
-    const q = query(collection(db, "behaviors"), orderBy("xp", "desc"));
+    if (!userData) return;
+    
+    // Determine the teacherId to follow
+    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    if (!teacherId) return;
+
+    const q = query(
+        collection(db, "behaviors"), 
+        where("teacherId", "==", teacherId),
+        orderBy("xp", "desc")
+    );
     const unsub = onSnapshot(q, (snapshot) => {
         setBehaviors(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior)));
     });
     return () => unsub();
-  }, []);
+  }, [userData]);
 
   const zoomRef = useRef(zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -248,8 +271,37 @@ export default function SolarSystem() {
 
   // Real-time subscription to all star travelers
   useEffect(() => {
-    // Listen to ALL users (so we can show the class roster)
-    const q = query(collection(db, "users"));
+    if (!userData) return;
+    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    if (!teacherId && userData.role !== 'admin') return;
+
+    // Listen to users in this class
+    let q = query(
+        collection(db, "users"),
+        where("teacherId", "==", teacherId)
+    );
+    
+    // Fallback/Legacy: If user is teacher but has no 'teacherId' set on themselves (which is fine),
+    // they query usually by... wait.
+    // Teachers don't have teacherId on themselves usually.
+    // If I am a teacher, I want to see students where teacherId == my uid.
+    // If I am a student, I want to see students where teacherId == my teacherId.
+    
+    // BUT! Students also need to see the Teacher's ship (if teachers have ships??)
+    // Currently teachers have role='teacher'. 
+    // If we want students to see the teacher, we might need a more complex query OR 
+    // just rely on 'teacherId' being on the student docs, and maybe the teacher sets their own teacherId to themselves?
+    // Or we execute two queries.
+    // For now, let's just show the class (students).
+    
+    if (userData.role === 'teacher') {
+         q = query(collection(db, "users"), where("teacherId", "==", userData.uid));
+    } else if (userData.role === 'student' && userData.teacherId) {
+         q = query(collection(db, "users"), where("teacherId", "==", userData.teacherId));
+    } else {
+        // Fallback or Admin
+        q = query(collection(db, "users"));
+    }
     
     // Permission-Fail-Safe Snapshot Listener
     const unsubscribe = onSnapshot(q, {
@@ -349,15 +401,25 @@ export default function SolarSystem() {
 
   // Load Dynamic Planet Stats
   useEffect(() => {
-     const unsub = onSnapshot(collection(db, "planets"), (snapshot) => {
+     if (!userData) return;
+     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+     if (!teacherId) return;
+
+     const q = query(collection(db, "planets"), where("teacherId", "==", teacherId));
+     
+     const unsub = onSnapshot(q, (snapshot) => {
          const d = new Map();
          snapshot.forEach(doc => {
-             d.set(doc.id, doc.data());
+             // We use the internal ID stored in the doc, not the document key (which is composite)
+             const data = doc.data();
+             if (data.id) {
+                 d.set(data.id, data);
+             }
          });
          setDynamicPlanets(d);
      });
      return () => unsub();
-  }, []);
+  }, [userData]);
 
   // Helper: Get Planet Position at specific time
   const getPlanetPosition = (planetId: string, timestamp: number) => {

@@ -8,32 +8,38 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { UserData, PLANETS } from "@/types";
 
+import { useAuth } from "@/context/AuthContext";
+import { createStudentAuthAccount } from "@/lib/student-auth";
+
 export default function RosterPage() {
+  const { user } = useAuth();
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Ghost User State
-  const [isAddingGhost, setIsAddingGhost] = useState(false);
-  const [newGhostName, setNewGhostName] = useState("");
+  // Student Creation State
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+  const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
+  const [creationError, setCreationError] = useState("");
+  const [creationLoading, setCreationLoading] = useState(false);
 
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<UserData>>({});
 
   const fetchRoster = async () => {
+    if (!user) return;
     setLoading(true);
     try {
-        // Fetch students and pending users
-        const q = query(collection(db, "users"), where("role", "in", ["student", "pending"]));
+        // Fetch only students belonging to this teacher
+        const q = query(
+            collection(db, "users"), 
+            where("role", "==", "student"),
+            where("teacherId", "==", user.uid)
+        );
         const snapshot = await getDocs(q);
         const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserData));
         
-        // Sort: Active Students first, then Pending
-        users.sort((a, b) => {
-            if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1;
-            if (a.status !== 'pending_approval' && b.status === 'pending_approval') return 1;
-            return (a.displayName || "").localeCompare(b.displayName || "");
-        });
+        users.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
 
         setStudents(users);
     } catch (e: any) {
@@ -44,33 +50,61 @@ export default function RosterPage() {
 
   useEffect(() => {
     fetchRoster();
-  }, []);
+  }, [user]);
 
-  const handleCreateGhost = async () => {
-      if (!newGhostName.trim()) return;
+  const handleAddStudent = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newStudentData.name || !newStudentData.username || !newStudentData.password) return;
+      
+      setCreationLoading(true);
+      setCreationError("");
+      
       try {
-          const ghostId = `ghost_${Date.now()}`;
-          const newStudent: any = {
-              displayName: newGhostName.trim(),
+          // 1. Generate Email
+          // We use a fake domain. Ensure username is unique enough or handle error.
+          const email = `${newStudentData.username}@class.local`; // simplistic for now
+          
+          // 2. Create Auth User
+          const uid = await createStudentAuthAccount(email, newStudentData.password);
+          
+          // 3. Create Firestore Document
+          const newStudent: UserData = {
+              uid: uid,
+              email: email,
+              displayName: newStudentData.name,
+              photoURL: null,
               role: 'student',
+              teacherId: user!.uid,
               status: 'active',
               xp: 0,
+              level: 1,
               location: 'earth',
               fuel: 500,
               travelStatus: 'idle',
-              isGhost: true,
-              email: null,
-              createdAt: Date.now()
+              spaceship: {
+                  name: 'SS ' + newStudentData.name.split(' ')[0],
+                  color: 'text-blue-400',
+                  type: 'scout',
+                  speed: 1
+              },
+              // Store simpler credentials for reference? NO, security risk.
+              // But maybe username for display?
           };
           
-          await setDoc(doc(db, "users", ghostId), newStudent);
+          await setDoc(doc(db, "users", uid), newStudent);
           
-          setStudents(prev => [...prev, { uid: ghostId, ...newStudent }]);
-          setNewGhostName("");
-          setIsAddingGhost(false);
-      } catch (e) {
-          console.error("Error adding ghost user:", e);
-          alert("Failed to create offline user.");
+          setStudents(prev => [...prev, newStudent]);
+          setNewStudentData({ name: "", username: "", password: "" });
+          setIsAddingStudent(false);
+      } catch (e: any) {
+          console.error("Error creating student:", e);
+          if (e.code === 'auth/email-already-in-use') {
+              setCreationError("Username already taken. Try another.");
+          } else {
+              setCreationError("Failed to create student. " + e.message);
+          }
+      } finally {
+          setCreationLoading(false);
       }
   };
 
@@ -135,31 +169,84 @@ export default function RosterPage() {
                  
                  <div className="flex gap-2">
                      <button 
-                        onClick={() => setIsAddingGhost(true)} 
+                        onClick={() => setIsAddingStudent(true)} 
                         className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded-lg transition-colors"
                      >
                         <UserPlus size={18} />
-                        <span className="hidden md:inline">Add Offline Cadet</span>
+                        <span className="hidden md:inline">Add Student</span>
                      </button>
                  </div>
             </div>
 
-            {/* Ghost User Input */}
-            {isAddingGhost && (
-                <div className="mb-8 bg-cyan-900/10 border border-cyan-500/30 p-6 rounded-xl animate-in fade-in slide-in-from-top-4">
-                    <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wider">New Cadet Registration</h3>
-                    <div className="flex gap-4">
-                        <input 
-                            type="text" 
-                            placeholder="Cadet Name" 
-                            className="bg-black/50 border border-cyan-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-cyan-400 flex-1"
-                            value={newGhostName}
-                            onChange={(e) => setNewGhostName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleCreateGhost()}
-                        />
-                        <button onClick={handleCreateGhost} className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg uppercase">Register</button>
-                        <button onClick={() => setIsAddingGhost(false)} className="px-6 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 font-bold rounded-lg uppercase">Cancel</button>
-                    </div>
+            {/* New Student Modal */}
+            {isAddingStudent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <form onSubmit={handleAddStudent} className="w-full max-w-md bg-slate-900 border border-cyan-500/50 p-6 rounded-2xl shadow-[0_0_50px_rgba(0,255,255,0.1)] relative">
+                        <button 
+                            type="button" 
+                            onClick={() => setIsAddingStudent(false)}
+                            className="absolute top-4 right-4 text-cyan-500 hover:text-white"
+                        >
+                            <X size={24} />
+                        </button>
+                        
+                        <h3 className="text-xl font-bold text-white mb-6 uppercase tracking-wider border-b border-cyan-900 pb-2">New Cadet Profile</h3>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-1 uppercase tracking-wider">Display Name</label>
+                                <input 
+                                    autoFocus
+                                    type="text" 
+                                    value={newStudentData.name}
+                                    onChange={(e) => setNewStudentData({...newStudentData, name: e.target.value})}
+                                    className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
+                                    placeholder="e.g. Cadet Tom"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-1 uppercase tracking-wider">Username</label>
+                                <input 
+                                    type="text" 
+                                    value={newStudentData.username}
+                                    onChange={(e) => setNewStudentData({...newStudentData, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')})}
+                                    className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
+                                    placeholder="tom99"
+                                />
+                                <p className="text-[10px] text-cyan-600/80 mt-1 uppercase">Login ID (No Spaces)</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-1 uppercase tracking-wider">Password</label>
+                                <input 
+                                    type="text" 
+                                    value={newStudentData.password}
+                                    onChange={(e) => setNewStudentData({...newStudentData, password: e.target.value})}
+                                    className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
+                                    placeholder="Set Password"
+                                />
+                            </div>
+                        </div>
+
+                        {creationError && <div className="mt-4 p-2 bg-red-900/20 border border-red-500/30 text-red-400 text-xs rounded uppercase tracking-wider">{creationError}</div>}
+
+                        <div className="flex gap-3 mt-8">
+                            <button 
+                                type="button"
+                                onClick={() => setIsAddingStudent(false)}
+                                className="flex-1 bg-slate-800 hover:bg-slate-700 text-gray-400 hover:text-white py-3 rounded-lg font-bold transition-colors uppercase tracking-wider text-xs"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit"
+                                disabled={creationLoading}
+                                className="flex-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-black py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-xs shadow-[0_0_20px_rgba(8,145,178,0.4)]"
+                            >
+                                {creationLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Register
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
 
