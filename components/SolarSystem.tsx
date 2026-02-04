@@ -860,8 +860,17 @@ export default function SolarSystem() {
                        }}
                     >
                        {/* Planet Visual */}
-                       <div className={`rounded-full ${planet.size} ${planet.color} shadow-lg transition-transform group-hover:scale-125 z-20 relative ring-0 group-hover:ring-4 ring-white/20`}>
+                       <div className={`rounded-full ${planet.size} ${['earth', 'mercury', 'venus'].includes(planet.id) ? '' : planet.color} shadow-lg transition-transform group-hover:scale-125 z-20 relative ring-0 group-hover:ring-4 ring-white/20 flex items-center justify-center`}>
                           
+                          {/* Image Texture (if available) */}
+                          {['earth', 'mercury', 'venus'].includes(planet.id) ? (
+                              <img 
+                                src={getAssetPath(`/images/planetpng/${planet.id}.png`)} 
+                                alt={planet.name}
+                                className="w-[140%] h-[140%] max-w-none object-contain" // Scale up slightly to fill standard sizes if needed, or fit
+                              />
+                          ) : null}
+
                           {/* VISITED FLAGS (Map View) */}
                           {/* Show small markers for visitors */}
                           {ships.some(s => s.visitedPlanets?.includes(planet.id)) && (
