@@ -36,7 +36,7 @@ export interface FlagConfig {
 export interface SpaceshipConfig {
     name: string;
     color: string;
-    type: 'scout' | 'fighter' | 'cargo';
+    type: 'scout' | 'fighter' | 'cargo' | 'cruiser';
     speed: number;
 }
   

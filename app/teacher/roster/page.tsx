@@ -6,14 +6,14 @@ import { db } from "@/lib/firebase";
 import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy } from "lucide-react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { UserData, PLANETS } from "@/types";
+import { UserData, PLANETS, SpaceshipConfig } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, AVATAR_PRESETS } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
 
-const SHIP_OPTIONS = [
+const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'scout', name: 'Stellar Scout', src: '/images/ships/finalship.png', type: 'scout' },
     { id: 'interceptor', name: 'Void Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
     { id: 'cruiser', name: 'Star Cruiser', src: '/images/ships/finalship.png', type: 'cruiser' },
