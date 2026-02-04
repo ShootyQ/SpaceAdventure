@@ -38,6 +38,7 @@ export interface SpaceshipConfig {
     color: string;
     type: 'scout' | 'fighter' | 'cargo' | 'cruiser';
     speed: number;
+    modelId?: string;
 }
   
 export interface Rank {
