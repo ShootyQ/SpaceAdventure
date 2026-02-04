@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import { Star, Map, Trophy, Users, LogIn, School, GraduationCap, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -28,7 +28,7 @@ export default function Home() {
     }
   }, [userData, loading, router]);
 
-  const handleStudentLogin = async (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: FormEvent) => {
       e.preventDefault();
       setError('');
       setStudentLoading(true);
@@ -42,7 +42,6 @@ export default function Home() {
           setStudentLoading(false);
       }
   };
-
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between relative overflow-hidden bg-slate-950 text-white">
