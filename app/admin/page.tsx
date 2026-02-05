@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserData } from "@/types";
-import { Loader2, Search, Save, X, Check, Shield, School, User, Gem } from "lucide-react";
+import { Loader2, Search, Save, X, Check, Shield, School, User, Gem, Pencil } from "lucide-react";
 
 interface TeacherStats extends UserData {
     studentCount: number;
