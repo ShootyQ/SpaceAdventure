@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === 'production';
-const repo = 'SpaceAdventure';
-const assetPrefix = isProd ? `/${repo}/` : '';
-const basePath = isProd ? `/${repo}` : '';
+// If deploying to a custom domain (e.g. classcrave.com), keep basePath empty.
+// If deploying to GitHub Pages subdirectory, set this to matches repo name:
+// const repo = 'SpaceAdventure';
+// const assetPrefix = isProd ? `/${repo}/` : '';
+// const basePath = isProd ? `/${repo}` : '';
+const assetPrefix = '';
+const basePath = '';
 
 const nextConfig = {
   output: 'export',
