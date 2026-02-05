@@ -113,7 +113,14 @@ export default function PlanetManagementPage() {
                                  <div className={`absolute top-0 right-0 w-32 h-32 ${planet.color.replace('bg-', 'bg-').replace('text-', '')} opacity-10 rounded-bl-full pointer-events-none`} />
                                  
                                  <div className="flex items-center gap-4 mb-6">
-                                     <div className={`w-12 h-12 rounded-full ${planet.color} shadow-[0_0_15px_currentColor]`} />
+                                     <div className="w-16 h-16 flex items-center justify-center relative">
+                                        <div className={`absolute inset-0 ${planet.color} blur-xl opacity-30 rounded-full`} />
+                                        <img 
+                                            src={getAssetPath(`/images/planetpng/${planet.id}.png`)}
+                                            alt={planet.name}
+                                            className="w-full h-full object-contain relative z-10 drop-shadow-md"
+                                        />
+                                     </div>
                                      <div>
                                          <h3 className="text-xl font-bold text-white uppercase tracking-wider">{planet.name}</h3>
                                          <div className="text-xs text-cyan-600 uppercase">Sector {planet.id}</div>
