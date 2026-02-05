@@ -953,13 +953,24 @@ export default function SettingsPage() {
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
 
     useEffect(() => {
-        const unsub = onSnapshot(doc(db, "game-config", "ranks"), (d) => {
+        if (!userData) return;
+        const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        
+        // Default to global
+        let ref = doc(db, "game-config", "ranks");
+        
+        // If teacher is associated, try to load their ranks
+        if (teacherId) {
+             ref = doc(db, `users/${teacherId}/settings`, "ranks");
+        }
+
+        const unsub = onSnapshot(ref, (d) => {
             if (d.exists() && d.data().list) {
                 setRanks(d.data().list);
             }
         });
         return () => unsub();
-    }, []);
+    }, [userData]);
 
     // Breadcrumb / Title Logic
     const getTitle = () => {

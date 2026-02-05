@@ -164,8 +164,8 @@ export default function SolarSystem() {
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId && userData.role !== 'admin') return;
 
-    // Try teacher config
-    const teacherRef = doc(db, "game-config", `ranks_${teacherId}`);
+    // Try teacher config in their user settings
+    const teacherRef = doc(db, `users/${teacherId}/settings`, "ranks");
     const unsub = onSnapshot(teacherRef, async (d) => {
         if (d.exists() && d.data().list) {
             setRanks(d.data().list);
@@ -407,7 +407,7 @@ export default function SolarSystem() {
     });
     
     return () => unsubscribe();
-  }, []);
+  }, [userData]);
 
 
   const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
