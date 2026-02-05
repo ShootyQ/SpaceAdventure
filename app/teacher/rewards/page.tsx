@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
 import { UserData, Rank } from "@/types";
 import { UserAvatar } from '@/components/UserAvatar';
-import { Star, Plus, Trash2, Save, X, Zap, Award } from "lucide-react";
+import { Star, Plus, Trash2, Save, X, Zap, Award, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
