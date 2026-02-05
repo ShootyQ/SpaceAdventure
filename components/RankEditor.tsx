@@ -28,7 +28,7 @@ export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClo
     useEffect(() => {
         if (isOpen && user) {
             // Load current config: Try teacher specific first, then global
-            const teacherConfigRef = doc(db, "game-config", `ranks_${user.uid}`);
+            const teacherConfigRef = doc(db, `users/${user.uid}/settings`, "ranks");
             
             // We use snapshot on the teacher config
             const unsub = onSnapshot(teacherConfigRef, async (d) => {
@@ -36,6 +36,8 @@ export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClo
                     setDraftRanks(d.data().list);
                 } else {
                     // Fallback fetch global if teacher config doesn't exist yet
+                    // Try the OLD teacher path first for migration compatibility or global?
+                    // Let's just check Global Default
                     const globalRef = doc(db, "game-config", "ranks");
                     const globalSnap = await getDoc(globalRef);
                     if (globalSnap.exists() && globalSnap.data().list) {
@@ -50,8 +52,8 @@ export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClo
     const handleSaveRanks = async () => {
         if (!user) return;
         try {
-            // Save to teacher specific config
-            await setDoc(doc(db, "game-config", `ranks_${user.uid}`), {
+            // Save to teacher specific subcollection
+            await setDoc(doc(db, `users/${user.uid}/settings`, "ranks"), {
                 list: draftRanks,
                 teacherId: user.uid
             });

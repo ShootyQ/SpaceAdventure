@@ -57,7 +57,8 @@ export default function CreateMissionPage() {
 
         try {
             if (!user) throw new Error("Not authenticated");
-            await addDoc(collection(db, "missions"), {
+            // Add to subcollection
+            await addDoc(collection(db, `users/${user.uid}/missions`), {
                 title,
                 description,
                 type,

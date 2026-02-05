@@ -860,14 +860,14 @@ export default function SolarSystem() {
                        }}
                     >
                        {/* Planet Visual */}
-                       <div className={`rounded-full ${planet.size} ${['earth', 'mercury', 'venus'].includes(planet.id) ? '' : planet.color} shadow-lg transition-transform group-hover:scale-125 z-20 relative ring-0 group-hover:ring-4 ring-white/20 flex items-center justify-center`}>
+                       <div className={`rounded-full ${planet.size} ${['sun', 'mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'].includes(planet.id) ? '' : planet.color} shadow-lg transition-transform group-hover:scale-125 z-20 relative ring-0 group-hover:ring-4 ring-white/20 flex items-center justify-center`}>
                           
                           {/* Image Texture (if available) */}
-                          {['earth', 'mercury', 'venus'].includes(planet.id) ? (
+                          {['sun', 'mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'].includes(planet.id) ? (
                               <img 
                                 src={getAssetPath(`/images/planetpng/${planet.id}.png`)} 
                                 alt={planet.name}
-                                className="w-[140%] h-[140%] max-w-none object-contain" // Scale up slightly to fill standard sizes if needed, or fit
+                                className="w-[140%] h-[140%] max-w-none object-contain drop-shadow-2xl" 
                               />
                           ) : null}
 
@@ -1040,7 +1040,14 @@ export default function SolarSystem() {
                  <button onClick={() => setSelectedPlanet(null)} className="text-gray-400 hover:text-white">✕</button>
                </div>
                
-               <div className={`w-full h-32 rounded-lg mb-6 ${selectedPlanet.color} shadow-[inset_0_0_50px_rgba(0,0,0,0.5)] opacity-80`} />
+               <div className="w-full h-40 rounded-lg mb-6 bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden relative group">
+                    <div className={`absolute inset-0 opacity-30 ${selectedPlanet.color} blur-xl`} />
+                    <img 
+                        src={getAssetPath(`/images/planetpng/${selectedPlanet.id}.png`)}
+                        className="w-32 h-32 object-contain relative z-10 drop-shadow-2xl"
+                        alt={selectedPlanet.name}
+                    />
+               </div>
                
                <p className="text-gray-300 mb-6">{selectedPlanet.description}</p>
                

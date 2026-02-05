@@ -67,10 +67,11 @@ export default function RewardsPage() {
             setStudents(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserData)));
         });
 
-        // 2. Fetch Behaviors
+        // 2. Fetch Behaviors (Subcollection)
+        if (!user) return;
+        
         const qBehaviors = query(
-            collection(db, "behaviors"), 
-            where("teacherId", "==", user.uid)
+            collection(db, `users/${user.uid}/behaviors`)
         );
         const unsubBehaviors = onSnapshot(qBehaviors, (snapshot) => {
             const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior));
@@ -79,7 +80,7 @@ export default function RewardsPage() {
         });
 
         // 3. Fetch Ranks
-        const unsubRanks = onSnapshot(doc(db, "game-config", `ranks_${user.uid}`), async (d) => {
+        const unsubRanks = onSnapshot(doc(db, `users/${user.uid}/settings`, "ranks"), async (d) => {
             if (d.exists() && d.data().list) {
                 setRanks(d.data().list);
             } else {
@@ -140,9 +141,8 @@ export default function RewardsPage() {
                  
                  if (rawLocation && xpAmount > 0) {
                      const planetId = rawLocation.toLowerCase();
-                     // Use composite key for Planet Progress: teacherId_planetName
-                     const planetDocId = `${user.uid}_${planetId}`;
-                     const planetRef = doc(db, "planets", planetDocId);
+                     // Use subcollection for Planet Progress
+                     const planetRef = doc(db, `users/${user.uid}/planets`, planetId);
                      
                      // Use set with merge to ensure doc exists and update safely
                      transaction.set(planetRef, { 
@@ -166,7 +166,8 @@ export default function RewardsPage() {
         e.preventDefault();
         if (!user) return;
         try {
-            await addDoc(collection(db, "behaviors"), {
+            // Add to subcollection
+            await addDoc(collection(db, `users/${user.uid}/behaviors`), {
                 label: newLabel,
                 xp: Number(newXp),
                 color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600",
@@ -182,9 +183,9 @@ export default function RewardsPage() {
 
     const handleDeleteBehavior = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if(!confirm("Remove this behavior?")) return;
+        if (!user || !confirm("Remove this behavior?")) return;
         try {
-            await deleteDoc(doc(db, "behaviors", id));
+            await deleteDoc(doc(db, `users/${user.uid}/behaviors`, id));
         } catch (e) { console.error(e); }
     };
 

@@ -36,9 +36,9 @@ export default function MissionsPage() {
         const fetchMissions = async () => {
             if (!user) return;
             try {
+                // Fetch from teacher's subcollection
                 const q = query(
-                    collection(db, "missions"), 
-                    where("teacherId", "==", user.uid),
+                    collection(db, `users/${user.uid}/missions`), 
                     orderBy("createdAt", "desc")
                 );
                 const snapshot = await getDocs(q);

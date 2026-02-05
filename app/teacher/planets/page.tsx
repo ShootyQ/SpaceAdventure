@@ -32,14 +32,15 @@ export default function PlanetManagementPage() {
     // Initial Load & Subscription
     useEffect(() => {
         if (!user) return;
-        const q = query(collection(db, "planets"), where("teacherId", "==", user.uid));
+        // Use subcollection
+        const q = collection(db, `users/${user.uid}/planets`);
         
         const unsub = onSnapshot(q, (snapshot) => {
              const dynamicMap = new Map<string, PlanetData>();
              snapshot.forEach(d => {
-                 // The docId is likely teacherId_planetId, but the internal id field is planetId
                  const data = d.data() as PlanetData;
-                 dynamicMap.set(data.id, data);
+                 // Ensure ID is set (if not in data, use doc ID)
+                 dynamicMap.set(d.id, { ...data, id: d.id });
              });
 
              const merged = PLANETS.map(staticPlanet => {
@@ -61,7 +62,7 @@ export default function PlanetManagementPage() {
              setLoading(false);
         });
         return () => unsub();
-    }, []);
+    }, [user]); // Add user dependency
 
     const handleChange = (id: string, field: keyof PlanetData, value: any) => {
         setPlanets(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
@@ -71,13 +72,10 @@ export default function PlanetManagementPage() {
         if (!user) return;
         setSaving(planet.id);
         try {
-            const docId = `${user.uid}_${planet.id}`;
-            await setDoc(doc(db, "planets", docId), {
+            // Save to subcollection
+            await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
                 id: planet.id,
                 xpGoal: Number(planet.xpGoal),
-                // We don't save currentXP here usually, as that's transactional from rewards, 
-                // but if we are "Setting up" the planet, we might want to preserve it or init it.
-                // Using merge: true protects us.
                 rewardName: planet.rewardName,
                 rewardDescription: planet.rewardDescription,
                 teacherId: user.uid
