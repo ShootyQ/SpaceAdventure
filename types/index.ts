@@ -91,6 +91,8 @@ export interface UserData {
     visitedPlanets?: string[];
     unlockedHats?: string[];
     completedMissions?: string[];
+    schoolName?: string;
+    subscriptionStatus?: 'trial' | 'active';
 }
   
 export interface Planet {

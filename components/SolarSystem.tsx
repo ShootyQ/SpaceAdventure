@@ -418,7 +418,8 @@ export default function SolarSystem() {
      const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
      if (!teacherId) return;
 
-     const q = query(collection(db, "planets"), where("teacherId", "==", teacherId));
+     // Correctly query the teacher's subcollection for planets
+     const q = collection(db, `users/${teacherId}/planets`);
      
      const unsub = onSnapshot(q, (snapshot) => {
          const d = new Map();

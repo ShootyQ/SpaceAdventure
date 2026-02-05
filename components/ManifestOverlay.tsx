@@ -119,7 +119,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             <div className="text-center w-full mb-4">
                 <h3 className="text-white font-bold truncate w-full mb-1">{student.cadetName}</h3>
                 <div className="flex flex-col items-center justify-center gap-1">
-                    {rank?.image && <img src={rank.image} alt={rank.name} className="w-24 h-24 object-contain drop-shadow-md" />}
+                    {rank?.image && <img src={getAssetPath(rank.image)} alt={rank.name} className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-md my-2" />}
                     
                     {/* Dynamic Rank Styling */}
                     <div className={`text-xs uppercase tracking-wider font-bold ${

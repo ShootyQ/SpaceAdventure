@@ -44,14 +44,17 @@ export default function StudentMissions() {
         const fetchData = async () => {
             if (!user || !userData) return;
             try {
-                // Get Missions
+                // Get Missions from Teacher's Subcollection
                 // Filter by teacher if student has a teacher
-                let q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
+                let q;
                 
                 if (userData.teacherId) {
-                    q = query(collection(db, "missions"), where("teacherId", "==", userData.teacherId), orderBy("createdAt", "desc"));
+                    // Correct: Read from the teacher's 'missions' subcollection
+                    q = query(collection(db, `users/${userData.teacherId}/missions`), orderBy("createdAt", "desc"));
                 } else {
-                     // If no teacher likely show global or none? For now global for legacy support
+                     // Fallback check global missions? Or just empty.
+                     // For now, let's look at root missions as a fallback just in case no teacherId
+                     q = query(collection(db, "missions"), orderBy("createdAt", "desc"));
                 }
 
                 const snapshot = await getDocs(q);

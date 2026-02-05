@@ -64,6 +64,14 @@ export default function RosterPage() {
 
   const handleAddStudent = async (e: React.FormEvent) => {
       e.preventDefault();
+
+      // Check Subscription Limit
+      const isTrial = (userData?.subscriptionStatus || 'trial') === 'trial';
+      if (isTrial && students.length >= 5) {
+          alert("TRIAL LIMIT REACHED: Upgrade clearance to recruit more cadets.");
+          return;
+      }
+
       if (!newStudentData.name || !newStudentData.username || !newStudentData.password) return;
       
       setCreationLoading(true);
