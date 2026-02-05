@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getAssetPath } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
