@@ -1,18 +1,58 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe } from 'lucide-react';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import RankEditor from '@/components/RankEditor';
 import CommsFeed from '@/components/CommsFeed';
 import { getAssetPath } from '@/lib/utils';
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+interface ClassBonusConfig {
+    current: number;
+    target: number;
+    reward: string;
+}
 
 export default function TeacherConsole() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const pathname = usePathname();
   const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
+
+  // Class Bonus State
+  const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig>({ current: 0, target: 10000, reward: "Class Reward" });
+  const [isEditingBonus, setIsEditingBonus] = useState(false);
+  const [editBonusForm, setEditBonusForm] = useState<ClassBonusConfig>({ current: 0, target: 10000, reward: "" });
+
+  useEffect(() => {
+        if (!user) return;
+        const bonusRef = doc(db, `users/${user.uid}/settings`, "classBonus");
+        const unsubBonus = onSnapshot(bonusRef, (doc) => {
+            if (doc.exists()) {
+                setBonusConfig(doc.data() as ClassBonusConfig);
+            } else {
+                setDoc(bonusRef, { current: 0, target: 10000, reward: "Class Reward" });
+            }
+        });
+        return () => unsubBonus();
+  }, [user]);
+
+  const handleSaveBonus = async () => {
+        if (!user) return;
+        try {
+            await setDoc(doc(db, `users/${user.uid}/settings`, "classBonus"), {
+                ...editBonusForm,
+                current: Number(editBonusForm.current),
+                target: Number(editBonusForm.target)
+            });
+            setIsEditingBonus(false);
+        } catch (e) {
+            console.error("Error saving bonus:", e);
+        }
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono">
@@ -97,22 +137,76 @@ export default function TeacherConsole() {
           {/* Right Panel - Sensors / Stats */}
           <div className="col-span-1 md:col-span-12 lg:col-span-3 flex flex-col gap-4">
              {/* Class Bonus / Shields */}
-             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-2 text-cyan-300">
-                    <div className="flex items-center gap-2">
-                        <Zap size={18} className="text-yellow-400" />
-                        <span className="text-sm font-bold uppercase tracking-wider">Class Bonus</span>
+             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-6 relative group">
+                <button 
+                    onClick={() => {
+                        setEditBonusForm(bonusConfig);
+                        setIsEditingBonus(true);
+                    }}
+                    className="absolute top-2 right-2 p-2 text-cyan-600 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                    <Edit2 size={14} />
+                </button>
+
+                {isEditingBonus ? (
+                    <div className="space-y-4">
+                         <div className="grid grid-cols-2 gap-2">
+                             <div>
+                                 <label className="text-[10px] uppercase text-cyan-600">Current</label>
+                                 <input 
+                                     type="number" 
+                                     value={editBonusForm.current} 
+                                     onChange={e => setEditBonusForm({...editBonusForm, current: Number(e.target.value)})}
+                                     className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                 />
+                             </div>
+                             <div>
+                                 <label className="text-[10px] uppercase text-cyan-600">Target</label>
+                                 <input 
+                                     type="number" 
+                                     value={editBonusForm.target} 
+                                     onChange={e => setEditBonusForm({...editBonusForm, target: Number(e.target.value)})}
+                                     className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                 />
+                             </div>
+                         </div>
+                         <div>
+                             <label className="text-[10px] uppercase text-cyan-600">Reward</label>
+                             <input 
+                                 type="text" 
+                                 value={editBonusForm.reward} 
+                                 onChange={e => setEditBonusForm({...editBonusForm, reward: e.target.value})}
+                                 className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                             />
+                         </div>
+                         <div className="flex justify-end gap-2">
+                             <button onClick={() => setIsEditingBonus(false)} className="p-1 text-red-500 hover:bg-white/10 rounded"><X size={16} /></button>
+                             <button onClick={handleSaveBonus} className="p-1 text-green-500 hover:bg-white/10 rounded"><Save size={16} /></button>
+                         </div>
                     </div>
-                    <span className="text-xs text-yellow-400 font-bold">7,500 / 10,000</span>
-                </div>
-                
-                <div className="w-full bg-gray-900 rounded-full h-4 mb-2 border border-cyan-500/20 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-yellow-400/10 animate-pulse"></div>
-                    <div 
-                        className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full w-[75%] shadow-[0_0_15px_rgba(250,204,21,0.5)] transition-all duration-1000"
-                    ></div>
-                </div>
-                <div className="text-right text-xs text-cyan-500/60 uppercase tracking-widest">Shields Charging...</div>
+                ) : (
+                    <>
+                        <div className="flex items-center justify-between mb-2 text-cyan-300">
+                            <div className="flex items-center gap-2">
+                                <Zap size={18} className="text-yellow-400" />
+                                <span className="text-sm font-bold uppercase tracking-wider">Class Bonus</span>
+                            </div>
+                            <span className="text-xs text-yellow-400 font-bold">{bonusConfig.current.toLocaleString()} / {bonusConfig.target.toLocaleString()}</span>
+                        </div>
+                        
+                        <div className="w-full bg-gray-900 rounded-full h-4 mb-2 border border-cyan-500/20 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-yellow-400/10 animate-pulse"></div>
+                            <div 
+                                className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(250,204,21,0.5)]"
+                                style={{ width: `${Math.min((bonusConfig.current / bonusConfig.target) * 100, 100)}%` }}
+                            ></div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <div className="text-xs text-yellow-400/80 italic truncate max-w-[150px]">{bonusConfig.reward}</div>
+                            <div className="text-xs text-cyan-500/60 uppercase tracking-widest">Shields Charging...</div>
+                        </div>
+                    </>
+                )}
              </div>
 
              {/* Placeholder for future sidebar items (since Comms moved) */}

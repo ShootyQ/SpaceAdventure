@@ -148,4 +148,10 @@ export interface AsteroidEvent {
   reward: string;
   penalty: string;
   status: 'active' | 'success' | 'failed' | 'idle';
-}  
+}
+
+export interface ClassBonusConfig {
+    current: number;
+    target: number;
+    reward: string;
+}

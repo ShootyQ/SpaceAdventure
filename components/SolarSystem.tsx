@@ -2,13 +2,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award } from "lucide-react";
+import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
-import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent } from "@/types";
+import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
 
 // Note: Removed local interface definitions in favor of @/types
@@ -101,6 +101,18 @@ export default function SolarSystem() {
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
+  const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
+
+  useEffect(() => {
+    if (!userData) return;
+    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    if (!teacherId) return;
+
+    const unsub = onSnapshot(doc(db, `users/${teacherId}/settings`, "classBonus"), (d) => {
+        if (d.exists()) setBonusConfig(d.data() as ClassBonusConfig);
+    });
+    return () => unsub();
+  }, [userData]);
 
   useEffect(() => {
     // Asteroid Event Listener
@@ -320,6 +332,7 @@ export default function SolarSystem() {
                     travelStart: data.travelStart,
                     travelEnd: data.travelEnd,
                     avatarColor: data.spaceship?.color || 'text-cyan-400',
+                    avatar: data.avatar, // Including Avatar Config
                     role: data.role, 
                     xp: data.xp || 0,
                     lastXpReason: data.lastXpReason,
@@ -1015,6 +1028,30 @@ export default function SolarSystem() {
            </button>
        </div>
 
+       {/* Class Bonus HUD */}
+       {bonusConfig && (
+           <div className="absolute top-6 right-6 z-40 bg-black/60 backdrop-blur border border-cyan-500/30 rounded-xl p-4 w-64 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+                <div className="flex items-center justify-between mb-2 text-cyan-300">
+                    <div className="flex items-center gap-2">
+                        <Zap size={16} className="text-yellow-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Class Bonus</span>
+                    </div>
+                </div>
+                
+                <div className="w-full bg-gray-900 rounded-full h-3 mb-2 border border-cyan-500/20 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-yellow-400/10 animate-pulse"></div>
+                    <div 
+                        className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                        style={{ width: `${Math.min((bonusConfig.current / bonusConfig.target) * 100, 100)}%` }}
+                    ></div>
+                </div>
+                <div className="flex justify-between items-center bg-black/40 p-1.5 rounded">
+                     <span className="text-[10px] text-yellow-400 font-bold">{bonusConfig.current.toLocaleString()} / {bonusConfig.target.toLocaleString()}</span>
+                     <span className="text-[10px] text-cyan-400 truncate max-w-[100px]">{bonusConfig.reward}</span>
+                </div>
+           </div>
+       )}
+
        {/* HUD Overlay for Selected Planet */}
        <AnimatePresence>
          {selectedPlanet && (
@@ -1022,7 +1059,7 @@ export default function SolarSystem() {
                initial={{ opacity: 0, x: 300 }}
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 300 }}
-               className="absolute right-0 top-0 bottom-0 w-80 bg-black/90 backdrop-blur-xl border-l border-white/10 p-6 z-50 flex flex-col"
+               className="absolute right-0 top-0 bottom-0 w-80 bg-black/90 backdrop-blur-xl border-l border-white/10 p-6 z-[70] flex flex-col"
             >
                {/* Header overrides for Command Mode */}
                {isCommandMode && controlledShipId && (

@@ -5,6 +5,24 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == userId || resource.data.teacherId == request.auth.uid || request.auth.token.email == 'andrewpcarlson85@gmail.com');
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null && (request.auth.uid == userId || resource.data.teacherId == request.auth.uid || request.auth.token.email == 'andrewpcarlson85@gmail.com');
+      
+      // Subcollections used by Teachers
+      match /behaviors/{docId} {
+        allow read: if request.auth != null; // Students need to read protocols
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /missions/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /planets/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /settings/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /missions/{missionId} {
