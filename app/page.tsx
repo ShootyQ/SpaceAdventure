@@ -16,7 +16,7 @@ export default function Home() {
            <div className="flex gap-6 text-sm font-medium text-slate-400">
               <Link href="#" className="hover:text-white transition-colors">About</Link>
               <Link href="#" className="hover:text-white transition-colors">Educators</Link>
-              <Link href="https://github.com/ShootyQ/SpaceAdventure" target="_blank" className="hover:text-white transition-colors">GitHub</Link>
+              <Link href="/space" className="hover:text-white transition-colors flex items-center gap-1 text-indigo-400"><Rocket className="w-4 h-4" /> Space Adventure</Link>
            </div>
         </div>
       </nav>
@@ -28,9 +28,16 @@ export default function Home() {
            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-indigo-500/20 rounded-[100%] blur-[100px] opacity-30 pointer-events-none" />
            
            <div className="max-w-4xl mx-auto text-center relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6">
-                <Sparkles className="w-3 h-3" />
-                Classroom Adventures: Voyages and Exploration
+              <div className="mb-6 flex flex-col items-center animate-fade-in-up">
+                <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 tracking-wide backdrop-blur-sm shadow-lg shadow-indigo-500/10 transition-all hover:bg-indigo-500/20 hover:scale-105 cursor-default">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span className="text-lg md:text-xl font-light">
+                    <b className="text-indigo-400 font-bold">C</b>lassroom <b className="text-indigo-400 font-bold">R</b>esources: <b className="text-indigo-400 font-bold">A</b>dventures, <b className="text-indigo-400 font-bold">V</b>oyages, & <b className="text-indigo-400 font-bold">E</b>xploration
+                  </span>
+                </div>
+                <p className="mt-4 text-lg md:text-xl text-indigo-300/80 font-medium italic tracking-wide">
+                  "What journey do you <span className="font-bold text-indigo-400">CRAVE</span>?"
+                </p>
               </div>
               
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 text-white">
