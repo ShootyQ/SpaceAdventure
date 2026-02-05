@@ -15,16 +15,16 @@ import { UserAvatar } from "@/components/UserAvatar";
 
 // Default Ranks Definition (Fallback)
 const DEFAULT_RANKS: Rank[] = [
-    { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
-    { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
-    { id: '3', name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
-    { id: '4', name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
-    { id: '5', name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
-    { id: '6', name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
-    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
-    { id: '8', name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
-    { id: '9', name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
-    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
+    { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
+    { id: '2', name: "Rookie Pilot", minXP: 100, image: "/images/badges/RookiePilot.png" },
+    { id: '3', name: "Star Scout", minXP: 300, image: "/images/badges/StarScout.png" },
+    { id: '4', name: "Nebula Navigator", minXP: 600, image: "/images/badges/NebulaNavigator.png" },
+    { id: '5', name: "Solar Specialist", minXP: 1000, image: "/images/badges/SolarSpecialist.png" },
+    { id: '6', name: "Comet Captain", minXP: 1500, image: "/images/badges/CometCaptain.png" },
+    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: "/images/badges/GalaxyGuardian.png" },
+    { id: '8', name: "Cosmic Commander", minXP: 3000, image: "/images/badges/CosmicCommander.png" },
+    { id: '9', name: "Void Admiral", minXP: 4000, image: "/images/badges/VoidAdmiral.png" },
+    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: "/images/badges/GrandStarAdmiral.png" }
 ];
 
 // Data Prototypes
@@ -1379,7 +1379,7 @@ export default function SolarSystem() {
                                                     initial={{ scale: 0, rotate: 180 }}
                                                     animate={{ scale: 1, rotate: 0 }}
                                                     transition={{ type: "spring", bounce: 0.6 }}
-                                                    src={r.image} 
+                                                    src={getAssetPath(r.image)} 
                                                     alt="Rank Badge" 
                                                     className="w-16 h-16 object-contain my-1 drop-shadow-[0_0_20px_rgba(234,179,8,0.8)] relative z-10" 
                                             />

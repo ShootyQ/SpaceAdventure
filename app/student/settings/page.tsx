@@ -245,7 +245,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                                   <div className="text-xl font-bold text-white uppercase tracking-wider">{currentRank.name}</div>
                               </div>
                               {currentRank.image && (
-                                <img src={currentRank.image} alt="Rank Badge" className="w-16 h-16 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.3)]" />
+                                <img src={getAssetPath(currentRank.image)} alt="Rank Badge" className="w-16 h-16 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.3)]" />
                               )}
                           </div>
 
@@ -270,7 +270,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                        <div className="mt-6 aspect-square w-full flex flex-col items-center justify-center relative overflow-hidden rounded-lg bg-black/20 border border-white/5">
                            {currentRank.image ? (
                                 <div className="relative z-10 w-full h-full p-6 pb-8">
-                                    <img src={currentRank.image} alt="Badge" className="w-full h-full object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
+                                    <img src={getAssetPath(currentRank.image)} alt="Badge" className="w-full h-full object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
                                 </div>
                            ) : (
                                 <div className="w-12 h-12 rounded-full bg-black/30 flex items-center justify-center text-white/20">
@@ -933,16 +933,16 @@ function FlagDesigner() {
 }
 
 const DEFAULT_RANKS: Rank[] = [
-    { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
-    { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
-    { id: '3', name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
-    { id: '4', name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
-    { id: '5', name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
-    { id: '6', name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
-    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
-    { id: '8', name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
-    { id: '9', name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
-    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
+    { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
+    { id: '2', name: "Rookie Pilot", minXP: 100, image: "/images/badges/RookiePilot.png" },
+    { id: '3', name: "Star Scout", minXP: 300, image: "/images/badges/StarScout.png" },
+    { id: '4', name: "Nebula Navigator", minXP: 600, image: "/images/badges/NebulaNavigator.png" },
+    { id: '5', name: "Solar Specialist", minXP: 1000, image: "/images/badges/SolarSpecialist.png" },
+    { id: '6', name: "Comet Captain", minXP: 1500, image: "/images/badges/CometCaptain.png" },
+    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: "/images/badges/GalaxyGuardian.png" },
+    { id: '8', name: "Cosmic Commander", minXP: 3000, image: "/images/badges/CosmicCommander.png" },
+    { id: '9', name: "Void Admiral", minXP: 4000, image: "/images/badges/VoidAdmiral.png" },
+    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: "/images/badges/GrandStarAdmiral.png" }
 ];
 
 // --- Main Component ---

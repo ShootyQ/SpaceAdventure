@@ -36,13 +36,38 @@ export default function RewardsPage() {
     const [ranks, setRanks] = useState<Rank[]>([]);
     
     // UI State
-    const [selectedStudent, setSelectedStudent] = useState<UserData | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isAwarding, setIsAwarding] = useState(false);
     const [isManagingProtocols, setIsManagingProtocols] = useState(false);
     
     // Forms
     const [newLabel, setNewLabel] = useState("");
     const [newXp, setNewXp] = useState(50);
     const { user } = useAuth();
+
+    // Helper for Multi-Select
+    const toggleSelection = (uid: string) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(uid)) {
+            newSet.delete(uid);
+        } else {
+            newSet.add(uid);
+        }
+        setSelectedIds(newSet);
+    };
+
+    const clearSelection = () => {
+        setSelectedIds(new Set());
+        setIsAwarding(false);
+    };
+    
+    const selectAll = () => {
+        if (selectedIds.size === students.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(students.map(s => s.uid)));
+        }
+    };
     
     // Mobile check roughly (can be done with CSS mostly, but logic helps for panel)
     const [isMobile, setIsMobile] = useState(false);
@@ -97,7 +122,7 @@ export default function RewardsPage() {
     }, [user]);
 
     const handleAward = async (behavior: Behavior) => {
-        if (!selectedStudent || !user) return;
+        if (selectedIds.size === 0 || !user) return;
         
         // Ensure atomic number handling
         const xpAmount = Number(behavior.xp);
@@ -111,51 +136,60 @@ export default function RewardsPage() {
         }
 
         try {
-            const studentRef = doc(db, "users", selectedStudent.uid);
-            
-            // ATOMIC TRANSACTION: User + Planet
-            await runTransaction(db, async (transaction) => {
-                 // 1. Read Student Data
-                 const sfDoc = await transaction.get(studentRef);
-                 if (!sfDoc.exists()) throw "Student document not found";
-                 const data = sfDoc.data();
-                 
-                 // 2. Calculate User Updates (Fuel Logic)
-                 const fuelLevel = data.upgrades?.fuel || 0;
-                 const maxFuel = 500 + (fuelLevel * 250);
-                 const currentFuel = data.fuel !== undefined ? data.fuel : 500;
-                 
-                 let newFuel = currentFuel + xpAmount;
-                 if (newFuel > maxFuel) newFuel = maxFuel;
-                 if (newFuel < 0) newFuel = 0;
-
-                 // 3. Queue User Update
-                 transaction.update(studentRef, {
-                    xp: increment(xpAmount),
-                    fuel: newFuel,
-                    lastXpReason: behavior.label
-                 });
-
-                 // 4. Queue Planet Update (Atomic)
-                 const rawLocation = data.location;
-                 
-                 if (rawLocation && xpAmount > 0) {
-                     const planetId = rawLocation.toLowerCase();
-                     // Use subcollection for Planet Progress
-                     const planetRef = doc(db, `users/${user.uid}/planets`, planetId);
+            // Process all selected students
+            const promises = Array.from(selectedIds).map(async (uid) => {
+                const studentRef = doc(db, "users", uid);
+                
+                // ATOMIC TRANSACTION: User + Planet
+                await runTransaction(db, async (transaction) => {
+                     // 1. Read Student Data
+                     const sfDoc = await transaction.get(studentRef);
+                     if (!sfDoc.exists()) throw "Student document not found";
+                     const data = sfDoc.data();
                      
-                     // Use set with merge to ensure doc exists and update safely
-                     transaction.set(planetRef, { 
-                         currentXP: increment(xpAmount),
-                         id: planetId,
-                         teacherId: user.uid
-                     }, { merge: true });
-                 }
+                     // 2. Calculate User Updates (Fuel Logic)
+                     const fuelLevel = data.upgrades?.fuel || 0;
+                     const maxFuel = 500 + (fuelLevel * 250);
+                     const currentFuel = data.fuel !== undefined ? data.fuel : 500;
+                     
+                     let newFuel = currentFuel + xpAmount;
+                     if (newFuel > maxFuel) newFuel = maxFuel;
+                     if (newFuel < 0) newFuel = 0;
+
+                     // 3. Queue User Update
+                     transaction.update(studentRef, {
+                        xp: increment(xpAmount),
+                        fuel: newFuel,
+                        lastXpReason: behavior.label
+                     });
+
+                     // 4. Queue Planet Update (Atomic)
+                     const rawLocation = data.location;
+                     
+                     if (rawLocation && xpAmount > 0) {
+                         const planetId = rawLocation.toLowerCase();
+                         // Use subcollection for Planet Progress
+                         const planetRef = doc(db, `users/${user.uid}/planets`, planetId);
+                         
+                         // Use set with merge to ensure doc exists and update safely
+                         transaction.set(planetRef, { 
+                             currentXP: increment(xpAmount),
+                             id: planetId,
+                             teacherId: user.uid
+                         }, { merge: true });
+                     }
+                });
             });
 
-            console.log(`SUCCESS: Awarded ${xpAmount} XP to student and updated local sector.`);
+            await Promise.all(promises);
+
+            console.log(`SUCCESS: Awarded ${xpAmount} XP to ${selectedIds.size} students.`);
+            setIsAwarding(false);
+            setNewLabel(""); // Reset just in case
+            // Optional: Clear selection after award? 
+            // Often teachers want to keep selection to award multiple things, but let's clear for safety/clarity.
+            setSelectedIds(new Set());
             
-            setSelectedStudent(null); // Close modal
         } catch (error) {
             console.error("Error awarding XP:", error);
             alert(`Award Transaction Failed!\n\n${error}`);
@@ -282,14 +316,22 @@ export default function RewardsPage() {
                     </AnimatePresence>
 
                     {/* RIGHT: Cadet Grid */}
-                    <div className="flex-1 bg-black/20 rounded-2xl p-2 md:p-4 overflow-hidden flex flex-col border border-white/5">
+                    <div className="flex-1 bg-black/20 rounded-2xl p-2 md:p-4 overflow-hidden flex flex-col border border-white/5 relative">
                          <div className="mb-4 flex items-center justify-between shrink-0 px-2">
                             <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-widest flex items-center gap-2">
                                 <Award className="text-cyan-400" size={20} />
                                 <span className="hidden md:inline">Active Fleet</span>
                                 <span className="md:hidden">Fleet</span>
                             </h2>
-                            <div className="text-xs text-cyan-600 font-bold bg-cyan-950/50 px-3 py-1 rounded-full">{students.length} Cadets</div>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={selectAll}
+                                    className="text-xs font-bold text-cyan-400 bg-cyan-950/50 hover:bg-cyan-900 border border-cyan-800 px-3 py-1.5 rounded uppercase tracking-wider transition-colors"
+                                >
+                                    {selectedIds.size === students.length && students.length > 0 ? 'Deselect All' : 'Select All'}
+                                </button>
+                                <div className="text-xs text-cyan-600 font-bold bg-cyan-950/50 px-3 py-1 rounded-full">{students.length} Cadets</div>
+                            </div>
                          </div>
 
                          {students.length === 0 ? (
@@ -300,23 +342,34 @@ export default function RewardsPage() {
                                 </div>
                             </div>
                          ) : (
-                             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                                <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 auto-rows-fr pb-20 md:pb-0">
+                             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-24">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 auto-rows-fr">
                                     {students.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
+                                        const isSelected = selectedIds.has(student.uid);
                                         return (
                                         <motion.button
                                             whileTap={{ scale: 0.95 }}
                                             key={student.uid}
-                                            onClick={() => setSelectedStudent(student)}
-                                            className="relative w-full aspect-square flex flex-col p-3 md:p-4 rounded-xl md:rounded-2xl border-2 border-cyan-900/50 bg-black/40 hover:bg-cyan-900/40 hover:border-cyan-400 transition-all cursor-pointer group overflow-hidden"
+                                            onClick={() => toggleSelection(student.uid)}
+                                            className={`
+                                                relative w-full aspect-square flex flex-col p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all cursor-pointer group overflow-hidden
+                                                ${isSelected 
+                                                    ? 'bg-cyan-900/40 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' 
+                                                    : 'bg-black/40 border-cyan-900/50 hover:bg-cyan-900/40 hover:border-cyan-400'}
+                                            `}
                                         >
+                                            {/* CHECKMARK for Selection */}
+                                            <div className={`absolute top-2 left-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
+                                                 {isSelected && <Check size={14} className="text-black stroke-[4]" />}
+                                            </div>
+
                                             {/* Corner Accents */}
                                             <div className="absolute top-0 left-0 w-6 h-6 md:w-8 md:h-8 border-t-2 border-l-2 border-white/5 rounded-tl-xl group-hover:border-cyan-400/50 transition-colors" />
                                             <div className="absolute bottom-0 right-0 w-6 h-6 md:w-8 md:h-8 border-b-2 border-r-2 border-white/5 rounded-br-xl group-hover:border-cyan-400/50 transition-colors" />
 
                                             {/* Rank Badge */}
-                                            <div className="absolute top-2 left-2 md:top-3 md:left-3 flex items-center gap-1 text-[9px] md:text-[10px] uppercase font-bold text-cyan-700 group-hover:text-cyan-400">
+                                            <div className="absolute top-2 left-8 md:top-3 md:left-10 flex items-center gap-1 text-[9px] md:text-[10px] uppercase font-bold text-cyan-700 group-hover:text-cyan-400">
                                                 {rank?.name || 'Cadet'}
                                             </div>
 
@@ -351,12 +404,55 @@ export default function RewardsPage() {
                                 </div>
                              </div>
                          )}
+                         
+                         {/* FLOATING ACTION BAR FOR SELECTION */}
+                         <AnimatePresence>
+                             {selectedIds.size > 0 && (
+                                 <motion.div 
+                                    initial={{ y: 100 }}
+                                    animate={{ y: 0 }}
+                                    exit={{ y: 100 }}
+                                    className="absolute bottom-4 left-4 right-4 bg-cyan-900/90 backdrop-blur-md border border-cyan-500/50 p-4 rounded-xl flex items-center justify-between shadow-2xl z-40"
+                                 >
+                                     <div className="flex items-center gap-4">
+                                         <div className="flex -space-x-2">
+                                             {Array.from(selectedIds).slice(0, 3).map(uid => {
+                                                 const s = students.find(st => st.uid === uid);
+                                                 return (
+                                                     <div key={uid} className="w-8 h-8 rounded-full bg-black border border-cyan-500 overflow-hidden">
+                                                         {s && <UserAvatar userData={s} className="w-full h-full" />}
+                                                     </div>
+                                                 );
+                                             })}
+                                             {selectedIds.size > 3 && (
+                                                 <div className="w-8 h-8 rounded-full bg-cyan-800 border border-cyan-500 flex items-center justify-center text-[10px] font-bold text-white">
+                                                     +{selectedIds.size - 3}
+                                                 </div>
+                                             )}
+                                         </div>
+                                         <div className="text-white font-bold">
+                                             {selectedIds.size} Cadet{selectedIds.size !== 1 ? 's' : ''} Selected
+                                         </div>
+                                     </div>
+                                     <div className="flex gap-2">
+                                         <button onClick={clearSelection} className="px-4 py-2 text-cyan-300 hover:text-white text-sm font-bold uppercase">Cancel</button>
+                                         <button 
+                                            onClick={() => setIsAwarding(true)}
+                                            className="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg uppercase tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center gap-2"
+                                         >
+                                             <Star size={18} className="fill-black" />
+                                             Award XP
+                                         </button>
+                                     </div>
+                                 </motion.div>
+                             )}
+                         </AnimatePresence>
                     </div>
                 </div>
 
                 {/* AWARD MODAL */}
                 <AnimatePresence>
-                    {selectedStudent && (
+                    {isAwarding && (
                         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <motion.div 
                                 initial={{ y: "100%", opacity: 0 }}
@@ -365,19 +461,27 @@ export default function RewardsPage() {
                                 className="bg-space-950 border border-cyan-500/30 rounded-t-2xl md:rounded-2xl w-full max-w-sm md:max-w-md overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]"
                             >
                                 <button 
-                                    onClick={() => setSelectedStudent(null)}
+                                    onClick={() => setIsAwarding(false)}
                                     className="absolute top-4 right-4 text-cyan-700 hover:text-white bg-black/50 p-2 rounded-full z-20"
                                 >
                                     <X size={24} />
                                 </button>
 
                                 <div className="p-6 text-center border-b border-cyan-900/50 bg-black/20 shrink-0">
-                                    <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-3 bg-cyan-900/20 ring-1 ring-cyan-500/30 overflow-hidden relative`}>
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-50"><Rocket size={50} /></div>
-                                        <UserAvatar userData={selectedStudent} className="w-full h-full relative z-10" />
+                                    <div className="flex justify-center -space-x-4 mb-4">
+                                        {Array.from(selectedIds).slice(0, 5).map(uid => {
+                                            const s = students.find(st => st.uid === uid);
+                                            return (
+                                                <div key={uid} className="w-12 h-12 rounded-full bg-black border-2 border-cyan-900 overflow-hidden relative ring-2 ring-black">
+                                                    {s && <UserAvatar userData={s} className="w-full h-full" />}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
-                                    <h2 className="text-2xl font-bold text-white mb-1">{selectedStudent.displayName}</h2>
-                                    <p className="text-cyan-600 text-xs uppercase font-bold tracking-widest mb-4">{selectedStudent.spaceship?.name || 'Vessel'}</p>
+                                    <h2 className="text-xl font-bold text-white mb-1">
+                                        Awarding {selectedIds.size} Cadet{selectedIds.size !== 1 ? 's' : ''}
+                                    </h2>
+                                    <p className="text-cyan-600 text-xs uppercase font-bold tracking-widest mb-0">Select protocol to transmit</p>
                                 </div>
 
                                 <div className="p-4 overflow-y-auto grid grid-cols-1 gap-2 custom-scrollbar bg-black/60">
