@@ -84,7 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     photoURL: currentUser.photoURL,
                     role: 'teacher', // Default new Google signups to Teacher
                     classCode: generateClassCode(),
-                    status: isSuperAdmin ? 'active' : 'pending_approval',
+                    status: 'active', // Auto-activate new teachers
+                    subscriptionStatus: 'trial', // Start on Trial
+                    schoolName: '',
                     location: 'earth',
                     spaceship: {
                         name: 'SS ' + (currentUser.displayName?.split(' ')[0] || 'Voyager'),

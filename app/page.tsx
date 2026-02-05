@@ -97,14 +97,14 @@ export default function Home() {
                         >
                             <div className="flex items-center gap-4">
                                 <div className="p-2 bg-white/20 rounded-lg"><School className="w-5 h-5" /></div>
-                                <span className="text-lg">Teacher Access</span>
+                                <span className="text-lg">Teacher Login</span>
                             </div>
                             <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
                         </button>
 
                         <div className="relative py-2">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
-                            <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="px-2 bg-slate-900 text-slate-500">or</span></div>
+                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
+                             <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="px-2 bg-slate-900 text-slate-500">or</span></div>
                         </div>
 
                         <button 
@@ -117,6 +117,16 @@ export default function Home() {
                             </div>
                             <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
                         </button>
+
+                        <div className="pt-4 border-t border-white/10 text-center">
+                            <p className="text-sm text-slate-400 mb-3">New to Command?</p>
+                            <Link 
+                                href="/start"
+                                className="inline-block px-6 py-2 rounded-full border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/50 hover:text-white transition-all text-sm font-bold uppercase tracking-wider"
+                            >
+                                Application for Commission
+                            </Link>
+                        </div>
                     </div>
                 ) : (
                     <form onSubmit={handleStudentLogin} className="space-y-4">
