@@ -1006,11 +1006,11 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                  <div className="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col">
                      <div className="flex-1">
                         <h3 className="text-xl font-bold text-white mb-2">Free Trial</h3>
-                        <p className="text-gray-400 text-sm mb-4">Perfect for trying out the Space Adventure in your classroom.</p>
+                        <p className="text-gray-400 text-sm mb-4">Perfect for small groups or testing the waters.</p>
                         <ul className="space-y-3 text-sm text-gray-300 mb-8">
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 30 Students</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Basic Solar System Map</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> 14-Day Access</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 5 Students</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Explore All Features</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Unlimited Duration</li>
                         </ul>
                      </div>
                      {userData?.subscriptionStatus !== 'active' && <button disabled className="w-full py-3 rounded-xl bg-white/10 text-white/50 font-bold cursor-not-allowed border border-white/10">Current Plan</button>}
@@ -1020,9 +1020,13 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                      <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
                      <div className="flex-1">
                         <h3 className="text-xl font-bold text-green-400 mb-2">Full Access</h3>
-                        <p className="text-gray-400 text-sm mb-4">Unlimited access to all features and future updates.</p>
+                        <div className="flex items-baseline gap-1 mb-4">
+                            <span className="text-2xl font-bold text-white">$100</span>
+                            <span className="text-sm text-gray-400">/year</span>
+                            <span className="text-xs text-green-400 ml-2">(or $10/mo)</span>
+                        </div>
                         <ul className="space-y-3 text-sm text-gray-300 mb-8">
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Unlimited Students</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 30 Students</li>
                             <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Custom Missions & Planets</li>
                             <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Priority Support</li>
                             <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Full Analytic Dashboard</li>
