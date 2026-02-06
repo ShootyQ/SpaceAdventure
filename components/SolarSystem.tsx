@@ -189,9 +189,9 @@ export default function SolarSystem() {
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId) return;
 
+    // Listens to the teacher's 'behaviors' subcollection
     const q = query(
-        collection(db, "behaviors"), 
-        where("teacherId", "==", teacherId),
+        collection(db, `users/${teacherId}/behaviors`), 
         orderBy("xp", "desc")
     );
     const unsub = onSnapshot(q, (snapshot) => {
