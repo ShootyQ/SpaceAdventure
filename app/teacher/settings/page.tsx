@@ -1156,14 +1156,6 @@ const Trash2 = ({ size, className }: { size: number, className?: string }) => (
     </svg>
 );
 
-function             <h4 className="text-blue-300 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
-                     <p className="text-gray-400 text-xs leading-relaxed">We believe in this tool. If you don't see an increase in student engagement within the first 30 days, we'll refund your subscription in full. No questions asked.</p>
-                 </div>
-             </div>
-        </div>
-    );
-}
-
 // Custom Check Icon for this view
 const Check = ({ size, className }: { size: number, className?: string }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}>
