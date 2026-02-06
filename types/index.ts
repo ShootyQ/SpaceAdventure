@@ -36,7 +36,7 @@ export interface FlagConfig {
 export interface SpaceshipConfig {
     name: string;
     color: string;
-    type: 'scout' | 'fighter' | 'cargo' | 'cruiser';
+    type: "scout" | "fighter" | "cargo" | "cruiser";
     speed: number;
     modelId?: string;
 }
@@ -64,11 +64,11 @@ export interface UserData {
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
-    role: 'teacher' | 'student' | 'pending' | 'admin';
+    role: "teacher" | "student" | "pending" | "admin";
     teacherId?: string; // Links student to a teacher
     classCode?: string; // For teachers, unique code for students to join
     classId?: string;   // Optional grouping
-    status: 'active' | 'pending_approval' | 'rejected';
+    status: "active" | "pending_approval" | "rejected";
     spaceship?: SpaceshipConfig;
     flag?: FlagConfig;
     avatar?: AvatarConfig;
@@ -92,20 +92,13 @@ export interface UserData {
     unlockedHats?: string[];
     completedMissions?: string[];
     schoolName?: string;
-    subscriptionStatus?: 'trial' | 'active';
-}
-  
-export interface Planet {
-    id: string;
-    name: string;
-    color: string;
-    size: string; // Tailwind class
-    pixelSize: number; // Actual pixel width/height for calculations
-    orbitSize: number; // Pixel value for calculation
-    orbitDuration: number; // Seconds
-    startAngle: number; // Degrees
-    description: string;
-    xpRequired: number;
+    subscriptionStatus?: "trial" | "active";
+    // Credentials for Print-outs (Optional/Classroom Management)
+    username?: string;
+    password?: string;
+    
+    // Teaching Team
+    coTeacherEmails?: string[];
 }
   
 export interface Ship {
@@ -118,7 +111,7 @@ export interface Ship {
     avatar?: AvatarConfig;
     travelStart?: number; // Timestamp
     travelEnd?: number; // Timestamp
-    role?: 'teacher' | 'student';
+    role?: "teacher" | "student";
     xp: number; // Added XP tracking
     lastXpReason?: string;
     flag?: FlagConfig;
@@ -149,7 +142,7 @@ export interface AsteroidEvent {
   startClassXP: number;
   reward: string;
   penalty: string;
-  status: 'active' | 'success' | 'failed' | 'idle';
+  status: "active" | "success" | "failed" | "idle";
 }
 
 export interface ClassBonusConfig {
@@ -157,3 +150,4 @@ export interface ClassBonusConfig {
     target: number;
     reward: string;
 }
+

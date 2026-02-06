@@ -3,19 +3,19 @@
 import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs, query, where, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
-    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle
+    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
 import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
 import RankEditor from "@/components/RankEditor";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams } from "next/navigation";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -37,12 +37,12 @@ const SHIP_COLORS = [
 ];
 
 const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
-    <div className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer ${active ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900/40 hover:border-cyan-500/50 hover:bg-cyan-900/20'}`}>
-        <Icon size={24} className={`mb-2 ${active ? 'text-cyan-300' : 'text-cyan-700'}`} />
-        <div className={`text-[10px] uppercase font-bold text-center tracking-wider ${active ? 'text-cyan-100' : 'text-cyan-800'}`}>{label}</div>
+    <div className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer ${active ? "bg-cyan-500/20 border-cyan-400" : "bg-black/40 border-cyan-900/40 hover:border-cyan-500/50 hover:bg-cyan-900/20"}`}>
+        <Icon size={24} className={`mb-2 ${active ? "text-cyan-300" : "text-cyan-700"}`} />
+        <div className={`text-[10px] uppercase font-bold text-center tracking-wider ${active ? "text-cyan-100" : "text-cyan-800"}`}>{label}</div>
         <div className="flex gap-1 mt-2">
             {[...Array(3)].map((_, i) => (
-                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-cyan-400 shadow-[0_0_5px_currentColor]' : 'bg-cyan-950'}`} />
+                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < level ? "bg-cyan-400 shadow-[0_0_5px_currentColor]" : "bg-cyan-950"}`} />
             ))}
         </div>
     </div>
@@ -51,64 +51,64 @@ const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: a
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
     const getColor = (id: string) => {
         const colors: Record<string, string> = {
-            red: '#ef4444', blue: '#3b82f6', green: '#22c55e', yellow: '#eab308',
-            purple: '#a855f7', black: '#171717', white: '#f8fafc', orange: '#f97316'
+            red: "#ef4444", blue: "#3b82f6", green: "#22c55e", yellow: "#eab308",
+            purple: "#a855f7", black: "#171717", white: "#f8fafc", orange: "#f97316"
         };
-        return colors[id] || '#3b82f6';
+        return colors[id] || "#3b82f6";
     };
     
     const poleColors: Record<string, string> = {
-        silver: '#cbd5e1', gold: '#eab308', wood: '#854d0e', black: '#262626'
+        silver: "#cbd5e1", gold: "#eab308", wood: "#854d0e", black: "#262626"
     };
 
     const c1 = getColor(config.primaryColor);
     const c2 = getColor(config.secondaryColor);
     // Simple unique ID for clipPath to avoid conflicts between multiple flags on page
-    const uniqueId = `clip-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, '');
+    const uniqueId = `clip-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, "");
 
     return (
         <svg width="24" height="30" viewBox="0 0 24 30" className="drop-shadow-md">
-            <rect x="2" y="2" width="2" height="28" rx="1" fill={poleColors[config.pole] || '#cbd5e1'} />
+            <rect x="2" y="2" width="2" height="28" rx="1" fill={poleColors[config.pole] || "#cbd5e1"} />
             <g transform="translate(4, 3)">
                 <defs>
                    <clipPath id={uniqueId}>
-                        {config.shape === 'rectangle' && <rect x="0" y="0" width="20" height="12" />}
-                        {config.shape === 'pennant' && <polygon points="0,0 20,6 0,12" />}
-                        {config.shape === 'triangle' && <polygon points="0,0 20,0 10,12 0,0" />} 
-                        {config.shape === 'swallowtail' && <polygon points="0,0 20,0 20,12 10,6 0,12" />} 
+                        {config.shape === "rectangle" && <rect x="0" y="0" width="20" height="12" />}
+                        {config.shape === "pennant" && <polygon points="0,0 20,6 0,12" />}
+                        {config.shape === "triangle" && <polygon points="0,0 20,0 10,12 0,0" />} 
+                        {config.shape === "swallowtail" && <polygon points="0,0 20,0 20,12 10,6 0,12" />} 
                    </clipPath>
                 </defs>
                 <g clipPath={`url(#${uniqueId})`}>
-                     {config.pattern === 'solid' && <rect x="0" y="0" width="20" height="12" fill={c1} />}
-                     {config.pattern === 'stripe-h' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
-                     {config.pattern === 'stripe-v' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
-                     {config.pattern === 'cross' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="8" y="0" width="4" height="12" fill={c2} /><rect x="0" y="4" width="20" height="4" fill={c2} /></>}
-                     {config.pattern === 'circle' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><circle cx="10" cy="6" r="4" fill={c2} /></>}
-                     {config.pattern === 'checkered' && <><rect x="0" y="0" width="10" height="6" fill={c1} /><rect x="10" y="0" width="10" height="6" fill={c2} /><rect x="0" y="6" width="10" height="6" fill={c2} /><rect x="10" y="6" width="10" height="6" fill={c1} /></>}
+                     {config.pattern === "solid" && <rect x="0" y="0" width="20" height="12" fill={c1} />}
+                     {config.pattern === "stripe-h" && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
+                     {config.pattern === "stripe-v" && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
+                     {config.pattern === "cross" && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="8" y="0" width="4" height="12" fill={c2} /><rect x="0" y="4" width="20" height="4" fill={c2} /></>}
+                     {config.pattern === "circle" && <><rect x="0" y="0" width="20" height="12" fill={c1} /><circle cx="10" cy="6" r="4" fill={c2} /></>}
+                     {config.pattern === "checkered" && <><rect x="0" y="0" width="10" height="6" fill={c1} /><rect x="10" y="0" width="10" height="6" fill={c2} /><rect x="0" y="6" width="10" height="6" fill={c2} /><rect x="10" y="6" width="10" height="6" fill={c1} /></>}
                 </g>
             </g>
         </svg>
     );
 }
 
-// UserAvatar replaced by import from '@/components/UserAvatar'
+// UserAvatar replaced by import from "@/components/UserAvatar"
 
 // --- Subviews ---
 
 function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (view: string) => void, ranks: Rank[], onOpenRankEditor: () => void }) {
     const { userData } = useAuth();
     const MENU_ITEMS = [
-        { id: 'ship', title: 'Hangar Bay', icon: Rocket, color: 'text-cyan-400', border: 'border-cyan-500', bg: 'bg-cyan-950/30' },
-        { id: 'inventory', title: 'Cargo Hold', icon: Box, color: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/30' },
-        { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30' },
-        { id: 'flag', title: 'Flag Designer', icon: Flag, color: 'text-red-400', border: 'border-red-500', bg: 'bg-red-950/30' },
+        { id: "ship", title: "Hangar Bay", icon: Rocket, color: "text-cyan-400", border: "border-cyan-500", bg: "bg-cyan-950/30" },
+        { id: "inventory", title: "Cargo Hold", icon: Box, color: "text-amber-400", border: "border-amber-500", bg: "bg-amber-950/30" },
+        { id: "avatar", title: "Pilot Profile", icon: User, color: "text-purple-400", border: "border-purple-500", bg: "bg-purple-950/30" },
+        { id: "flag", title: "Flag Designer", icon: Flag, color: "text-red-400", border: "border-red-500", bg: "bg-red-950/30" },
     ];
 
     // Determine Rank
     const currentXP = userData?.xp || 0;
     const sortedRanks = [...ranks].sort((a,b) => a.minXP - b.minXP);
     // Find highest rank with minXP <= currentXP
-    const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || sortedRanks[0] || { name: 'Recruit', minXP: 0 };
+    const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || sortedRanks[0] || { name: "Recruit", minXP: 0 };
     // Find next rank
     const nextRank = sortedRanks.find(r => r.minXP > currentXP);
     
@@ -125,7 +125,7 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
 
     const shipColor = userData?.spaceship?.color || "text-cyan-400";
     // Extract tailwind color class prefix for glowing effects (e.g. text-blue-400 -> blue)
-    const glowColor = shipColor.includes('-') ? shipColor.split('-')[1] : 'cyan';
+    const glowColor = shipColor.includes("-") ? shipColor.split("-")[1] : "cyan";
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto mt-8">
@@ -154,9 +154,9 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                             `}
                         >
                             <div className={`p-4 rounded-xl bg-black/50 border ${item.border} ${item.color} shadow-[0_0_15px_rgba(0,0,0,0.5)] group-hover:scale-110 transition-transform duration-300 overflow-hidden relative flex items-center justify-center`}>
-                                {item.id === 'avatar' ? (
+                                {item.id === "avatar" ? (
                                    <UserAvatar userData={userData} className="w-8 h-8 rounded-full border border-white/20" />
-                                ) : item.id === 'flag' && userData?.flag ? (
+                                ) : item.id === "flag" && userData?.flag ? (
                                    <div className="scale-125"><TinyFlag config={userData.flag} /></div>
                                 ) : (
                                    <item.icon size={32} />
@@ -170,12 +170,12 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                             </div>
                             
                             {/* Decorative Corner */}
-                            <div className={`absolute top-0 right-0 w-8 h-8 ${item.color.replace('text', 'bg').replace('400', '500')}/10 rounded-bl-3xl`} />
+                            <div className={`absolute top-0 right-0 w-8 h-8 ${item.color.replace("text", "bg").replace("400", "500")}/10 rounded-bl-3xl`} />
                         </motion.button>
                     ))}
 
                     {/* Asteroid Launcher */}
-                     <Link href="/teacher/settings?mode=asteroids" onClick={(e) => { e.preventDefault(); onNavigate('asteroids'); }}>
+                     <Link href="/teacher/settings?mode=asteroids" onClick={(e) => { e.preventDefault(); onNavigate("asteroids"); }}>
                         <motion.div
                              whileHover={{ scale: 1.01 }}
                              className="border border-orange-500/30 bg-orange-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-orange-900/10 transition-colors group cursor-pointer h-full"
@@ -190,8 +190,23 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                         </motion.div>
                     </Link>
 
+                    {/* Team Management */}
+                    <motion.button
+                         onClick={() => onNavigate("team")}
+                         whileHover={{ scale: 1.01 }}
+                         className="border border-blue-500/30 bg-blue-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-blue-900/10 transition-colors group cursor-pointer text-left w-full"
+                    >
+                         <div className="p-4 rounded-xl bg-black/50 border border-blue-500 text-blue-400">
+                            <Users size={32} />
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-bold uppercase tracking-wider text-blue-400">Co-Teachers</h3>
+                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Manage Access</p>
+                         </div>
+                    </motion.button>
+
                     {/* Rank Editor (Teacher Only) */}
-                    {(userData?.role === 'teacher' || userData?.email === 'andrewpcarlson85@gmail.com') && (
+                    {(userData?.role === "teacher" || userData?.email === "andrewpcarlson85@gmail.com") && (
                          <motion.button
                              onClick={onOpenRankEditor}
                              whileHover={{ scale: 1.01 }}
@@ -207,6 +222,21 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                         </motion.button>
                     )}
                     
+                    {/* Billing */}
+                     <motion.button
+                         onClick={() => onNavigate("billing")}
+                         whileHover={{ scale: 1.01 }}
+                         className="border border-green-500/30 bg-green-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-green-900/10 transition-colors group cursor-pointer text-left w-full"
+                    >
+                         <div className="p-4 rounded-xl bg-black/50 border border-green-500 text-green-400">
+                            <CreditCard size={32} />
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-bold uppercase tracking-wider text-green-400">Subscription</h3>
+                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Manage Plan & Billing</p>
+                         </div>
+                    </motion.button>
+
                     {/* Placeholder for future Solar Map Link */}
                     <Link href="/teacher/map" className="md:col-span-2">
                         <motion.div
@@ -233,7 +263,7 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                      <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Commander"}</div>
                      <div className="flex justify-center gap-4 text-[10px] uppercase font-bold tracking-widest text-cyan-400/80">
                         <span>{currentRank.name}</span>
-                        <span className="text-white/30">•</span>
+                        <span className="text-white/30"></span>
                         <span>{currentXP} XP</span>
                      </div>
                  </div>
@@ -282,7 +312,7 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                                     className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400"
                                  />
                              </div>
-                             <p className="text-[10px] text-center text-gray-500 uppercase tracking-widest mt-2">{nextRank ? 'To Next Promotion' : 'Maximum Rank Achieved'}</p>
+                             <p className="text-[10px] text-center text-gray-500 uppercase tracking-widest mt-2">{nextRank ? "To Next Promotion" : "Maximum Rank Achieved"}</p>
                           </div>
                       </div>
 
@@ -309,7 +339,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [loading, setLoading] = useState(false);
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
-    // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
+    // const [selectedType, setSelectedType] = useState("scout"); // Removed Chassis Logic
 
     useEffect(() => {
         if (userData?.spaceship) {
@@ -384,7 +414,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                                 <div className="w-px h-full bg-black/20" />
                              </div>
                         </div>
-                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE • POWERED BY XP</div>
+                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE  POWERED BY XP</div>
                     </div>
                 </div>
 
@@ -416,10 +446,10 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                             <button
                                 key={color.name}
                                 onClick={() => setSelectedColor(color)}
-                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedColor.name === color.name ? 'bg-cyan-500/20 border-cyan-400 scale-105' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedColor.name === color.name ? "bg-cyan-500/20 border-cyan-400 scale-105" : "bg-black/40 border-cyan-900 hover:border-cyan-700"}`}
                             >
                                 <div className={`w-4 h-4 rounded-full ${color.bg} shadow-[0_0_5px_currentColor]`} />
-                                <span className={`text-xs uppercase font-bold ${selectedColor.name === color.name ? 'text-white' : 'text-gray-500'}`}>{color.name}</span>
+                                <span className={`text-xs uppercase font-bold ${selectedColor.name === color.name ? "text-white" : "text-gray-500"}`}>{color.name}</span>
                             </button>
                         ))}
                     </div>
@@ -441,7 +471,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                 <button
                     onClick={handleSave}
                     disabled={loading}
-                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? 'bg-gray-700 text-gray-400 cursor-wait' : 'bg-cyan-600 hover:bg-cyan-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(8,145,178,0.4)]'}`}
+                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? "bg-gray-700 text-gray-400 cursor-wait" : "bg-cyan-600 hover:bg-cyan-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(8,145,178,0.4)]"}`}
                 >
                     <Save size={20} />
                     {loading ? "Calibrating..." : "Save Configuration"}
@@ -483,8 +513,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [bgHue, setBgHue] = useState(userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 240);
     const [bgSat, setBgSat] = useState(userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50);
     const [bgLight, setBgLight] = useState(userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20);
-    const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
-    const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
+    const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || "none");
+    const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || "bunny");
 
     const handleSelectPreset = (presetId: string) => {
         const preset = AVATAR_PRESETS.find(p => p.id === presetId);
@@ -541,7 +571,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
                  <div className="mt-8 text-center">
                     <h3 className="text-xl font-bold text-purple-400 uppercase tracking-widest mb-1">Preview</h3>
-                    <p className="text-purple-300/60 text-sm font-mono">{activeHat !== 'none' ? HAT_OPTIONS.find(h => h.id === activeHat)?.name : 'Standard Uniform'}</p>
+                    <p className="text-purple-300/60 text-sm font-mono">{activeHat !== "none" ? HAT_OPTIONS.find(h => h.id === activeHat)?.name : "Standard Uniform"}</p>
                  </div>
             </div>
 
@@ -612,7 +642,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     // Rank Logic
     const currentXP = userData?.xp || 0;
     const sortedRanks = [...(ranks || [])].sort((a,b) => a.minXP - b.minXP);
-    const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || { name: 'Recruit', minXP: 0 };
+    const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || { name: "Recruit", minXP: 0 };
 
     useEffect(() => {
         if (userData?.displayName) setNewName(userData.displayName);
@@ -643,7 +673,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                     <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none" />
                 </div>
                 <button
-                    onClick={() => onNavigate('avatar-config')}
+                    onClick={() => onNavigate("avatar-config")}
                     className="absolute bottom-0 right-0 p-3 bg-purple-500 rounded-full text-black hover:bg-purple-400 transition-colors shadow-[0_0_15px_rgba(168,85,247,0.5)] z-30"
                 >
                     <Wrench size={20} />
@@ -662,7 +692,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                             autoFocus
                         />
                         <button onClick={handleSaveName} className="p-2 bg-green-600 rounded-lg hover:bg-green-500 text-white"><Save size={16} /></button>
-                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white">✕</button>
+                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white"></button>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3 group/edit">
@@ -679,7 +709,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                 )}
             </div>
 
-            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name} • NO FACTION</p>
+            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name}  NO FACTION</p>
             <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                  <div className="bg-purple-950/30 p-4 rounded-xl border border-purple-500/20 text-center">
                     <div className="text-2xl font-bold text-white">{currentXP} XP</div>
@@ -697,30 +727,30 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
 // --- Flag Designer ---
 
 const FLAG_POLES = [
-    { id: 'silver', name: 'Titanium', color: '#cbd5e1' },
-    { id: 'gold', name: 'Gold Ultima', color: '#eab308' },
-    { id: 'wood', name: 'Ancient Oak', color: '#854d0e' },
-    { id: 'black', name: 'Carbon Fiber', color: '#262626' },
+    { id: "silver", name: "Titanium", color: "#cbd5e1" },
+    { id: "gold", name: "Gold Ultima", color: "#eab308" },
+    { id: "wood", name: "Ancient Oak", color: "#854d0e" },
+    { id: "black", name: "Carbon Fiber", color: "#262626" },
 ];
 
 const FLAG_PATTERNS = [
-    { id: 'solid', name: 'Solid Standard' },
-    { id: 'stripe-h', name: 'Horizon Stripe' },
-    { id: 'stripe-v', name: 'Vertical Split' },
-    { id: 'cross', name: 'Solar Cross' },
-    { id: 'checkered', name: 'Battle Checker' },
-    { id: 'circle', name: 'Core Sun' },
+    { id: "solid", name: "Solid Standard" },
+    { id: "stripe-h", name: "Horizon Stripe" },
+    { id: "stripe-v", name: "Vertical Split" },
+    { id: "cross", name: "Solar Cross" },
+    { id: "checkered", name: "Battle Checker" },
+    { id: "circle", name: "Core Sun" },
 ];
 
 const FLAG_COLORS = [
-    { id: 'red', hex: '#ef4444' },
-    { id: 'blue', hex: '#3b82f6' },
-    { id: 'green', hex: '#22c55e' },
-    { id: 'yellow', hex: '#eab308' },
-    { id: 'purple', hex: '#a855f7' },
-    { id: 'black', hex: '#171717' },
-    { id: 'white', hex: '#f8fafc' },
-    { id: 'orange', hex: '#f97316' },
+    { id: "red", hex: "#ef4444" },
+    { id: "blue", hex: "#3b82f6" },
+    { id: "green", hex: "#22c55e" },
+    { id: "yellow", hex: "#eab308" },
+    { id: "purple", hex: "#a855f7" },
+    { id: "black", hex: "#171717" },
+    { id: "white", hex: "#f8fafc" },
+    { id: "orange", hex: "#f97316" },
 ];
 
 function FlagDesigner() {
@@ -758,40 +788,40 @@ function FlagDesigner() {
         setLoading(false);
     };
 
-    const getColor = (id: string) => FLAG_COLORS.find(c => c.id === id)?.hex || '#3b82f6';
+    const getColor = (id: string) => FLAG_COLORS.find(c => c.id === id)?.hex || "#3b82f6";
 
     const renderFlagContent = () => {
         const c1 = getColor(primaryColor);
         const c2 = getColor(secondaryColor);
 
         switch (pattern) {
-            case 'solid': return <rect x="0" y="0" width="200" height="120" fill={c1} />;
-            case 'stripe-h': return (
+            case "solid": return <rect x="0" y="0" width="200" height="120" fill={c1} />;
+            case "stripe-h": return (
                 <>
                     <rect x="0" y="0" width="200" height="120" fill={c1} />
                     <rect x="0" y="40" width="200" height="40" fill={c2} />
                 </>
             );
-            case 'stripe-v': return (
+            case "stripe-v": return (
                 <>
                     <rect x="0" y="0" width="200" height="120" fill={c1} />
                     <rect x="66" y="0" width="66" height="120" fill={c2} />
                 </>
             );
-            case 'cross': return (
+            case "cross": return (
                 <>
                     <rect x="0" y="0" width="200" height="120" fill={c1} />
                     <rect x="50" y="0" width="30" height="120" fill={c2} />
                     <rect x="0" y="45" width="200" height="30" fill={c2} />
                 </>
             );
-            case 'circle': return (
+            case "circle": return (
                 <>
                     <rect x="0" y="0" width="200" height="120" fill={c1} />
                     <circle cx="100" cy="60" r="35" fill={c2} />
                 </>
             );
-            case 'checkered': return (
+            case "checkered": return (
                 <>
                     <rect x="0" y="0" width="100" height="60" fill={c1} />
                     <rect x="100" y="0" width="100" height="60" fill={c2} />
@@ -819,17 +849,17 @@ function FlagDesigner() {
                              {/* Shadows/Waves overlay */}
                              <defs>
                                 <clipPath id="flagShape">
-                                    {shape === 'rectangle' && <rect x="0" y="0" width="200" height="120" />}
-                                    {shape === 'pennant' && <polygon points="0,0 200,60 0,120" />}
-                                    {shape === 'triangle' && <polygon points="0,0 200,0 100,120 0,0" />} 
-                                    {shape === 'swallowtail' && <polygon points="0,0 200,0 200,120 100,60 0,120" />} 
+                                    {shape === "rectangle" && <rect x="0" y="0" width="200" height="120" />}
+                                    {shape === "pennant" && <polygon points="0,0 200,60 0,120" />}
+                                    {shape === "triangle" && <polygon points="0,0 200,0 100,120 0,0" />} 
+                                    {shape === "swallowtail" && <polygon points="0,0 200,0 200,120 100,60 0,120" />} 
                                 </clipPath>
                              </defs>
                              
                              <g clipPath="url(#flagShape)">
                                  {renderFlagContent()}
                                  {/* Fabric Ripple Effect */}
-                                 <rect x="0" y="0" width="200" height="120" fill="url(#ripple)" opacity="0.3" style={{ mixBlendMode: 'multiply' }} />
+                                 <rect x="0" y="0" width="200" height="120" fill="url(#ripple)" opacity="0.3" style={{ mixBlendMode: "multiply" }} />
                              </g>
                         </g>
 
@@ -858,7 +888,7 @@ function FlagDesigner() {
                                  <button
                                     key={p.id}
                                     onClick={() => setPole(p.id)}
-                                    className={`flex-1 p-2 rounded text-xs uppercase font-bold border transition-all ${pole === p.id ? 'bg-red-500 text-black border-red-400' : 'bg-black/40 border-red-900/50 text-gray-500 hover:text-red-400'}`}
+                                    className={`flex-1 p-2 rounded text-xs uppercase font-bold border transition-all ${pole === p.id ? "bg-red-500 text-black border-red-400" : "bg-black/40 border-red-900/50 text-gray-500 hover:text-red-400"}`}
                                  >
                                     {p.name}
                                  </button>
@@ -874,7 +904,7 @@ function FlagDesigner() {
                                  <button
                                      key={`p-${c.id}`}
                                      onClick={() => setPrimaryColor(c.id)}
-                                     className={`h-10 rounded border transition-all ${primaryColor === c.id ? 'scale-110 border-white ring-2 ring-red-500 ring-offset-2 ring-offset-black' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                     className={`h-10 rounded border transition-all ${primaryColor === c.id ? "scale-110 border-white ring-2 ring-red-500 ring-offset-2 ring-offset-black" : "border-transparent opacity-70 hover:opacity-100"}`}
                                      style={{ backgroundColor: c.hex }}
                                  />
                              ))}
@@ -889,7 +919,7 @@ function FlagDesigner() {
                                  <button
                                      key={`s-${c.id}`}
                                      onClick={() => setSecondaryColor(c.id)}
-                                     className={`h-10 rounded border transition-all ${secondaryColor === c.id ? 'scale-110 border-white ring-2 ring-red-500 ring-offset-2 ring-offset-black' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                     className={`h-10 rounded border transition-all ${secondaryColor === c.id ? "scale-110 border-white ring-2 ring-red-500 ring-offset-2 ring-offset-black" : "border-transparent opacity-70 hover:opacity-100"}`}
                                      style={{ backgroundColor: c.hex }}
                                  />
                              ))}
@@ -904,7 +934,7 @@ function FlagDesigner() {
                                 <button
                                     key={p.id}
                                     onClick={() => setPattern(p.id)}
-                                    className={`p-3 rounded border text-left text-xs uppercase font-bold transition-all ${pattern === p.id ? 'bg-red-500/20 border-red-400 text-white' : 'bg-black/30 border-red-900/30 text-gray-500 hover:bg-red-900/20'}`}
+                                    className={`p-3 rounded border text-left text-xs uppercase font-bold transition-all ${pattern === p.id ? "bg-red-500/20 border-red-400 text-white" : "bg-black/30 border-red-900/30 text-gray-500 hover:bg-red-900/20"}`}
                                 >
                                     {p.name}
                                 </button>
@@ -916,13 +946,13 @@ function FlagDesigner() {
                      <div className="mb-6">
                         <label className="block text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Banner Shape</label>
                         <div className="flex gap-2">
-                             {['rectangle', 'pennant', 'check', 'swallowtail'].map(s => (
+                             {["rectangle", "pennant", "check", "swallowtail"].map(s => (
                                 <button
                                     key={s}
                                     onClick={() => setShape(s)}
-                                    className={`flex-1 p-2 rounded border text-[10px] uppercase font-bold transition-all ${shape === s ? 'bg-white text-black' : 'bg-black/50 border-white/20 text-gray-400 hover:bg-white/10'}`}
+                                    className={`flex-1 p-2 rounded border text-[10px] uppercase font-bold transition-all ${shape === s ? "bg-white text-black" : "bg-black/50 border-white/20 text-gray-400 hover:bg-white/10"}`}
                                 >
-                                    {s === 'swallowtail' ? 'Tail' : s}
+                                    {s === "swallowtail" ? "Tail" : s}
                                 </button>
                              ))}
                         </div>
@@ -932,7 +962,7 @@ function FlagDesigner() {
                 <button
                     onClick={handleSave}
                     disabled={loading}
-                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? 'bg-gray-700 text-gray-400 cursor-wait' : 'bg-red-600 hover:bg-red-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(220,38,38,0.4)]'}`}
+                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? "bg-gray-700 text-gray-400 cursor-wait" : "bg-red-600 hover:bg-red-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(220,38,38,0.4)]"}`}
                 >
                     <Save size={20} />
                     {loading ? "Forging..." : "Fabricate Flag"}
@@ -942,36 +972,287 @@ function FlagDesigner() {
     );
 }
 
+function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const { userData } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [cycle, setCycle] = useState<"monthly" | "yearly">("yearly");
+
+    const PRICE_IDS = {
+        monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
+        yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
+    };
+
+    const handleSubscribe = async () => {
+        if (!userData?.uid) return;
+        setLoading(true);
+        try {
+            const priceId = cycle === "monthly" ? PRICE_IDS.monthly : PRICE_IDS.yearly;
+            
+            const response = await fetch("/api/stripe/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    priceId,
+                    userId: userData.uid,
+                    email: userData.email
+                })
+            });
+
+            if (!response.ok) throw new Error("Network response was not ok");
+            
+            const { url } = await response.json();
+            if (url) {
+                window.location.href = url;
+            } else {
+                throw new Error("No Checkout URL returned");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Checkout initialization failed. Check console.");
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto border border-green-500/30 bg-black/40 rounded-3xl p-8 flex flex-col gap-6">
+             <div className="flex items-center gap-4 border-b border-green-500/30 pb-4">
+                 <div className="p-3 bg-green-500/20 rounded-xl border border-green-500 text-green-400">
+                     <CreditCard size={24} />
+                 </div>
+                 <div>
+                     <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Subscription Management</h2>
+                     <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Plan Status: <span className={userData?.subscriptionStatus === "active" ? "text-green-400 font-bold" : "text-yellow-400 font-bold"}>{userData?.subscriptionStatus || "TRIAL"}</span></p>
+                 </div>
+             </div>
+             
+             <div className="grid md:grid-cols-2 gap-8">
+                 <div className="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col">
+                     <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-2">Free Trial</h3>
+                        <p className="text-gray-400 text-sm mb-4">Perfect for small groups or testing the waters.</p>
+                        <ul className="space-y-3 text-sm text-gray-300 mb-8">
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 5 Students</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Explore All Features</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Unlimited Duration</li>
+                        </ul>
+                     </div>
+                     {userData?.subscriptionStatus !== "active" && <button disabled className="w-full py-3 rounded-xl bg-white/10 text-white/50 font-bold cursor-not-allowed border border-white/10">Current Plan</button>}
+                 </div>
+
+                 <div className="bg-gradient-to-br from-green-900/20 to-black rounded-2xl p-6 border border-green-500/50 flex flex-col relative overflow-hidden">
+                     <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
+                     <div className="flex-1">
+                        <h3 className="text-xl font-bold text-green-400 mb-4">Full Access</h3>
+                        
+                        {/* Toggle */}
+                        <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 w-fit mb-6">
+                            <button 
+                                onClick={() => setCycle("monthly")}
+                                className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${cycle === "monthly" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                Monthly
+                            </button>
+                            <button 
+                                onClick={() => setCycle("yearly")}
+                                className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${cycle === "yearly" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                Yearly
+                            </button>
+                        </div>
+
+                        {cycle === "yearly" ? (
+                            <div className="flex items-baseline gap-1 mb-4">
+                                <span className="text-3xl font-bold text-white">$100</span>
+                                <span className="text-sm text-gray-400">/year</span>
+                                <span className="text-xs text-green-400 ml-2 font-bold bg-green-900/30 px-2 py-1 rounded">SAVE $20</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-baseline gap-1 mb-4">
+                                <span className="text-3xl font-bold text-white">$10</span>
+                                <span className="text-sm text-gray-400">/month</span>
+                            </div>
+                        )}
+
+                        <ul className="space-y-3 text-sm text-gray-300 mb-8">
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 30 Students</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Custom Missions & Planets</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Priority Support</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Full Analytic Dashboard</li>
+                        </ul>
+                     </div>
+                     {userData?.subscriptionStatus === "active" ? (
+                         <button disabled className="w-full py-3 rounded-xl bg-green-500/20 text-green-400 font-bold cursor-not-allowed border border-green-500/50">Active Plan</button>
+                     ) : (
+                         <button onClick={handleSubscribe} className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold transition-all border border-green-400 shadow-[0_0_20px_rgba(22,163,74,0.3)]">
+                            {loading ? "Processing..." : `Upgrade (${cycle})`}
+                         </button>
+                     )}
+                 </div>
+             </div>
+             
+             <div className="mt-4 p-4 bg-blue-900/10 border border-blue-500/30 rounded-xl flex items-start gap-4">
+                 <Sparkles className="text-blue-400 shrink-0 mt-1" />
+                 <div>
+                     <h4 className="text-blue-300 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
+                     <p className="text-gray-400 text-xs leading-relaxed">We believe in this tool. If you don"t see an increase in student engagement within the first 30 days, we"ll refund your subscription in full. No questions asked.</p>
+                 </div>
+             </div>
+        </div>
+    );
+}
+
+function TeamView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const { userData } = useAuth();
+    const [email, setEmail] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !userData?.uid) return;
+        setLoading(true);
+        setError(null);
+        try {
+            await updateDoc(doc(db, "users", userData.uid), {
+                coTeacherEmails: arrayUnion(email.trim())
+            });
+            setEmail("");
+        } catch (e: any) {
+            setError(e.message);
+        }
+        setLoading(false);
+    };
+
+    const handleRemove = async (emailToRemove: string) => {
+        if (!userData?.uid) return;
+        if (!confirm(`Revoke access for ${emailToRemove}?`)) return;
+        try {
+            await updateDoc(doc(db, "users", userData.uid), {
+                coTeacherEmails: arrayRemove(emailToRemove)
+            });
+        } catch (e: any) {
+            setError(e.message);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto border border-blue-500/30 bg-black/40 rounded-3xl p-8 flex flex-col gap-6">
+             <div className="flex items-center gap-4 border-b border-blue-500/30 pb-4">
+                 <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-500 text-blue-400">
+                     <Users size={24} />
+                 </div>
+                 <div>
+                     <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Command Team</h2>
+                     <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Grant access to other educators</p>
+                 </div>
+             </div>
+             
+             <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                 <h3 className="text-lg font-bold text-white mb-4">Authorized Officers</h3>
+                 {(!userData?.coTeacherEmails || userData.coTeacherEmails.length === 0) ? (
+                     <p className="text-gray-500 italic text-sm">No co-teachers assigned.</p>
+                 ) : (
+                     <div className="space-y-3">
+                         {userData.coTeacherEmails.map((email: string) => (
+                             <div key={email} className="flex items-center justify-between p-3 bg-black/40 rounded-lg border border-white/5">
+                                 <div className="flex items-center gap-3">
+                                     <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                                         {email[0].toUpperCase()}
+                                     </div>
+                                     <span className="text-gray-200 font-mono">{email}</span>
+                                 </div>
+                                 <button onClick={() => handleRemove(email)} className="p-2 hover:bg-white/10 rounded-lg text-red-400 transition-colors" title="Revoke Access">
+                                     <Trash2 size={18} />
+                                 </button>
+                             </div>
+                         ))}
+                     </div>
+                 )}
+             </div>
+
+            <form onSubmit={handleAdd} className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-blue-300 mb-4">Add Officer</h3>
+                <div className="flex gap-4">
+                    <input 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="teacher@school.edu"
+                        className="flex-1 bg-black/50 border border-blue-500/30 rounded-xl px-4 py-3 text-white placeholder-blue-500/30 focus:outline-none focus:border-blue-400"
+                        required
+                    />
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="bg-blue-500 hover:bg-blue-400 text-black font-bold uppercase tracking-wider px-6 rounded-xl transition-all disabled:opacity-50"
+                    >
+                        {loading ? "Saving..." : "Grant"}
+                    </button>
+                </div>
+                {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+                <p className="text-blue-400/50 text-[10px] uppercase tracking-widest mt-4">
+                    Note: The user must log in with this Google Email to access your class data.
+                </p>
+            </form>
+        </div>
+    );
+}
+
+// Check icon already defined above? No, Trash2 is missing.
+const Trash2 = ({ size, className }: { size: number, className?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+);
+
+// Custom Check Icon for this view
+const Check = ({ size, className }: { size: number, className?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polyline points="20 6 9 17 4 12" />
+    </svg>
+);
+
 function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const { userData } = useAuth();
     const [durationMinutes, setDurationMinutes] = useState(30);
     const [xpTarget, setXpTarget] = useState(1000); // Increased default target
     const [reward, setReward] = useState("5 Minutes of Extra Recess");
     const [penalty, setPenalty] = useState("No Penalty");
-    const [status, setStatus] = useState<'idle' | 'active' | 'success' | 'failed'>('idle');
+    const [status, setStatus] = useState<"idle" | "active" | "success" | "failed">("idle");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeEventData, setActiveEventData] = useState<AsteroidEvent | null>(null);
     const [timeLeft, setTimeLeft] = useState(0);
 
     useEffect(() => {
-        const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
+        if (!userData?.uid) return;
+        const eventId = `asteroidEvent_${userData.uid}`; // Teacher-specific event
+        
+        const unsub = onSnapshot(doc(db, "game-config", eventId), (d) => {
             if (d.exists()) {
                 const data = d.data() as AsteroidEvent;
-                setStatus(data.active ? 'active' : data.status);
+                setStatus(data.active ? "active" : data.status);
                 setActiveEventData(data);
                 if(data.active && data.startTime) {
                     const end = data.startTime + (data.duration * 1000);
                     const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
                     setTimeLeft(left);
                 }
+            } else {
+                // If doc doesn"t exist yet, we are idle
+                setStatus("idle");
+                setActiveEventData(null);
             }
         });
         return () => unsub();
-    }, []);
+    }, [userData]);
 
     // Timer Interval
     useEffect(() => {
-        if(status !== 'active') return;
+        if(status !== "active") return;
         const interval = setInterval(() => {
              if(activeEventData?.startTime) {
                  const end = activeEventData.startTime + (activeEventData.duration * 1000);
@@ -983,22 +1264,31 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
     }, [status, activeEventData]);
 
     const launchEvent = async () => {
+        if (!userData?.uid) return;
         setLoading(true);
         setError(null);
         try {
            // Fetch current total XP of class to set baseline
            const usersRef = collection(db, "users");
-           const snapshot = await getDocs(usersRef);
+           
+           // Filter for THIS teacher"s students only
+           const q = query(usersRef, where("teacherId", "==", userData.uid));
+           const snapshot = await getDocs(q);
+           
            let startTotal = 0;
            snapshot.forEach(doc => {
                const data = doc.data();
                startTotal += (data.xp || 0);
            });
 
+           // Also include the teacher if they play? usually not.
+           
            // Duration in seconds
            const durationSeconds = durationMinutes * 60;
+           
+           const eventId = `asteroidEvent_${userData.uid}`;
 
-           await setDoc(doc(db, "game-config", "asteroidEvent"), {
+           await setDoc(doc(db, "game-config", eventId), {
                active: true,
                startTime: Date.now(),
                duration: durationSeconds,
@@ -1006,9 +1296,9 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                startClassXP: startTotal, 
                reward,
                penalty,
-               status: 'active'
+               status: "active"
            });
-           setStatus('active');
+           setStatus("active");
         } catch(e: any) { 
             console.error(e); 
             setError("Launch Failed: " + e.message);
@@ -1017,9 +1307,11 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
     };
 
     const stopEvent = async () => {
+        if (!userData?.uid) return;
         setLoading(true);
+        const eventId = `asteroidEvent_${userData.uid}`;
         try {
-            await updateDoc(doc(db, "game-config", "asteroidEvent"), { active: false, status: 'failed' }); 
+            await updateDoc(doc(db, "game-config", eventId), { active: false, status: "failed" }); 
         } catch(e: any) { setError(e.message); }
         setLoading(false);
     };
@@ -1043,14 +1335,14 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                  </div>
              )}
 
-             {status === 'active' ? (
+             {status === "active" ? (
                  <div className="bg-red-900/20 border border-red-500/50 p-8 rounded-xl text-center flex flex-col items-center">
                      <div className="animate-pulse mb-6 p-4 bg-red-500/20 rounded-full border border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.4)]">
                         <AlertTriangle size={64} className="text-red-500" />
                      </div>
                      <h3 className="text-3xl font-bold text-red-500 uppercase tracking-widest mb-2">Event in Progress</h3>
                      <div className="text-4xl font-mono text-white mb-6 font-bold tabular-nums tracking-widest">
-                         {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                         {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}
                      </div>
                      <p className="text-white/60 mb-8 max-w-md">The class is currently defending against the asteroid. Monitor student XP gains on the dashboard.</p>
                      
@@ -1086,7 +1378,7 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                              <input type="text" value={reward} onChange={e => setReward(e.target.value)} className="w-full bg-black border border-orange-500/30 rounded p-3 text-white" />
                          </div>
                          <button onClick={launchEvent} disabled={loading} className="w-full py-4 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-black font-bold rounded-xl text-xl uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all">
-                              {loading ? "Initializing Sensors..." : "⚠️ Initiate Alert"}
+                              {loading ? "Initializing Sensors..." : " Initiate Alert"}
                          </button>
                      </div>
                  </div>
@@ -1096,16 +1388,16 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
 }
 
 const DEFAULT_RANKS: Rank[] = [
-    { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
-    { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
-    { id: '3', name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
-    { id: '4', name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
-    { id: '5', name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
-    { id: '6', name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
-    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
-    { id: '8', name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
-    { id: '9', name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
-    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
+    { id: "1", name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
+    { id: "2", name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
+    { id: "3", name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
+    { id: "4", name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
+    { id: "5", name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
+    { id: "6", name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
+    { id: "7", name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
+    { id: "8", name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
+    { id: "9", name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
+    { id: "10", name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
 ];
 
 // --- Main Component ---
@@ -1121,14 +1413,17 @@ export default function SettingsPage() {
 function SettingsContent() {
     const { userData, user } = useAuth();
     const searchParams = useSearchParams();
-    const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids'>('cockpit');
+    
+    type SettingsView = "cockpit" | "ship" | "inventory" | "avatar" | "avatar-config" | "flag" | "asteroids" | "billing" | "team";
+    const [view, setView] = useState<SettingsView>("cockpit");
+
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
     useEffect(() => {
-        const mode = searchParams.get('mode');
-        if (mode === 'asteroids') {
-            setView('asteroids');
+        const mode = searchParams.get("mode");
+        if (mode === "asteroids") {
+            setView("asteroids");
         }
     }, [searchParams]);
 
@@ -1144,13 +1439,13 @@ function SettingsContent() {
     // Breadcrumb / Title Logic
     const getTitle = () => {
         switch(view) {
-            case 'ship': return 'Hangar Bay';
-            case 'inventory': return 'Cargo Hold';
-            case 'avatar': return 'Pilot Profile';
-            case 'avatar-config': return 'DNA Sequencer';
-            case 'flag': return 'Flag Fabricator';
-            case 'asteroids': return 'Defense Systems';
-            default: return 'Main Cockpit';
+            case "ship": return "Hangar Bay";
+            case "inventory": return "Cargo Hold";
+            case "avatar": return "Pilot Profile";
+            case "avatar-config": return "DNA Sequencer";
+            case "flag": return "Flag Fabricator";
+            case "asteroids": return "Defense Systems";
+            default: return "Main Cockpit";
         }
     };
 
@@ -1162,13 +1457,13 @@ function SettingsContent() {
 
                 {/* Header Navigation */}
                 <div className="flex items-center gap-4 mb-8">
-                    {view === 'cockpit' ? (
+                    {view === "cockpit" ? (
                         <Link href="/teacher" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                             <ArrowLeft size={20} />
                             <span className="sr-only">Exit Cockpit</span>
                         </Link>
                     ) : (
-                        <button onClick={() => setView(view === 'avatar-config' ? 'avatar' : 'cockpit')} className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                        <button onClick={() => setView(view === "avatar-config" ? "avatar" : "cockpit")} className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                             <LayoutDashboard size={20} />
                         </button>
                     )}
@@ -1188,18 +1483,20 @@ function SettingsContent() {
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={view}
-                        initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-                        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                        exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
+                        initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                        animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
                         transition={{ duration: 0.3 }}
                     >
-                        {view === 'cockpit' && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
-                        {view === 'ship' && <ShipSettings userData={userData} user={user} />}
-                        {view === 'inventory' && <InventoryView />}
-                        {view === 'avatar' && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
-                        {view === 'avatar-config' && <AvatarConfigView onBack={() => setView('avatar')} />}
-                        {view === 'flag' && <FlagDesigner />}
-                        {view === 'asteroids' && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
+                        {view === "cockpit" && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
+                        {view === "ship" && <ShipSettings userData={userData} user={user} />}
+                        {view === "inventory" && <InventoryView />}
+                        {view === "avatar" && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
+                        {view === "avatar-config" && <AvatarConfigView onBack={() => setView("avatar")} />}
+                        {view === "flag" && <FlagDesigner />}
+                        {view === "asteroids" && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
+                        {view === "billing" && <BillingView onNavigate={(v) => setView(v as any)} />}
+                        {view === "team" && <TeamView onNavigate={(v) => setView(v as any)} />}
                     </motion.div>
                 </AnimatePresence>
                 
@@ -1209,5 +1506,3 @@ function SettingsContent() {
         </div>
     );
 }
-
-
