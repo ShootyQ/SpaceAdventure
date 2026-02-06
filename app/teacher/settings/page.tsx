@@ -3,12 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs, query, where, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
-    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle
+    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
 import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
 import RankEditor from "@/components/RankEditor";
@@ -190,6 +190,21 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                         </motion.div>
                     </Link>
 
+                    {/* Team Management */}
+                    <motion.button
+                         onClick={() => onNavigate('team')}
+                         whileHover={{ scale: 1.01 }}
+                         className="border border-blue-500/30 bg-blue-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-blue-900/10 transition-colors group cursor-pointer text-left w-full"
+                    >
+                         <div className="p-4 rounded-xl bg-black/50 border border-blue-500 text-blue-400">
+                            <Users size={32} />
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-bold uppercase tracking-wider text-blue-400">Co-Teachers</h3>
+                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Manage Access</p>
+                         </div>
+                    </motion.button>
+
                     {/* Rank Editor (Teacher Only) */}
                     {(userData?.role === 'teacher' || userData?.email === 'andrewpcarlson85@gmail.com') && (
                          <motion.button
@@ -207,6 +222,21 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                         </motion.button>
                     )}
                     
+                    {/* Billing */}
+                     <motion.button
+                         onClick={() => onNavigate('billing')}
+                         whileHover={{ scale: 1.01 }}
+                         className="border border-green-500/30 bg-green-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-green-900/10 transition-colors group cursor-pointer text-left w-full"
+                    >
+                         <div className="p-4 rounded-xl bg-black/50 border border-green-500 text-green-400">
+                            <CreditCard size={32} />
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-bold uppercase tracking-wider text-green-400">Subscription</h3>
+                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Manage Plan & Billing</p>
+                         </div>
+                    </motion.button>
+
                     {/* Placeholder for future Solar Map Link */}
                     <Link href="/teacher/map" className="md:col-span-2">
                         <motion.div
@@ -942,7 +972,199 @@ function FlagDesigner() {
     );
 }
 
+function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const { userData } = useAuth();
+    const [loading, setLoading] = useState(false);
+
+    const handleSubscribe = async () => {
+        setLoading(true);
+        try {
+            // Mock integration - replace with real Stripe call later
+            // const response = await fetch('/api/create-checkout-session', { method: 'POST' });
+            // const { url } = await response.json();
+            // window.location.href = url;
+            alert("This will redirect to Stripe Checkout.");
+        } catch (e) {
+            console.error(e);
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto border border-green-500/30 bg-black/40 rounded-3xl p-8 flex flex-col gap-6">
+             <div className="flex items-center gap-4 border-b border-green-500/30 pb-4">
+                 <div className="p-3 bg-green-500/20 rounded-xl border border-green-500 text-green-400">
+                     <CreditCard size={24} />
+                 </div>
+                 <div>
+                     <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Subscription Management</h2>
+                     <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Plan Status: <span className={userData?.subscriptionStatus === 'active' ? "text-green-400 font-bold" : "text-yellow-400 font-bold"}>{userData?.subscriptionStatus || 'TRIAL'}</span></p>
+                 </div>
+             </div>
+             
+             <div className="grid md:grid-cols-2 gap-8">
+                 <div className="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col">
+                     <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-2">Free Trial</h3>
+                        <p className="text-gray-400 text-sm mb-4">Perfect for trying out the Space Adventure in your classroom.</p>
+                        <ul className="space-y-3 text-sm text-gray-300 mb-8">
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 30 Students</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Basic Solar System Map</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> 14-Day Access</li>
+                        </ul>
+                     </div>
+                     {userData?.subscriptionStatus !== 'active' && <button disabled className="w-full py-3 rounded-xl bg-white/10 text-white/50 font-bold cursor-not-allowed border border-white/10">Current Plan</button>}
+                 </div>
+
+                 <div className="bg-gradient-to-br from-green-900/20 to-black rounded-2xl p-6 border border-green-500/50 flex flex-col relative overflow-hidden">
+                     <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
+                     <div className="flex-1">
+                        <h3 className="text-xl font-bold text-green-400 mb-2">Full Access</h3>
+                        <p className="text-gray-400 text-sm mb-4">Unlimited access to all features and future updates.</p>
+                        <ul className="space-y-3 text-sm text-gray-300 mb-8">
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Unlimited Students</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Custom Missions & Planets</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Priority Support</li>
+                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Full Analytic Dashboard</li>
+                        </ul>
+                     </div>
+                     {userData?.subscriptionStatus === 'active' ? (
+                         <button disabled className="w-full py-3 rounded-xl bg-green-500/20 text-green-400 font-bold cursor-not-allowed border border-green-500/50">Active Plan</button>
+                     ) : (
+                         <button onClick={handleSubscribe} className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold transition-all border border-green-400 shadow-[0_0_20px_rgba(22,163,74,0.3)]">
+                            Upgrade Now
+                         </button>
+                     )}
+                 </div>
+             </div>
+             
+             <div className="mt-4 p-4 bg-blue-900/10 border border-blue-500/30 rounded-xl flex items-start gap-4">
+                 <Sparkles className="text-blue-400 shrink-0 mt-1" />
+                 <div>
+         TeamView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const { userData } = useAuth();
+    const [email, setEmail] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !userData?.uid) return;
+        setLoading(true);
+        setError(null);
+        try {
+            await updateDoc(doc(db, "users", userData.uid), {
+                coTeacherEmails: arrayUnion(email.trim())
+            });
+            setEmail("");
+        } catch (e: any) {
+            setError(e.message);
+        }
+        setLoading(false);
+    };
+
+    const handleRemove = async (emailToRemove: string) => {
+        if (!userData?.uid) return;
+        if (!confirm(`Revoke access for ${emailToRemove}?`)) return;
+        try {
+            await updateDoc(doc(db, "users", userData.uid), {
+                coTeacherEmails: arrayRemove(emailToRemove)
+            });
+        } catch (e: any) {
+            setError(e.message);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto border border-blue-500/30 bg-black/40 rounded-3xl p-8 flex flex-col gap-6">
+             <div className="flex items-center gap-4 border-b border-blue-500/30 pb-4">
+                 <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-500 text-blue-400">
+                     <Users size={24} />
+                 </div>
+                 <div>
+                     <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Command Team</h2>
+                     <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Grant access to other educators</p>
+                 </div>
+             </div>
+             
+             <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                 <h3 className="text-lg font-bold text-white mb-4">Authorized Officers</h3>
+                 {(!userData?.coTeacherEmails || userData.coTeacherEmails.length === 0) ? (
+                     <p className="text-gray-500 italic text-sm">No co-teachers assigned.</p>
+                 ) : (
+                     <div className="space-y-3">
+                         {userData.coTeacherEmails.map((email: string) => (
+                             <div key={email} className="flex items-center justify-between p-3 bg-black/40 rounded-lg border border-white/5">
+                                 <div className="flex items-center gap-3">
+                                     <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                                         {email[0].toUpperCase()}
+                                     </div>
+                                     <span className="text-gray-200 font-mono">{email}</span>
+                                 </div>
+                                 <button onClick={() => handleRemove(email)} className="p-2 hover:bg-white/10 rounded-lg text-red-400 transition-colors" title="Revoke Access">
+                                     <Trash2 size={18} />
+                                 </button>
+                             </div>
+                         ))}
+                     </div>
+                 )}
+             </div>
+
+            <form onSubmit={handleAdd} className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-blue-300 mb-4">Add Officer</h3>
+                <div className="flex gap-4">
+                    <input 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="teacher@school.edu"
+                        className="flex-1 bg-black/50 border border-blue-500/30 rounded-xl px-4 py-3 text-white placeholder-blue-500/30 focus:outline-none focus:border-blue-400"
+                        required
+                    />
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="bg-blue-500 hover:bg-blue-400 text-black font-bold uppercase tracking-wider px-6 rounded-xl transition-all disabled:opacity-50"
+                    >
+                        {loading ? "Saving..." : "Grant"}
+                    </button>
+                </div>
+                {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+                <p className="text-blue-400/50 text-[10px] uppercase tracking-widest mt-4">
+                    Note: The user must log in with this Google Email to access your class data.
+                </p>
+            </form>
+        </div>
+    );
+}
+
+// Check icon already defined above? No, Trash2 is missing.
+const Trash2 = ({ size, className }: { size: number, className?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+);
+
+function             <h4 className="text-blue-300 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
+                     <p className="text-gray-400 text-xs leading-relaxed">We believe in this tool. If you don't see an increase in student engagement within the first 30 days, we'll refund your subscription in full. No questions asked.</p>
+                 </div>
+             </div>
+        </div>
+    );
+}
+
+// Custom Check Icon for this view
+const Check = ({ size, className }: { size: number, className?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polyline points="20 6 9 17 4 12" />
+    </svg>
+);
+
 function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => void }) {
+    const { userData } = useAuth();
     const [durationMinutes, setDurationMinutes] = useState(30);
     const [xpTarget, setXpTarget] = useState(1000); // Increased default target
     const [reward, setReward] = useState("5 Minutes of Extra Recess");
@@ -954,7 +1176,10 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
     const [timeLeft, setTimeLeft] = useState(0);
 
     useEffect(() => {
-        const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
+        if (!userData?.uid) return;
+        const eventId = `asteroidEvent_${userData.uid}`; // Teacher-specific event
+        
+        const unsub = onSnapshot(doc(db, "game-config", eventId), (d) => {
             if (d.exists()) {
                 const data = d.data() as AsteroidEvent;
                 setStatus(data.active ? 'active' : data.status);
@@ -964,10 +1189,14 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
                     const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
                     setTimeLeft(left);
                 }
+            } else {
+                // If doc doesn't exist yet, we are idle
+                setStatus('idle');
+                setActiveEventData(null);
             }
         });
         return () => unsub();
-    }, []);
+    }, [userData]);
 
     // Timer Interval
     useEffect(() => {
@@ -983,22 +1212,31 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
     }, [status, activeEventData]);
 
     const launchEvent = async () => {
+        if (!userData?.uid) return;
         setLoading(true);
         setError(null);
         try {
            // Fetch current total XP of class to set baseline
            const usersRef = collection(db, "users");
-           const snapshot = await getDocs(usersRef);
+           
+           // Filter for THIS teacher's students only
+           const q = query(usersRef, where("teacherId", "==", userData.uid));
+           const snapshot = await getDocs(q);
+           
            let startTotal = 0;
            snapshot.forEach(doc => {
                const data = doc.data();
                startTotal += (data.xp || 0);
            });
 
+           // Also include the teacher if they play? usually not.
+           
            // Duration in seconds
            const durationSeconds = durationMinutes * 60;
+           
+           const eventId = `asteroidEvent_${userData.uid}`;
 
-           await setDoc(doc(db, "game-config", "asteroidEvent"), {
+           await setDoc(doc(db, "game-config", eventId), {
                active: true,
                startTime: Date.now(),
                duration: durationSeconds,
@@ -1017,9 +1255,11 @@ function AsteroidControlView({ onNavigate }: { onNavigate: (view: string) => voi
     };
 
     const stopEvent = async () => {
+        if (!userData?.uid) return;
         setLoading(true);
+        const eventId = `asteroidEvent_${userData.uid}`;
         try {
-            await updateDoc(doc(db, "game-config", "asteroidEvent"), { active: false, status: 'failed' }); 
+            await updateDoc(doc(db, "game-config", eventId), { active: false, status: 'failed' }); 
         } catch(e: any) { setError(e.message); }
         setLoading(false);
     };
@@ -1121,7 +1361,7 @@ export default function SettingsPage() {
 function SettingsContent() {
     const { userData, user } = useAuth();
     const searchParams = useSearchParams();
-    const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids'>('cockpit');
+type SettingsView = 'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids' | 'billing' | 'team';
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
@@ -1200,6 +1440,8 @@ function SettingsContent() {
                         {view === 'avatar-config' && <AvatarConfigView onBack={() => setView('avatar')} />}
                         {view === 'flag' && <FlagDesigner />}
                         {view === 'asteroids' && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
+                        {view === 'billing' && <BillingView onNavigate={(v) => setView(v as any)} />}
+                        {view === 'team' && <TeamView onNavigate={(v) => setView(v as any)} />}
                     </motion.div>
                 </AnimatePresence>
                 

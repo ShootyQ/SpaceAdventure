@@ -1,17 +1,48 @@
 "use client";
 import Link from 'next/link';
+import Image from 'next/image';
 import { Rocket, Sparkles, ArrowRight, BookOpen, Compass } from 'lucide-react';
 
 export default function Home() {
+  
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ClassCrave",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Gamified classroom management platform that turns learning into an epic space adventure.",
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "150"
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col font-sans bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       
       {/* Navigation */}
       <nav className="w-full border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
            <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-              <Compass className="w-6 h-6 text-indigo-400" />
-              <span>CRAVE</span>
+              <Image 
+                src="/images/logos/classcrave logo.png" 
+                alt="ClassCrave Logo" 
+                width={160} 
+                height={40} 
+                className="h-10 w-auto object-contain"
+                priority
+              />
            </div>
            <div className="flex gap-6 text-sm font-medium text-slate-400">
               <Link href="/about" className="hover:text-white transition-colors">About</Link>

@@ -96,6 +96,9 @@ export interface UserData {
     // Credentials for Print-outs (Optional/Classroom Management)
     username?: string;
     password?: string;
+    
+    // Teaching Team
+    coTeacherEmails?: string[];
 }
   
 export interface Planet {
