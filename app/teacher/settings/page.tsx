@@ -1361,7 +1361,10 @@ export default function SettingsPage() {
 function SettingsContent() {
     const { userData, user } = useAuth();
     const searchParams = useSearchParams();
-type SettingsView = 'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids' | 'billing' | 'team';
+    
+    type SettingsView = 'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag' | 'asteroids' | 'billing' | 'team';
+    const [view, setView] = useState<SettingsView>('cockpit');
+
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
