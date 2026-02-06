@@ -93,6 +93,9 @@ export interface UserData {
     completedMissions?: string[];
     schoolName?: string;
     subscriptionStatus?: 'trial' | 'active';
+    // Credentials for Print-outs (Optional/Classroom Management)
+    username?: string;
+    password?: string;
 }
   
 export interface Planet {

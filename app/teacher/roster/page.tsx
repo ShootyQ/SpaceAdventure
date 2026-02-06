@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy } from "lucide-react";
+import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy, Printer } from "lucide-react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { UserData, PLANETS, SpaceshipConfig } from "@/types";
@@ -114,8 +114,9 @@ export default function RosterPage() {
                   modelId: selectedShip.id // Store the ship model ID if needed later
               },
               avatar: selectedPreset.config,
-              // Store simpler credentials for reference? NO, security risk.
-              // But maybe username for display?
+              // Storing credentials for classroom management features (Print Cards)
+              username: newStudentData.username,
+              password: newStudentData.password
           };
           
           await setDoc(doc(db, "users", uid), newStudent);
@@ -224,6 +225,14 @@ export default function RosterPage() {
                  </div>
                  
                  <div className="flex gap-2">
+                     <Link 
+                        href="/teacher/roster/print"
+                        className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold uppercase rounded-lg transition-colors border border-white/20"
+                     >
+                        <Printer size={18} />
+                        <span className="hidden md:inline">Print Cards</span>
+                     </Link>
+
                      <button 
                         onClick={() => setIsAddingStudent(true)} 
                         className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded-lg transition-colors"
