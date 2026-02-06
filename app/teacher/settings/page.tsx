@@ -1041,7 +1041,15 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
              <div className="mt-4 p-4 bg-blue-900/10 border border-blue-500/30 rounded-xl flex items-start gap-4">
                  <Sparkles className="text-blue-400 shrink-0 mt-1" />
                  <div>
-         TeamView({ onNavigate }: { onNavigate: (view: string) => void }) {
+                     <h4 className="text-blue-300 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
+                     <p className="text-gray-400 text-xs leading-relaxed">We believe in this tool. If you don't see an increase in student engagement within the first 30 days, we'll refund your subscription in full. No questions asked.</p>
+                 </div>
+             </div>
+        </div>
+    );
+}
+
+function TeamView({ onNavigate }: { onNavigate: (view: string) => void }) {
     const { userData } = useAuth();
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
