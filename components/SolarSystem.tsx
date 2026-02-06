@@ -115,14 +115,23 @@ export default function SolarSystem() {
   }, [userData]);
 
   useEffect(() => {
-    // Asteroid Event Listener
-    const unsub = onSnapshot(doc(db, "game-config", "asteroidEvent"), (d) => {
+    if (!userData) return;
+    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    if (!teacherId) return;
+
+    // Use Teacher-Specific Asteroid Event ID
+    const eventId = `asteroidEvent_${teacherId}`;
+
+    const unsub = onSnapshot(doc(db, "game-config", eventId), (d) => {
         if (d.exists()) {
              setAsteroidEvent(d.data() as AsteroidEvent);
+        } else {
+             // Fallback to global if legacy exists? Or just null
+             setAsteroidEvent(null);
         }
     });
     return () => unsub();
-  }, []);
+  }, [userData]);
 
   const [isSoundOn, setIsSoundOn] = useState(true); // Default on for Map View
   const toggleSound = () => {
@@ -189,9 +198,9 @@ export default function SolarSystem() {
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId) return;
 
+    // Listens to the teacher's 'behaviors' subcollection
     const q = query(
-        collection(db, "behaviors"), 
-        where("teacherId", "==", teacherId),
+        collection(db, `users/${teacherId}/behaviors`), 
         orderBy("xp", "desc")
     );
     const unsub = onSnapshot(q, (snapshot) => {
@@ -242,8 +251,16 @@ export default function SolarSystem() {
   useEffect(() => {
     setMounted(true);
     let frameId: number;
-    const animate = () => {
-        setNow(Date.now());
+    let lastTime = 0;
+    const FPS = 30;
+    const interval = 1000 / FPS;
+
+    const animate = (time: number) => {
+        const delta = time - lastTime;
+        if (delta > interval) {
+            setNow(Date.now());
+            lastTime = time - (delta % interval);
+        }
         frameId = requestAnimationFrame(animate);
     };
     // Pause animation if the Manifest Overlay is open to save resources

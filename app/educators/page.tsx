@@ -2,8 +2,44 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle, GraduationCap, School } from 'lucide-react';
 
 export default function EducatorsPage() {
+    
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does ClassCrave increase student engagement?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ClassCrave turns passive listeners into active crew members by calculating XP and assigning ranks based on participation and behavior."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is ClassCrave suitable for my grade level?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, ClassCrave is flexible and designed to work with any subject. It is optimized for 4th through 9th grade classrooms."
+        }
+      },
+      {
+         "@type": "Question",
+         "name": "Does it replace behavior charts?",
+         "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, our automated XP (Experience Points) and HP (Health Points) systems provide a digital, gamified alternative to traditional behavior tracking methods."
+         }
+      }
+    ]
+  };
+
   return (
     <div className="flex min-h-screen flex-col font-sans bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+       <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       
        {/* Navigation */}
        <nav className="w-full border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
