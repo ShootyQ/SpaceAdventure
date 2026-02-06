@@ -170,7 +170,7 @@ export default function Home() {
                                 value={studentCreds.password}
                                 onChange={(e) => setStudentCreds({...studentCreds, password: e.target.value})}
                                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 transition-all"
-                                placeholder="••••••••"
+                                placeholder=""
                             />
                         </div>
 

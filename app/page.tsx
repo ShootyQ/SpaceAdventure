@@ -14,8 +14,8 @@ export default function Home() {
               <span>CRAVE</span>
            </div>
            <div className="flex gap-6 text-sm font-medium text-slate-400">
-              <Link href="#" className="hover:text-white transition-colors">About</Link>
-              <Link href="#" className="hover:text-white transition-colors">Educators</Link>
+              <Link href="/about" className="hover:text-white transition-colors">About</Link>
+              <Link href="/educators" className="hover:text-white transition-colors">Educators</Link>
               <Link href="/space" className="hover:text-white transition-colors flex items-center gap-1 text-indigo-400"><Rocket className="w-4 h-4" /> Space Adventure</Link>
            </div>
         </div>
@@ -32,7 +32,7 @@ export default function Home() {
                 <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 tracking-wide backdrop-blur-sm shadow-lg shadow-indigo-500/10 transition-all hover:bg-indigo-500/20 hover:scale-105 cursor-default">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
                   <span className="text-lg md:text-xl font-light">
-                    <b className="text-indigo-400 font-bold">C</b>lassroom <b className="text-indigo-400 font-bold">R</b>esources: <b className="text-indigo-400 font-bold">A</b>dventures, <b className="text-indigo-400 font-bold">V</b>oyages, & <b className="text-indigo-400 font-bold">E</b>xploration
+                    <b className="text-indigo-400 font-bold">C</b>lass<b className="text-indigo-400 font-bold">r</b>oom <b className="text-indigo-400 font-bold">A</b>dventures, <b className="text-indigo-400 font-bold">V</b>oyages, & <b className="text-indigo-400 font-bold">E</b>xploration
                   </span>
                 </div>
                 <p className="mt-4 text-lg md:text-xl text-indigo-300/80 font-medium italic tracking-wide">
@@ -49,12 +49,12 @@ export default function Home() {
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                 <button className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-500/20 flex items-center gap-2">
+                 <Link href="/start" className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-500/20 flex items-center gap-2">
                     Get Started Free <ArrowRight className="w-5 h-5" />
-                 </button>
-                 <button className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full font-bold transition-all">
+                 </Link>
+                 <Link href="/about" className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full font-bold transition-all">
                     How it Works
-                 </button>
+                 </Link>
               </div>
            </div>
         </div>
@@ -63,7 +63,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 py-20 w-full">
             <h2 className="text-2xl font-bold mb-10 text-center text-slate-200">Available Simulations</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* Space Adventure Card */}
                 <Link href="/space" className="group relative block h-80 rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 to-black border border-slate-800 hover:border-indigo-500/50 transition-all hover:shadow-2xl hover:shadow-indigo-500/20">
@@ -84,22 +84,32 @@ export default function Home() {
                     </div>
                 </Link>
 
-                {/* Coming Soon Card 1 */}
-                <div className="relative h-80 rounded-2xl overflow-hidden bg-slate-900/50 border border-slate-800 border-dashed flex flex-col items-center justify-center text-center p-8 opacity-70">
-                    <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
-                        <span className="text-2xl">🤠</span>
+                {/* Future Plans */}
+                <div className="relative h-80 rounded-2xl overflow-hidden bg-slate-900/20 border border-slate-800/50 flex flex-col p-8">
+                    <div className="mb-6">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">
+                            Future Plans
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Expansion Pack</h3>
+                        <p className="text-slate-400 text-sm">New worlds are constantly being charted.</p>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-300 mb-2">Wild West Frontier</h3>
-                    <p className="text-slate-500 text-sm">Organize towns, manage resources, and survive the trail. <br/>(In Development)</p>
-                </div>
 
-                 {/* Coming Soon Card 2 */}
-                 <div className="relative h-80 rounded-2xl overflow-hidden bg-slate-900/50 border border-slate-800 border-dashed flex flex-col items-center justify-center text-center p-8 opacity-70">
-                    <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
-                        <BookOpen className="w-8 h-8 text-slate-600" />
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
+                            <span className="text-xl"></span>
+                            <div>
+                                <div className="font-bold text-slate-300">Wild West Frontier</div>
+                                <div className="text-xs text-slate-500">In Development</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
+                             <BookOpen className="w-6 h-6 text-slate-600" />
+                            <div>
+                                <div className="font-bold text-slate-300">Fantasy Realms</div>
+                                <div className="text-xs text-slate-500">Planned</div>
+                            </div>
+                        </div>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-300 mb-2">Fantasy Realms</h3>
-                    <p className="text-slate-500 text-sm">Coming soon to a classroom near you.</p>
                 </div>
 
             </div>
