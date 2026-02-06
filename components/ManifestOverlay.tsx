@@ -215,21 +215,26 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                      <div className="relative group">
                                          <select 
                                             id="bulk-protocol"
+                                            onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 const xpInput = document.getElementById('bulk-xp') as HTMLInputElement;
                                                 const reasonInput = document.getElementById('bulk-reason') as HTMLInputElement;
                                                 const selected = behaviors.find(b => b.id === e.target.value);
                                                 
                                                 if (selected && xpInput && reasonInput) {
+                                                    // IMPORTANT: Must manually set value property for controlled/uncontrolled inputs
+                                                    // and trigger events if React is listening, though these are uncontrolled (defaultValue)
                                                     xpInput.value = selected.xp.toString();
                                                     reasonInput.value = selected.label;
                                                 }
                                             }}
-                                            className="bg-black border border-white/20 text-white pl-4 pr-10 py-2 rounded w-48 focus:border-cyan-500 outline-none appearance-none cursor-pointer hover:border-cyan-500/50"
+                                            className="bg-black border border-white/20 text-white pl-4 pr-10 py-2 rounded w-48 focus:border-cyan-500 outline-none appearance-none cursor-pointer hover:border-cyan-500/50 z-[70]"
                                          >
-                                             <option value="">Select Protocol...</option>
+                                             <option value="" className="bg-black text-gray-500">Select Protocol...</option>
                                              {behaviors.map(b => (
-                                                 <option key={b.id} value={b.id}>{b.label} ({b.xp > 0 ? '+' : ''}{b.xp} XP)</option>
+                                                 <option key={b.id} value={b.id} className="bg-black text-white hover:bg-white/20">
+                                                     {b.label} ({b.xp > 0 ? '+' : ''}{b.xp} XP)
+                                                 </option>
                                              ))}
                                          </select>
                                           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-500">
@@ -237,12 +242,27 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                           </div>
                                      </div>
 
-                                    <input type="number" id="bulk-xp" placeholder="XP" className="bg-black border border-white/20 text-white px-4 py-2 rounded w-24 text-center font-bold focus:border-cyan-500 outline-none" />
-                                    <input type="text" id="bulk-reason" placeholder="Reason (Optional)" className="bg-black border border-white/20 text-white px-4 py-2 rounded w-64 focus:border-cyan-500 outline-none" />
+                                    <input 
+                                        type="number" 
+                                        id="bulk-xp" 
+                                        placeholder="XP" 
+                                        className="bg-black border border-white/20 text-white px-4 py-2 rounded w-24 text-center font-bold focus:border-cyan-500 outline-none z-[70]" 
+                                        onClick={(e) => e.stopPropagation()} 
+                                    />
+                                    <input 
+                                        type="text" 
+                                        id="bulk-reason" 
+                                        placeholder="Reason (Optional)" 
+                                        className="bg-black border border-white/20 text-white px-4 py-2 rounded w-64 focus:border-cyan-500 outline-none z-[70]"
+                                        onClick={(e) => e.stopPropagation()} 
+                                    />
                                 </div>
 
                                 <button 
-                                    onClick={async () => {
+                                    className="bg-green-600 hover:bg-green-500 text-white font-bold px-6 py-2 rounded shadow-[0_0_15px_rgba(34,197,94,0.4)] z-[70]"
+                                    onClick={async (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
                                         const xpInput = parseInt((document.getElementById('bulk-xp') as HTMLInputElement).value) || 0;
                                         const reasonInput = (document.getElementById('bulk-reason') as HTMLInputElement).value || "Command Award";
                                         
@@ -281,11 +301,24 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                         lastXpReason: reasonInput
                                                     });
 
-                                                    // 3. Queue Planet Update (Atomic)
+                                                    // 3. Queue Class Bonus Update (If student has a teacher)
+                                                    if (data.teacherId && xpInput > 0) {
+                                                        const bonusRef = doc(db, `users/${data.teacherId}/settings`, "classBonus");
+                                                        // We use set with merge to create it if it doesn't exist (though it should)
+                                                        transaction.set(bonusRef, { 
+                                                            current: increment(xpInput) 
+                                                        }, { merge: true });
+                                                    }
+
+                                                    // 4. Queue Planet Update (Atomic)
+                                                    // Only award planet XP if ship is effectively orbiting (not traveling)
                                                     const rawLocation = data.location;
-                                                    if (rawLocation && xpInput > 0) {
+                                                    const isTraveling = data.travelStatus === 'traveling';
+                                                    
+                                                    if (rawLocation && xpInput > 0 && !isTraveling && data.teacherId) {
                                                         const planetId = rawLocation.toLowerCase();
-                                                        const planetRef = doc(db, "planets", planetId);
+                                                        // Planet stats are stored in the teacher's subcollection
+                                                        const planetRef = doc(db, `users/${data.teacherId}/planets`, planetId);
                                                         
                                                         transaction.set(planetRef, { 
                                                             currentXP: increment(xpInput),

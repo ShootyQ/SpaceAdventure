@@ -94,6 +94,23 @@ export default function Home() {
                         <p className="text-slate-400 text-sm">New worlds are constantly being charted.</p>
                     </div>
 
+<<<<<<< HEAD
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
+                            <span className="text-xl">🤠</span>
+                            <div>
+                                <div className="font-bold text-slate-300">Wild West Frontier</div>
+                                <div className="text-xs text-slate-500">In Development</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
+                             <BookOpen className="w-6 h-6 text-slate-600" />
+                            <div>
+                                <div className="font-bold text-slate-300">Fantasy Realms</div>
+                                <div className="text-xs text-slate-500">Planned</div>
+                            </div>
+                        </div>
+=======
                     <div className="space-y-4">
                         <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
                             <span className="text-xl"></span>
@@ -109,6 +126,7 @@ export default function Home() {
                                 <div className="text-xs text-slate-500">Planned</div>
                             </div>
                         </div>
+>>>>>>> 12734f0f55ee06a5fdf1edcd240af51c930e2b02
                     </div>
                 </div>
 
