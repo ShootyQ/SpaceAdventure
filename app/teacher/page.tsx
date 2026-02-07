@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText } from 'lucide-react';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getAssetPath } from '@/lib/utils';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
@@ -18,7 +18,6 @@ interface ClassBonusConfig {
 export default function TeacherConsole() {
   const { logout, user } = useAuth();
   const pathname = usePathname();
-  const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
   // Class Bonus State
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig>({ current: 0, target: 10000, reward: "Class Reward" });
@@ -54,7 +53,6 @@ export default function TeacherConsole() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono">
-       <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />
        
        {/* Background Image & Overlay */}
        <div className="absolute inset-0 z-0 pointer-events-none">
@@ -271,6 +269,14 @@ export default function TeacherConsole() {
                     href="/teacher/settings?mode=ranks"
                     color="text-purple-400"
                     borderColor="border-purple-500/30"
+                />
+                <QuickAction 
+                    title="Print Visuals"
+                    icon={<Printer size={28} />}
+                    desc="Badges & Credentials"
+                    href="/teacher/printables"
+                    color="text-pink-400"
+                    borderColor="border-pink-500/30"
                 />
                 <QuickAction 
                     title="Config"
