@@ -1,7 +1,8 @@
 "use client";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Rocket, Sparkles, ArrowRight, BookOpen, Compass } from 'lucide-react';
+import { Rocket, Sparkles, ArrowRight, BookOpen, User, Star, Globe } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Home() {
   
@@ -25,132 +26,255 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col font-sans bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+    <div className="flex min-h-screen flex-col font-sans bg-[#020617] text-slate-100 selection:bg-indigo-500/30 overflow-x-hidden">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       
       {/* Navigation */}
-      <nav className="w-full border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <nav className="w-full border-b border-white/5 bg-[#020617]/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
            <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
               <Image 
                 src="/images/logos/classcrave logo.png" 
                 alt="ClassCrave Logo" 
-                width={160} 
-                height={40} 
-                className="h-10 w-auto object-contain"
+                width={180} 
+                height={50} 
+                className="h-12 w-auto object-contain"
                 priority
               />
            </div>
-           <div className="flex gap-6 text-sm font-medium text-slate-400">
-              <Link href="/about" className="hover:text-white transition-colors">About</Link>
+           
+           {/* Desktop Nav */}
+           <div className="hidden md:flex gap-8 text-sm font-medium text-slate-400 items-center">
+              <Link href="/about" className="hover:text-white transition-colors">How it Works</Link>
               <Link href="/educators" className="hover:text-white transition-colors">Educators</Link>
-              <Link href="/space" className="hover:text-white transition-colors flex items-center gap-1 text-indigo-400"><Rocket className="w-4 h-4" /> Space Adventure</Link>
+              <Link href="/space" className="px-4 py-2 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all flex items-center gap-2">
+                 <Rocket className="w-4 h-4" /> 
+                 Launch Demo
+              </Link>
            </div>
         </div>
       </nav>
 
       {/* Hero Section */}
       <main className="flex-1 flex flex-col">
-        <div className="relative py-24 lg:py-32 px-4 overflow-hidden">
-           {/* Background decorative blobs */}
-           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-indigo-500/20 rounded-[100%] blur-[100px] opacity-30 pointer-events-none" />
+        <div className="relative pt-20 pb-32 lg:pt-32 overflow-hidden">
            
-           <div className="max-w-4xl mx-auto text-center relative z-10">
-              <div className="mb-6 flex flex-col items-center animate-fade-in-up">
-                <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 tracking-wide backdrop-blur-sm shadow-lg shadow-indigo-500/10 transition-all hover:bg-indigo-500/20 hover:scale-105 cursor-default">
+           {/* Background decorative elements */}
+           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/4 pointer-events-none" />
+           
+           <div className="max-w-7xl mx-auto px-4 grid lg:grid-cols-2 gap-12 items-center relative z-10">
+              
+              {/* Left Column: Text */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="text-center lg:text-left"
+              >
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-950/50 border border-indigo-500/30 text-indigo-300 text-sm font-medium mb-8 backdrop-blur-sm">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
-                  <span className="text-lg md:text-xl font-light">
-                    <b className="text-indigo-400 font-bold">C</b>lass<b className="text-indigo-400 font-bold">r</b>oom <b className="text-indigo-400 font-bold">A</b>dventures, <b className="text-indigo-400 font-bold">V</b>oyages, & <b className="text-indigo-400 font-bold">E</b>xploration
-                  </span>
+                  <span>The Classroom Management RPG</span>
                 </div>
-                <p className="mt-4 text-lg md:text-xl text-indigo-300/80 font-medium italic tracking-wide">
-                  "What journey do you <span className="font-bold text-indigo-400">CRAVE</span>?"
+                
+                <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6 text-white leading-[1.1]">
+                  What Journey Do You <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">CRAVE?</span>
+                </h1>
+                
+                <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                  Transform your daily curriculum into an immersive campaign. Engage students with XP, ranks, and collaborative missions that make learning unforgettable.
                 </p>
-              </div>
-              
-              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 text-white">
-                Turn your classroom into an <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Epic Journey</span>.
-              </h1>
-              
-              <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-                Gamify your curriculum with immersive simulations. Engage students with narratives, XP systems, and collaborative missions that make learning unforgettable.
-              </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                 <Link href="/start" className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-500/20 flex items-center gap-2">
-                    Get Started Free <ArrowRight className="w-5 h-5" />
-                 </Link>
-                 <Link href="/about" className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full font-bold transition-all">
-                    How it Works
-                 </Link>
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                   <Link href="/start" className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-2">
+                      Start Your Journey <ArrowRight className="w-5 h-5" />
+                   </Link>
+                   <Link href="/about" className="w-full sm:w-auto px-8 py-4 bg-slate-800/50 hover:bg-slate-800 text-slate-200 border border-slate-700/50 rounded-xl font-bold transition-all backdrop-blur-sm flex items-center justify-center">
+                      See Features
+                   </Link>
+                </div>
+                
+                <div className="mt-10 flex items-center justify-center lg:justify-start gap-4 text-sm text-slate-500">
+                    <div className="flex -space-x-2">
+                        {[1,2,3,4].map(i => (
+                            <div key={i} className="w-8 h-8 rounded-full bg-slate-800 border-2 border-[#020617] flex items-center justify-center text-xs">
+                                <User size={12} />
+                            </div>
+                        ))}
+                    </div>
+                    <p>Joined by 150+ Educators this month</p>
+                </div>
+              </motion.div>
+
+              {/* Right Column: Dynamic Visuals */}
+              <div className="relative h-[500px] w-full hidden lg:block perspective-[1000px]">
+                  {/* Main Planet (Saturn-ish) */}
+                  <motion.div 
+                    animate={{ y: [0, -20, 0] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px]"
+                  >
+                     {/* Glow behind */}
+                     <div className="absolute inset-0 bg-indigo-500/20 blur-[80px] rounded-full" />
+                     <Image
+                        src="/images/planetpng/saturn.png"
+                        alt="Planet Saturn"
+                        fill
+                        className="object-contain drop-shadow-2xl"
+                     />
+                  </motion.div>
+
+                  {/* Secondary Planet (Mars) */}
+                  <motion.div 
+                    animate={{ y: [0, 15, 0], x: [0, 10, 0] }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                    className="absolute top-20 right-0 w-32 h-32"
+                  >
+                      <Image
+                        src="/images/planetpng/mars.png"
+                        alt="Planet Mars"
+                        fill
+                        className="object-contain opacity-80"
+                     />
+                  </motion.div>
+
+                   {/* Floating Ship */}
+                   <motion.div 
+                    animate={{ x: [0, -10, 0], y: [0, 5, 0], rotate: [0, -2, 0] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute bottom-20 left-10 w-48 h-48 z-20"
+                  >
+                      <Image
+                        src="/images/ships/spaceship_red.png" 
+                        alt="Spaceship"
+                        fill
+                        className="object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                     />
+                  </motion.div>
+
+                  {/* UI Elements Floating */}
+                  <motion.div
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5, duration: 0.8 }}
+                    className="absolute top-40 -left-10 bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl z-30 flex items-center gap-3"
+                  >
+                      <div className="bg-green-500/20 p-2 rounded-lg text-green-400"><Star size={20} fill="currentColor" /></div>
+                      <div>
+                          <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">XP Gained</div>
+                          <div className="text-white font-bold">+500 XP</div>
+                      </div>
+                  </motion.div>
               </div>
            </div>
         </div>
 
-        {/* Adventures Grid */}
-        <div className="max-w-7xl mx-auto px-4 py-20 w-full">
-            <h2 className="text-2xl font-bold mb-10 text-center text-slate-200">Available Simulations</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* Space Adventure Card */}
-                <Link href="/space" className="group relative block h-80 rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 to-black border border-slate-800 hover:border-indigo-500/50 transition-all hover:shadow-2xl hover:shadow-indigo-500/20">
-                    <div className="absolute inset-0 bg-indigo-950/30 opacity-50 group-hover:opacity-70 transition-opacity" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                    
-                    <div className="absolute bottom-0 left-0 p-8 w-full">
-                         <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4 text-white shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
-                            <Rocket className="w-6 h-6" />
-                         </div>
-                         <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-blue-300 transition-colors">Space Adventure</h3>
-                         <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                            Command a starship, explore the galaxy, and master the cosmos. Perfect for science, math, and general classroom management.
-                         </p>
-                         <div className="flex items-center text-blue-400 text-sm font-bold uppercase tracking-wider">
-                            Enter Simulation <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                         </div>
-                    </div>
-                </Link>
-
-                {/* Future Plans */}
-                <div className="relative h-80 rounded-2xl overflow-hidden bg-slate-900/20 border border-slate-800/50 flex flex-col p-8">
-                    <div className="mb-6">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">
-                            Future Plans
-                        </div>
-                        <h3 className="text-2xl font-bold text-white mb-2">Expansion Pack</h3>
-                        <p className="text-slate-400 text-sm">New worlds are constantly being charted.</p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
-                            <span className="text-xl">🤠</span>
-                            <div>
-                                <div className="font-bold text-slate-300">Wild West Frontier</div>
-                                <div className="text-xs text-slate-500">In Development</div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 opacity-60">
-                             <BookOpen className="w-6 h-6 text-slate-600" />
-                            <div>
-                                <div className="font-bold text-slate-300">Fantasy Realms</div>
-                                <div className="text-xs text-slate-500">Planned</div>
-                            </div>
-                        </div>
-                    </div>
+        {/* Adventures Grid Section */}
+        <div className="bg-[#0b0f1f]/50 py-24 border-t border-white/5">
+            <div className="max-w-7xl mx-auto px-4 w-full">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Choose Your Simulation</h2>
+                    <p className="text-slate-400 max-w-2xl mx-auto">Start with our flagship Space Adventure, or prepare for upcoming worlds. Every simulation connects to the same student profiles.</p>
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                    
+                    {/* Active Space Adventure Card */}
+                    <Link href="/space" className="group relative block aspect-[4/3] rounded-3xl overflow-hidden bg-black border border-indigo-500/30 hover:border-indigo-400 transition-all hover:shadow-[0_0_40px_rgba(79,70,229,0.2)]">
+                        {/* Background Image Layer */}
+                        <div className="absolute inset-0 z-0">
+                             <Image 
+                                src="/images/planetpng/earth.png" 
+                                alt="Space Background" 
+                                width={600} 
+                                height={600}
+                                className="absolute -right-20 -bottom-20 opacity-60 group-hover:scale-110 transition-transform duration-700" 
+                             />
+                             <div className="absolute inset-0 bg-gradient-to-t from-black via-indigo-950/20 to-transparent opacity-90" />
+                             {/* Stars */}
+                             <div className="absolute inset-0 bg-[url('/images/stars.png')] opacity-50" />
+                        </div>
+                        
+                        <div className="absolute inset-0 p-8 md:p-12 flex flex-col justify-end z-10">
+                             <div className="mb-auto">
+                                <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-bold uppercase tracking-widest border border-green-500/20">
+                                    Live Now
+                                </span>
+                             </div>
 
+                             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 text-white shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform">
+                                <Rocket className="w-8 h-8" />
+                             </div>
+                             
+                             <h3 className="text-3xl font-bold text-white mb-3 group-hover:text-indigo-300 transition-colors">Space Adventure</h3>
+                             <p className="text-slate-300 mb-6 leading-relaxed">
+                                Command a starship, explore the solar system, and earn badges. Complete with interactive maps and customizable ships.
+                             </p>
+                             
+                             <div className="flex items-center text-white font-bold tracking-wide group-hover:gap-2 transition-all">
+                                Launch Simulation <ArrowRight className="w-5 h-5 ml-2" />
+                             </div>
+                        </div>
+                    </Link>
+
+                    {/* Future Plans Card */}
+                    <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-slate-900/30 border border-white/5 p-8 md:p-12 flex flex-col">
+                        <div className="flex justify-between items-start mb-auto">
+                            <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-widest border border-white/10">
+                                Coming Soon
+                            </span>
+                            <Globe className="text-slate-700 w-24 h-24 absolute -top-4 -right-4 opacity-20 rotate-12" />
+                        </div>
+
+                        <h3 className="text-3xl font-bold text-white mb-8">Future Worlds</h3>
+                        
+                        <div className="space-y-4">
+                            <div className="group flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-slate-600 transition-colors">
+                                <div className="text-2xl bg-black/30 w-12 h-12 flex items-center justify-center rounded-lg">🤠</div>
+                                <div>
+                                    <div className="font-bold text-slate-200">Wild West Frontier</div>
+                                    <div className="text-xs text-slate-500 uppercase tracking-wider">Historical Sim</div>
+                                </div>
+                            </div>
+                            
+                            <div className="group flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-slate-600 transition-colors">
+                                <div className="p-3 bg-black/30 rounded-lg">
+                                     <BookOpen className="w-6 h-6 text-purple-400" />
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-200">Fantasy Realms</div>
+                                    <div className="text-xs text-slate-500 uppercase tracking-wider">Creative Writing Focus</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
 
       </main>
 
-      <footer className="border-t border-white/5 py-12 bg-slate-950">
-          <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-             <p>&copy; {new Date().getFullYear()} Classroom Adventures. Built for teachers, by teachers.</p>
+      <footer className="border-t border-white/5 py-12 bg-[#020617]">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between text-slate-500 text-sm">
+             <div className="mb-4 md:mb-0">
+                <Image 
+                    src="/images/logos/classcrave logo.png" 
+                    alt="ClassCrave" 
+                    width={120} 
+                    height={30} 
+                    className="opacity-50 grayscale hover:grayscale-0 transition-all mb-2"
+                />
+                <p>&copy; {new Date().getFullYear()} ClassCrave. Built for teachers, by teachers.</p>
+             </div>
+             <div className="flex gap-6">
+                 <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
+                 <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
+                 <Link href="#" className="hover:text-white transition-colors">Support</Link>
+             </div>
           </div>
       </footer>
     </div>
