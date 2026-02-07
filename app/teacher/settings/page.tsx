@@ -7,7 +7,7 @@ import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs, query, where, 
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import {
-    ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag,
+    ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
 import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
@@ -901,7 +901,7 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
 
     const PRICE_IDS = {
         monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
-        yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
+        yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "price_1SxvZNRt6vQIRlSNVgvCKL89" 
     };
 
     const handleSubscribe = async () => {
@@ -1344,6 +1344,19 @@ function SettingsContent() {
 
     useEffect(() => {
         const mode = searchParams.get("mode");
+        const success = searchParams.get("success");
+        const canceled = searchParams.get("canceled");
+
+        if (success) {
+            setView("billing");
+            // clear params to prevent re-alerting? Next.js navigation replacement is complex here without router.
+            // visual feedback is handled by subscription status update usually
+        }
+        
+        if (canceled) {
+            setView("billing");
+        }
+
         if (mode === "asteroids") {
             setView("asteroids");
         } else if (mode === "team") {

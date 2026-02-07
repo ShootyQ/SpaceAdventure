@@ -156,9 +156,10 @@ export default function TeacherConsole() {
                             setEditBonusForm(bonusConfig);
                             setIsEditingBonus(true);
                         }}
-                        className="absolute top-2 right-2 p-2 text-cyan-600 hover:text-cyan-400 opacity-50 hover:opacity-100 transition-opacity z-20"
+                        className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 bg-cyan-950/50 hover:bg-cyan-900/50 border border-cyan-500/30 rounded-lg text-cyan-400 transition-all z-20 group/edit"
                     >
-                        <Edit2 size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Edit</span>
+                        <Edit2 size={14} className="group-hover/edit:scale-110 transition-transform" />
                     </button>
 
                     {isEditingBonus ? (
