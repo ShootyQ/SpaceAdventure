@@ -36,15 +36,13 @@ export default function DashboardTutorial() {
     useEffect(() => {
         if (!isOpen) return;
 
-        const handleResize = () => {
+        const updatePosition = () => {
             const step = STEPS[currentStep];
             if (step.targetId) {
                 const el = document.getElementById(step.targetId);
                 if (el) {
                     const rect = el.getBoundingClientRect();
                     setTargetRect(rect);
-                    // Scroll into view if needed
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 } else {
                     setTargetRect(null);
                 }
@@ -53,9 +51,26 @@ export default function DashboardTutorial() {
             }
         };
 
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        // Scroll to target when step changes
+        const step = STEPS[currentStep];
+        if (step.targetId) {
+            const el = document.getElementById(step.targetId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Give a small delay for scroll to settle before grabbing rec, though live scroll update handles it mostly
+                setTimeout(updatePosition, 500); 
+            }
+        } else {
+            setTargetRect(null);
+        }
+
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true); // Capture phase to handle all scrolls
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
     }, [currentStep, isOpen]);
 
     const completeTutorial = async () => {
@@ -132,19 +147,48 @@ export default function DashboardTutorial() {
         }
     };
 
-    // Calculate tooltip position (basic heuristic)
+    // Calculate tooltip position (Robust & Responsive)
     const getTooltipCurrentStyle = () => {
         if (!targetRect) return {}; // Centered default handled by CSS classes
 
+        const isMobile = window.innerWidth < 768; // Standard md breakpoint check
+        const CARD_WIDTH = 384; // max-w-sm is roughly 384px
+
+        // Mobile Strategy: Fixed Bottom Sheet
+        if (isMobile) {
+            return {
+                position: 'fixed' as 'fixed',
+                left: '50%',
+                bottom: '24px',
+                transform: 'translateX(-50%)',
+                width: 'calc(100% - 32px)', // Full width minus padding
+                maxWidth: '400px',
+                margin: 0,
+                zIndex: 60
+            };
+        }
+
+        // Desktop Strategy: Smart Anchoring
         // If target is in top half, show tooltip below. Else above.
         const isTopHalf = targetRect.top < window.innerHeight / 2;
         
+        // Horizontal Center Calculation with Clamping
+        // Start centered on the target
+        let left = targetRect.left + (targetRect.width / 2) - (CARD_WIDTH / 2);
+        
+        // Clamp so it doesn't go off-screen (20px safety margin)
+        const margin = 20;
+        const maxLeft = window.innerWidth - CARD_WIDTH - margin;
+        left = Math.max(margin, Math.min(left, maxLeft));
+
         return {
             position: 'absolute' as 'absolute',
-            left: targetRect.left + (targetRect.width / 2) - 200, // Center horizontally (assuming 400px width card)
-            top: isTopHalf ? targetRect.bottom + 20 : 'auto',
-            bottom: !isTopHalf ? (window.innerHeight - targetRect.top) + 20 : 'auto',
-            transform: 'none' // Override centered transform
+            left: left,
+            top: isTopHalf ? targetRect.bottom + 24 : 'auto',
+            bottom: !isTopHalf ? (window.innerHeight - targetRect.top) + 24 : 'auto',
+            width: `${CARD_WIDTH}px`,
+            transform: 'none', // Override default centered transform
+            zIndex: 60
         };
     };
 
@@ -175,20 +219,20 @@ export default function DashboardTutorial() {
                                 {/* We compose the spotlight using borders on four sides or a ClipPath. 
                                     ClipPath is cleanest but 'box-shadow' is easiest for border-radius support. */}
                                 <div 
-                                    className="absolute transition-all duration-500 ease-in-out box-content border-black/80"
+                                    className="absolute transition-all duration-75 ease-out box-content border-black/80"
                                     style={{
                                         top: targetRect.top,
                                         left: targetRect.left,
                                         width: targetRect.width,
                                         height: targetRect.height,
-                                        // This creates the dark overlay everywhere else
-                                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.85)',
+                                        // Improved visibility: Lower opacity (0.7) to see context
+                                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
                                         borderRadius: '12px'
                                     }}
                                 />
                                 {/* Pulsing Border around target */}
                                 <div 
-                                    className="absolute border-2 border-cyan-400 rounded-xl animate-pulse transition-all duration-500 ease-in-out"
+                                    className="absolute border-2 border-cyan-400 rounded-xl animate-pulse transition-all duration-75 ease-out"
                                     style={{
                                         top: targetRect.top - 4,
                                         left: targetRect.left - 4,
