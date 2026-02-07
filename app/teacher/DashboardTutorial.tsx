@@ -10,26 +10,53 @@ import { useAuth } from "@/context/AuthContext";
 type TutorialStep = {
     title: string;
     description: React.ReactNode;
-    targetId?: string; // If we were using a real anchor system, but simplified for now
+    targetId?: string;
 };
 
 export default function DashboardTutorial() {
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
-    const [hasSeenTutorial, setHasSeenTutorial] = useState(false);
+    const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
+    // Initial Check
     useEffect(() => {
         if (!user) return;
         const checkTutorial = async () => {
             const userSettingsRef = doc(db, `users/${user.uid}/settings/tutorial`);
             const snap = await getDoc(userSettingsRef);
             if (!snap.exists() || !snap.data().hasSeenDashboard) {
-                setTimeout(() => setIsOpen(true), 1000); // Delay for effect
+                setTimeout(() => setIsOpen(true), 1000);
             }
         };
         checkTutorial();
     }, [user]);
+
+    // Step Positioning Logic
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleResize = () => {
+            const step = STEPS[currentStep];
+            if (step.targetId) {
+                const el = document.getElementById(step.targetId);
+                if (el) {
+                    const rect = el.getBoundingClientRect();
+                    setTargetRect(rect);
+                    // Scroll into view if needed
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    setTargetRect(null);
+                }
+            } else {
+                setTargetRect(null);
+            }
+        };
+
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [currentStep, isOpen]);
 
     const completeTutorial = async () => {
         if (!user) return;
@@ -48,14 +75,15 @@ export default function DashboardTutorial() {
         },
         {
             title: "1. Manage Roster",
-            description: "Start here to add your students. You'll generate their unique login codes and assign them to your class fleet."
+            description: "Start here to add your students. You'll generate their unique login codes and assign them to your class fleet.",
+            targetId: "tile-roster"
         },
         {
             title: "2. Rank Protocols",
             description: (
                 <div className="space-y-2">
                     <p>Customize how much XP is needed for each rank.</p>
-                    <div className="bg-blue-50/10 p-2 rounded border border-blue-500/30 text-xs">
+                    <div className="bg-blue-50/10 p-2 rounded border border-blue-500/30 text-xs text-blue-200">
                         <strong>Pro Tip:</strong>
                         <ul className="list-disc pl-4 mt-1 space-y-1 opacity-80">
                             <li><strong>Younger Grades (K-3):</strong> Keep thresholds low (e.g., 100 XP per rank). Award frequent, small amounts (1-5 XP).</li>
@@ -63,7 +91,8 @@ export default function DashboardTutorial() {
                         </ul>
                     </div>
                 </div>
-            )
+            ),
+            targetId: "tile-ranks"
         },
         {
             title: "3. Behavior Settings",
@@ -75,23 +104,23 @@ export default function DashboardTutorial() {
                         If a rank requires <strong>500 XP</strong>, and you give <strong>50 XP</strong> daily, they'll rank up in 10 days. Ensure your protocols match your pacing!
                     </div>
                 </div>
-            )
+            ),
+            targetId: "tile-rewards"
         },
         {
             title: "4. Co-Teachers",
-            description: "Invite other educators to your classroom command deck. They'll have permission to award points and help manage missions."
+            description: "Invite other educators to your classroom command deck. They'll have permission to award points and help manage missions.",
+            targetId: "tile-team"
         },
         {
             title: "5. Planet Rewards",
-            description: "Each planet serves as a major milestone. You can customize what real-world reward (like a pizza party or extra recess) is unlocked when the class reaches a new planet."
+            description: "Each planet serves as a major milestone. You can customize what real-world reward (like a pizza party or extra recess) is unlocked when the class reaches a new planet.",
+            targetId: "tile-planets"
         },
         {
             title: "6. Asteroid Event",
-            description: "Need a quick engagement boost? Launch an asteroid event! Students must earn XP quickly to destroy the asteroid before it hits."
-        },
-        {
-            title: "7. Award Points (Mobile)",
-            description: "Use this tile on your phone or tablet to walk around the room and award points instantly without being tied to your desk."
+            description: "Need a quick engagement boost? Launch an asteroid event! Students must earn XP quickly to destroy the asteroid before it hits.",
+            targetId: "tile-asteroids"
         }
     ];
 
@@ -101,6 +130,22 @@ export default function DashboardTutorial() {
         } else {
             completeTutorial();
         }
+    };
+
+    // Calculate tooltip position (basic heuristic)
+    const getTooltipCurrentStyle = () => {
+        if (!targetRect) return {}; // Centered default handled by CSS classes
+
+        // If target is in top half, show tooltip below. Else above.
+        const isTopHalf = targetRect.top < window.innerHeight / 2;
+        
+        return {
+            position: 'absolute' as 'absolute',
+            left: targetRect.left + (targetRect.width / 2) - 200, // Center horizontally (assuming 400px width card)
+            top: isTopHalf ? targetRect.bottom + 20 : 'auto',
+            bottom: !isTopHalf ? (window.innerHeight - targetRect.top) + 20 : 'auto',
+            transform: 'none' // Override centered transform
+        };
     };
 
     return (
@@ -115,60 +160,105 @@ export default function DashboardTutorial() {
 
             <AnimatePresence>
                 {isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        {/* Backyard Overlay */}
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                            onClick={() => setIsOpen(false)}
-                        />
+                    <div className="fixed inset-0 z-50 overflow-hidden pointer-events-none">
+                        
+                        {/* 1. Backdrop / Spotlight */}
+                        {targetRect ? (
+                            // Spotlight Mode: Dark overlay with a "hole" for the target
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 z-40"
+                                style={{ pointerEvents: 'auto' }} // Catch clicks outside
+                            >
+                                {/* We compose the spotlight using borders on four sides or a ClipPath. 
+                                    ClipPath is cleanest but 'box-shadow' is easiest for border-radius support. */}
+                                <div 
+                                    className="absolute transition-all duration-500 ease-in-out box-content border-black/80"
+                                    style={{
+                                        top: targetRect.top,
+                                        left: targetRect.left,
+                                        width: targetRect.width,
+                                        height: targetRect.height,
+                                        // This creates the dark overlay everywhere else
+                                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.85)',
+                                        borderRadius: '12px'
+                                    }}
+                                />
+                                {/* Pulsing Border around target */}
+                                <div 
+                                    className="absolute border-2 border-cyan-400 rounded-xl animate-pulse transition-all duration-500 ease-in-out"
+                                    style={{
+                                        top: targetRect.top - 4,
+                                        left: targetRect.left - 4,
+                                        width: targetRect.width + 8,
+                                        height: targetRect.height + 8,
+                                    }}
+                                />
+                            </motion.div>
+                        ) : (
+                            // Standard Modal Mode: Full dark backdrop
+                            <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-sm z-40"
+                                onClick={() => setIsOpen(false)}
+                                style={{ pointerEvents: 'auto' }}
+                            />
+                        )}
 
-                        {/* Modal */}
-                        <motion.div 
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white text-slate-900 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden z-50"
-                        >
-                            {/* Header */}
-                            <div className="bg-slate-900 text-white p-6 pb-8 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-4 opacity-20">
-                                    <div className="w-24 h-24 rounded-full border-4 border-white dashed spin-slow" />
-                                </div>
-                                <h2 className="text-xl font-bold">{STEPS[currentStep].title}</h2>
-                                <div className="flex gap-1 mt-4">
-                                    {STEPS.map((_, i) => (
-                                        <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= currentStep ? "bg-cyan-400" : "bg-white/20"}`} />
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Content */}
-                            <div className="p-6">
-                                <div className="min-h-[120px] text-slate-600 leading-relaxed text-sm">
-                                    {STEPS[currentStep].description}
+                        {/* 2. The Card */}
+                        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                            <motion.div 
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ 
+                                    scale: 1, 
+                                    opacity: 1, 
+                                    y: 0,
+                                    ...getTooltipCurrentStyle()
+                                }}
+                                transition={{ type: "spring", duration: 0.5 }}
+                                className="bg-slate-900 text-slate-100 w-full max-w-sm rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-700 relative overflow-hidden pointer-events-auto mx-4"
+                                style={targetRect ? { margin: 0 } : {}}
+                            >
+                                {/* Card Header */}
+                                <div className="bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center">
+                                    <h3 className="font-bold text-cyan-400 uppercase tracking-widest text-sm">
+                                        {currentStep + 1} / {STEPS.length}
+                                    </h3>
+                                    <button onClick={() => completeTutorial()} className="text-slate-500 hover:text-white"><X size={16}/></button>
                                 </div>
 
-                                <div className="flex justify-between items-center mt-6 pt-6 border-t border-slate-100">
-                                    <button 
-                                        onClick={() => completeTutorial()}
-                                        className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-wider"
-                                    >
-                                        Skip Guide
-                                    </button>
+                                {/* Content */}
+                                <div className="p-6">
+                                    <h2 className="text-xl font-bold mb-4 text-white">{STEPS[currentStep].title}</h2>
+                                    <div className="text-slate-400 text-sm leading-relaxed mb-6">
+                                        {STEPS[currentStep].description}
+                                    </div>
 
-                                    <button 
-                                        onClick={nextStep}
-                                        className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-transform active:scale-95 shadow-lg"
-                                    >
-                                        {currentStep === STEPS.length - 1 ? "Finish" : "Next"}
-                                        {currentStep === STEPS.length - 1 ? <Check size={18} /> : <ChevronRight size={18} />}
-                                    </button>
+                                    <div className="flex justify-between items-center">
+                                        <button 
+                                            onClick={() => {
+                                                if(currentStep > 0) setCurrentStep(c => c - 1);
+                                            }}
+                                            className={`text-slate-500 hover:text-white text-sm ${currentStep === 0 ? 'invisible' : ''}`}
+                                        >
+                                            Back
+                                        </button>
+
+                                        <button 
+                                            onClick={nextStep}
+                                            className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg hover:shadow-cyan-500/20"
+                                        >
+                                            {currentStep === STEPS.length - 1 ? "Finish" : "Next"}
+                                            {currentStep === STEPS.length - 1 ? <Check size={16} /> : <ChevronRight size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </motion.div>
+                            </motion.div>
+                        </div>
                     </div>
                 )}
             </AnimatePresence>

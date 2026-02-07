@@ -115,7 +115,7 @@ export default function TeacherConsole() {
                             setEditBonusForm(bonusConfig);
                             setIsEditingBonus(true);
                         }}
-                        className="absolute top-2 right-2 p-2 text-cyan-600 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                        className="absolute top-2 right-2 p-2 text-cyan-600 hover:text-cyan-400 opacity-50 hover:opacity-100 transition-opacity z-20"
                     >
                         <Edit2 size={14} />
                     </button>
@@ -177,6 +177,10 @@ export default function TeacherConsole() {
                                 <div className="text-sm text-yellow-400/90 italic truncate font-bold">{bonusConfig.reward}</div>
                                 <div className="text-[10px] text-cyan-500/60 uppercase tracking-widest">Shields Charging...</div>
                             </div>
+
+                            <div className="mt-2 text-[10px] text-cyan-500/40 leading-tight">
+                                Earn XP together to unlock this reward. When the bar is full, you win!
+                            </div>
                         </>
                     )}
                  </div>
@@ -184,104 +188,128 @@ export default function TeacherConsole() {
 
              {/* Row 2: Quick Command Modules */}
              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20">
-                <QuickAction 
-                    title="Student Roster" 
-                    icon={<Users size={28} />} 
-                    desc="Manage Students"
-                    href="/teacher/roster"
-                    color="text-blue-400"
-                    borderColor="border-blue-500/30"
-                />
-                 <QuickAction 
-                    title="Rank Thresholds" 
-                    icon={<Shield size={28} />} 
-                    desc="Edit XP Levels"
-                    href="/teacher/settings?mode=ranks"
-                    color="text-purple-400"
-                    borderColor="border-purple-500/30"
-                />
-                <QuickAction 
-                    title="Behavior Settings" 
-                    icon={<Zap size={28} />} 
-                    desc="Edit Protocols"
-                    href="/teacher/rewards"
-                    color="text-yellow-400"
-                    borderColor="border-yellow-500/30"
-                />
-                <QuickAction 
-                    title="My Teacher Avatar"
-                    icon={<Settings size={28} />}
-                    desc="Personal Config"
-                    href="/teacher/settings"
-                    color="text-cyan-400"
-                    borderColor="border-cyan-500/30"
-                />
+                <div id="tile-roster">
+                    <QuickAction 
+                        title="Student Roster" 
+                        icon={<Users size={28} />} 
+                        desc="Manage Students"
+                        href="/teacher/roster"
+                        color="text-blue-400"
+                        borderColor="border-blue-500/30"
+                    />
+                </div>
+                <div id="tile-ranks">
+                     <QuickAction 
+                        title="Rank Thresholds" 
+                        icon={<Shield size={28} />} 
+                        desc="Edit XP Levels"
+                        href="/teacher/settings?mode=ranks"
+                        color="text-purple-400"
+                        borderColor="border-purple-500/30"
+                    />
+                </div>
+                <div id="tile-rewards">
+                    <QuickAction 
+                        title="Behavior Settings" 
+                        icon={<Zap size={28} />} 
+                        desc="Edit Protocols"
+                        href="/teacher/rewards"
+                        color="text-white"
+                        borderColor="border-yellow-500/30"
+                    />
+                </div>
+                <div id="tile-avatar">
+                    <QuickAction 
+                        title="My Teacher Avatar"
+                        icon={<Settings size={28} />}
+                        desc="Personal Config"
+                        href="/teacher/settings"
+                        color="text-cyan-400"
+                        borderColor="border-cyan-500/30"
+                    />
+                </div>
 
-                <QuickAction 
-                    title="Lesson Plans" 
-                    icon={<Target size={28} />} 
-                    desc="Assign Missions"
-                    href="/teacher/missions"
-                    color="text-red-400"
-                    borderColor="border-red-500/30"
-                />
-                 <QuickAction 
-                    title="Classroom Display" 
-                    icon={<Globe size={28} />} 
-                    desc="Solar System Map"
-                    href="/teacher/map"
-                    color="text-green-400"
-                    borderColor="border-green-500/30"
-                />
-                 <QuickAction 
-                    title="Planet Rewards" 
-                    icon={<Award size={28} />} 
-                    desc="Edit Milestones"
-                    href="/teacher/planets"
-                    color="text-teal-400"
-                    borderColor="border-teal-500/30"
-                />
-                <QuickAction 
-                    title="Asteroid Event" 
-                    icon={<AlertTriangle size={28} />} 
-                    desc="Launch Challenge"
-                    href="/teacher/settings?mode=asteroids"
-                    color="text-orange-400"
-                    borderColor="border-orange-500/30"
-                />
+                <div id="tile-lessons">
+                    <QuickAction 
+                        title="Lesson Plans" 
+                        icon={<Target size={28} />} 
+                        desc="Assign Missions"
+                        href="/teacher/missions"
+                        color="text-red-400"
+                        borderColor="border-red-500/30"
+                    />
+                </div>
+                <div id="tile-map">
+                     <QuickAction 
+                        title="Classroom Display" 
+                        icon={<Globe size={28} />} 
+                        desc="Solar System Map"
+                        href="/teacher/map"
+                        color="text-green-400"
+                        borderColor="border-green-500/30"
+                    />
+                </div>
+                <div id="tile-planets">
+                     <QuickAction 
+                        title="Planet Rewards" 
+                        icon={<Award size={28} />} 
+                        desc="Edit Milestones"
+                        href="/teacher/planets"
+                        color="text-teal-400"
+                        borderColor="border-teal-500/30"
+                    />
+                </div>
+                <div id="tile-asteroids">
+                    <QuickAction 
+                        title="Asteroid Event" 
+                        icon={<AlertTriangle size={28} />} 
+                        desc="Launch Challenge"
+                        href="/teacher/settings?mode=asteroids"
+                        color="text-orange-400"
+                        borderColor="border-orange-500/30"
+                    />
+                </div>
                 
-                 <QuickAction 
-                    title="Subscriptions" 
-                    icon={<CreditCard size={28} />} 
-                    desc="Billing"
-                    href="/teacher/settings?mode=billing"
-                    color="text-emerald-400"
-                    borderColor="border-emerald-500/30"
-                />
-                <QuickAction 
-                    title="Manage Team" 
-                    icon={<UserPlus size={28} />} 
-                    desc="Co-Teachers"
-                    href="/teacher/settings?mode=team"
-                    color="text-indigo-400"
-                    borderColor="border-indigo-500/30"
-                />
-                <QuickAction 
-                    title="Print Center"
-                    icon={<Printer size={28} />}
-                    desc="Badges & Cards"
-                    href="/teacher/printables"
-                    color="text-pink-400"
-                    borderColor="border-pink-500/30"
-                />
-                <QuickAction 
-                    title="Award Points" 
-                    icon={<Zap size={28} />} 
-                    desc="Mobile Tool"
-                    href="/teacher/rewards"
-                    color="text-yellow-400"
-                    borderColor="border-yellow-500/30"
-                />
+                <div id="tile-billing">
+                     <QuickAction 
+                        title="Subscriptions" 
+                        icon={<CreditCard size={28} />} 
+                        desc="Billing"
+                        href="/teacher/settings?mode=billing"
+                        color="text-emerald-400"
+                        borderColor="border-emerald-500/30"
+                    />
+                </div>
+                <div id="tile-team">
+                    <QuickAction 
+                        title="Manage Team" 
+                        icon={<UserPlus size={28} />} 
+                        desc="Co-Teachers"
+                        href="/teacher/settings?mode=team"
+                        color="text-indigo-400"
+                        borderColor="border-indigo-500/30"
+                    />
+                </div>
+                <div id="tile-print">
+                    <QuickAction 
+                        title="Print Center"
+                        icon={<Printer size={28} />}
+                        desc="Badges & Cards"
+                        href="/teacher/printables"
+                        color="text-pink-400"
+                        borderColor="border-pink-500/30"
+                    />
+                </div>
+                <div id="tile-award">
+                    <QuickAction 
+                        title="Award Points" 
+                        icon={<Zap size={28} />} 
+                        desc="Mobile Tool"
+                        href="/teacher/rewards"
+                        color="text-yellow-400"
+                        borderColor="border-yellow-500/30"
+                    />
+                </div>
              </div>
              
              {/* Row 3: Auxiliary / Status removed as requested for simplified UI */}
