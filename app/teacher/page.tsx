@@ -3,10 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X } from 'lucide-react';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import RankEditor from '@/components/RankEditor';
-import { Rocket, LayoutGrid } from 'lucide-react';
 import { getAssetPath } from '@/lib/utils';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -95,12 +93,9 @@ export default function TeacherConsole() {
              <NavButton icon={<Globe />} label="Planets" href="/teacher/planets" isActive={pathname === '/teacher/planets'} />
              <NavButton icon={<Award />} label="Rewards" href="/teacher/rewards" isActive={pathname === '/teacher/rewards'} />
              <div className="mt-auto">
+                {/* 
                 <NavButton icon={<Settings />} label="Config" href="/teacher/settings" isActive={pathname === '/teacher/settings'} />
-                {/* Asteroid Quick Launch */}
-                <Link href="/teacher/settings?mode=asteroids" className="mt-2 flex items-center justify-center p-3 rounded-xl border border-orange-500/50 bg-orange-950/30 text-orange-400 hover:bg-orange-900/50 hover:text-orange-200 transition-all text-sm font-bold uppercase tracking-wider group">
-                    <Shield size={18} className="mr-2 group-hover:animate-pulse" />
-                    Reset Shields
-                </Link>
+                */}
 
                 <button
                     onClick={logout}
@@ -212,7 +207,7 @@ export default function TeacherConsole() {
              </div>
 
              {/* Row 2: Quick Command Modules */}
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 <QuickAction 
                     title="Manage Roster" 
                     icon={<Users size={28} />} 
@@ -232,18 +227,58 @@ export default function TeacherConsole() {
                  <QuickAction 
                     title="Mission Control" 
                     icon={<Target size={28} />} 
-                    desc="Approve & Create"
+                    desc="Create Lessons"
                     href="/teacher/missions"
                     color="text-red-400"
                     borderColor="border-red-500/30"
                 />
                  <QuickAction 
-                    title="Hyper Map" 
-                    icon={<Map size={28} />} 
+                    title="Solar System Map" 
+                    icon={<Globe size={28} />} 
                     desc="Navigate Sector"
                     href="/teacher/map"
                     color="text-green-400"
                     borderColor="border-green-500/30"
+                />
+                 <QuickAction 
+                    title="Subscriptions" 
+                    icon={<CreditCard size={28} />} 
+                    desc="Manage Plan & Billing"
+                    href="/teacher/settings?mode=billing"
+                    color="text-emerald-400"
+                    borderColor="border-emerald-500/30"
+                />
+                <QuickAction 
+                    title="Launch Asteroid" 
+                    icon={<AlertTriangle size={28} />} 
+                    desc="Global Event"
+                    href="/teacher/settings?mode=asteroids"
+                    color="text-orange-400"
+                    borderColor="border-orange-500/30"
+                />
+                <QuickAction 
+                    title="Co-Teachers" 
+                    icon={<UserPlus size={28} />} 
+                    desc="Manage Access"
+                    href="/teacher/settings?mode=team"
+                    color="text-indigo-400"
+                    borderColor="border-indigo-500/30"
+                />
+                <QuickAction 
+                    title="Rank Protocols" 
+                    icon={<Shield size={28} />} 
+                    desc="Edit Clearance Levels"
+                    href="/teacher/settings?mode=ranks"
+                    color="text-purple-400"
+                    borderColor="border-purple-500/30"
+                />
+                <QuickAction 
+                    title="Config"
+                    icon={<Settings size={28} />}
+                    desc="Modify Teacher Spaceship"
+                    href="/teacher/settings"
+                    color="text-cyan-400"
+                    borderColor="border-cyan-500/30"
                 />
              </div>
              

@@ -174,84 +174,6 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                         </motion.button>
                     ))}
 
-                    {/* Asteroid Launcher */}
-                     <Link href="/teacher/settings?mode=asteroids" onClick={(e) => { e.preventDefault(); onNavigate("asteroids"); }}>
-                        <motion.div
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-orange-500/30 bg-orange-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-orange-900/10 transition-colors group cursor-pointer h-full"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-orange-500 text-orange-400">
-                                <AlertTriangle size={32} className="animate-pulse" />
-                             </div>
-                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-orange-400">Asteroid Defense</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Global Event</p>
-                             </div>
-                        </motion.div>
-                    </Link>
-
-                    {/* Team Management */}
-                    <motion.button
-                         onClick={() => onNavigate("team")}
-                         whileHover={{ scale: 1.01 }}
-                         className="border border-blue-500/30 bg-blue-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-blue-900/10 transition-colors group cursor-pointer text-left w-full"
-                    >
-                         <div className="p-4 rounded-xl bg-black/50 border border-blue-500 text-blue-400">
-                            <Users size={32} />
-                         </div>
-                         <div>
-                            <h3 className="text-xl font-bold uppercase tracking-wider text-blue-400">Co-Teachers</h3>
-                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Manage Access</p>
-                         </div>
-                    </motion.button>
-
-                    {/* Rank Editor (Teacher Only) */}
-                    {(userData?.role === "teacher" || userData?.email === "andrewpcarlson85@gmail.com") && (
-                         <motion.button
-                             onClick={onOpenRankEditor}
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-purple-500/30 bg-purple-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-purple-900/10 transition-colors group cursor-pointer text-left w-full"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-purple-500 text-purple-400">
-                                <Shield size={32} />
-                             </div>
-                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-purple-400">Rank Protocols</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Edit Clearance Levels</p>
-                             </div>
-                        </motion.button>
-                    )}
-                    
-                    {/* Billing */}
-                     <motion.button
-                         onClick={() => onNavigate("billing")}
-                         whileHover={{ scale: 1.01 }}
-                         className="border border-green-500/30 bg-green-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-green-900/10 transition-colors group cursor-pointer text-left w-full"
-                    >
-                         <div className="p-4 rounded-xl bg-black/50 border border-green-500 text-green-400">
-                            <CreditCard size={32} />
-                         </div>
-                         <div>
-                            <h3 className="text-xl font-bold uppercase tracking-wider text-green-400">Subscription</h3>
-                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Manage Plan & Billing</p>
-                         </div>
-                    </motion.button>
-
-                    {/* Placeholder for future Solar Map Link */}
-                    <Link href="/teacher/map" className="md:col-span-2">
-                        <motion.div
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-cyan-500/30 bg-cyan-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-cyan-900/10 transition-colors group cursor-pointer"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-cyan-500 text-cyan-400">
-                                <Crosshair size={32} className="animate-spin-slow" />
-                             </div>
-                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-cyan-400">Launch Solar Map</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Initiate Flight Sequence</p>
-                             </div>
-                        </motion.div>
-                    </Link>
                 </div>
             </div>
 
@@ -1424,6 +1346,14 @@ function SettingsContent() {
         const mode = searchParams.get("mode");
         if (mode === "asteroids") {
             setView("asteroids");
+        } else if (mode === "team") {
+            setView("team");
+        } else if (mode === "billing") {
+            setView("billing");
+        } else if (mode === "ranks") {
+            setView("cockpit");
+            // Small timeout to allow render if needed, or just set it
+             setTimeout(() => setIsRankEditorOpen(true), 100);
         }
     }, [searchParams]);
 
