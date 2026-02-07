@@ -181,14 +181,50 @@ export default function DashboardTutorial() {
         const maxLeft = window.innerWidth - CARD_WIDTH - margin;
         left = Math.max(margin, Math.min(left, maxLeft));
 
+        // Calculate available vertical space to assign nice Max Height limits
+        const spaceBelow = window.innerHeight - (targetRect.bottom + 24) - margin;
+        const spaceAbove = (targetRect.top - 24) - margin;
+
+        let maxHeight = 0;
+        let top: number | string = 'auto';
+        let bottom: number | string = 'auto';
+
+        if (isTopHalf) {
+            // PLACING BELOW
+            top = targetRect.bottom + 24;
+            maxHeight = spaceBelow;
+        } else {
+             // PLACING ABOVE
+             bottom = (window.innerHeight - targetRect.top) + 24;
+             maxHeight = spaceAbove;
+        }
+
+        // Failsafe: If assigned space is too small (< 250px), try flipping
+        if (maxHeight < 250) {
+             if (isTopHalf && spaceAbove > spaceBelow) {
+                 // Flip to above
+                 top = 'auto';
+                 bottom = (window.innerHeight - targetRect.top) + 24;
+                 maxHeight = spaceAbove;
+             } else if (!isTopHalf && spaceBelow > spaceAbove) {
+                 // Flip to below
+                 bottom = 'auto';
+                 top = targetRect.bottom + 24;
+                 maxHeight = spaceBelow;
+             }
+        }
+
         return {
             position: 'absolute' as 'absolute',
             left: left,
-            top: isTopHalf ? targetRect.bottom + 24 : 'auto',
-            bottom: !isTopHalf ? (window.innerHeight - targetRect.top) + 24 : 'auto',
+            top: top,
+            bottom: bottom,
             width: `${CARD_WIDTH}px`,
-            transform: 'none', // Override default centered transform
-            zIndex: 60
+            maxHeight: `${Math.max(200, maxHeight)}px`, // Enforce strict bounds
+            transform: 'none', 
+            zIndex: 60,
+            display: 'flex', // Ensure flex layout for inner scrolling
+            flexDirection: 'column' as 'column'
         };
     };
 
@@ -264,11 +300,11 @@ export default function DashboardTutorial() {
                                     ...getTooltipCurrentStyle()
                                 }}
                                 transition={{ type: "spring", duration: 0.5 }}
-                                className="bg-slate-900 text-slate-100 w-full max-w-sm rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-700 relative overflow-hidden pointer-events-auto mx-4"
+                                className="bg-slate-900 text-slate-100 w-full max-w-sm rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-700 relative overflow-hidden pointer-events-auto mx-4 flex flex-col"
                                 style={targetRect ? { margin: 0 } : {}}
                             >
                                 {/* Card Header */}
-                                <div className="bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center">
+                                <div className="bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center shrink-0">
                                     <h3 className="font-bold text-cyan-400 uppercase tracking-widest text-sm">
                                         {currentStep + 1} / {STEPS.length}
                                     </h3>
@@ -276,13 +312,13 @@ export default function DashboardTutorial() {
                                 </div>
 
                                 {/* Content */}
-                                <div className="p-6">
+                                <div className="p-6 overflow-y-auto custom-scrollbar">
                                     <h2 className="text-xl font-bold mb-4 text-white">{STEPS[currentStep].title}</h2>
                                     <div className="text-slate-400 text-sm leading-relaxed mb-6">
                                         {STEPS[currentStep].description}
                                     </div>
 
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center pt-4">
                                         <button 
                                             onClick={() => {
                                                 if(currentStep > 0) setCurrentStep(c => c - 1);
