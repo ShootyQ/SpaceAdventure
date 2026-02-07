@@ -34,14 +34,14 @@ export default function Home() {
       
       {/* Navigation */}
       <nav className="w-full border-b border-white/5 bg-[#020617]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 h-28 flex items-center justify-between">
            <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
               <Image 
                 src="/images/logos/classcrave logo.png" 
                 alt="ClassCrave Logo" 
-                width={180} 
-                height={50} 
-                className="h-12 w-auto object-contain"
+                width={300} 
+                height={90} 
+                className="h-24 w-auto object-contain"
                 priority
               />
            </div>

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import RankEditor from '@/components/RankEditor';
-import CommsFeed from '@/components/CommsFeed';
+import { Rocket, LayoutGrid } from 'lucide-react';
 import { getAssetPath } from '@/lib/utils';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -112,107 +112,146 @@ export default function TeacherConsole() {
              </div>
           </nav>
 
-          {/* Center Panel - Main Dashboard Area */}
-          <div className="col-span-1 md:col-span-9 lg:col-span-7 flex flex-col gap-6">
-             {/* Big Greeting / Quick Actions */}
-             <div className="flex-1 border border-cyan-500/30 rounded-2xl bg-black/50 backdrop-blur-sm p-8 relative overflow-hidden group flex flex-col">
-                <div className="absolute inset-0 bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors pointer-events-none" />
-                
-                {/* Decorative HUD lines */}
-                <div className="absolute top-0 left-0 w-16 h-16 border-t-2 border-l-2 border-cyan-500/50 rounded-tl-lg" />
-                <div className="absolute top-0 right-0 w-16 h-16 border-t-2 border-r-2 border-cyan-500/50 rounded-tr-lg" />
-                <div className="absolute bottom-0 left-0 w-16 h-16 border-b-2 border-l-2 border-cyan-500/50 rounded-bl-lg" />
-                <div className="absolute bottom-0 right-0 w-16 h-16 border-b-2 border-r-2 border-cyan-500/50 rounded-br-lg" />
-
-                <div className="mb-8">
-                    <h2 className="text-3xl font-bold text-white mb-2">Welcome Back, Commander.</h2>
-                    <p className="text-cyan-300/80">Classroom systems functional. Warp drive ready.</p>
-                </div>
-
-                {/* Comms Feed (Real-time) */}
-                <CommsFeed />
-             </div>
-          </div>
-
-          {/* Right Panel - Sensors / Stats */}
-          <div className="col-span-1 md:col-span-12 lg:col-span-3 flex flex-col gap-4">
-             {/* Class Bonus / Shields */}
-             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-6 relative group">
-                <button 
-                    onClick={() => {
-                        setEditBonusForm(bonusConfig);
-                        setIsEditingBonus(true);
-                    }}
-                    className="absolute top-2 right-2 p-2 text-cyan-600 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                    <Edit2 size={14} />
-                </button>
-
-                {isEditingBonus ? (
-                    <div className="space-y-4">
-                         <div className="grid grid-cols-2 gap-2">
-                             <div>
-                                 <label className="text-[10px] uppercase text-cyan-600">Current</label>
-                                 <input 
-                                     type="number" 
-                                     value={editBonusForm.current} 
-                                     onChange={e => setEditBonusForm({...editBonusForm, current: Number(e.target.value)})}
-                                     className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
-                                 />
-                             </div>
-                             <div>
-                                 <label className="text-[10px] uppercase text-cyan-600">Target</label>
-                                 <input 
-                                     type="number" 
-                                     value={editBonusForm.target} 
-                                     onChange={e => setEditBonusForm({...editBonusForm, target: Number(e.target.value)})}
-                                     className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
-                                 />
-                             </div>
-                         </div>
-                         <div>
-                             <label className="text-[10px] uppercase text-cyan-600">Reward</label>
-                             <input 
-                                 type="text" 
-                                 value={editBonusForm.reward} 
-                                 onChange={e => setEditBonusForm({...editBonusForm, reward: e.target.value})}
-                                 className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
-                             />
-                         </div>
-                         <div className="flex justify-end gap-2">
-                             <button onClick={() => setIsEditingBonus(false)} className="p-1 text-red-500 hover:bg-white/10 rounded"><X size={16} /></button>
-                             <button onClick={handleSaveBonus} className="p-1 text-green-500 hover:bg-white/10 rounded"><Save size={16} /></button>
-                         </div>
+          {/* Center Panel - Dashboard Content (Replaces previous Center + Right logic) */}
+          <div className="col-span-1 md:col-span-9 lg:col-span-10 flex flex-col gap-6">
+             
+             {/* Row 1: Welcome & Bonus Widget */}
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                 
+                 {/* Welcome Message */}
+                 <div className="lg:col-span-2 border border-cyan-500/30 rounded-2xl bg-black/50 backdrop-blur-sm p-8 relative overflow-hidden flex flex-col justify-center min-h-[220px]">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-900/20 to-cyan-900/10 pointer-events-none" />
+                    
+                    {/* Decorative Lines */}
+                    <div className="absolute top-0 right-0 p-4 opacity-50">
+                        <div className="w-20 h-1 bg-cyan-500/20 mb-1" />
+                        <div className="w-10 h-1 bg-cyan-500/20 ml-auto" />
                     </div>
-                ) : (
-                    <>
-                        <div className="flex items-center justify-between mb-2 text-cyan-300">
-                            <div className="flex items-center gap-2">
-                                <Zap size={18} className="text-yellow-400" />
-                                <span className="text-sm font-bold uppercase tracking-wider">Class Bonus</span>
+
+                    <div className="relative z-10">
+                        <h2 className="text-3xl font-bold text-white mb-2">Welcome Back, Commander.</h2>
+                        <p className="text-cyan-300/80 text-lg max-w-lg">
+                            All classroom systems are operational. Warp drive is primed. 
+                            Your cadets are awaiting orders.
+                        </p>
+                    </div>
+                 </div>
+
+                 {/* Class Bonus Control - Prominent placement */}
+                 <div className="lg:col-span-1 border border-cyan-500/30 bg-black/60 rounded-xl p-6 relative group flex flex-col justify-center">
+                    <button 
+                        onClick={() => {
+                            setEditBonusForm(bonusConfig);
+                            setIsEditingBonus(true);
+                        }}
+                        className="absolute top-2 right-2 p-2 text-cyan-600 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    >
+                        <Edit2 size={14} />
+                    </button>
+
+                    {isEditingBonus ? (
+                        <div className="space-y-4">
+                             <div className="grid grid-cols-2 gap-2">
+                                 <div>
+                                     <label className="text-[10px] uppercase text-cyan-600">Current</label>
+                                     <input 
+                                         type="number" 
+                                         value={editBonusForm.current} 
+                                         onChange={e => setEditBonusForm({...editBonusForm, current: Number(e.target.value)})}
+                                         className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                     />
+                                 </div>
+                                 <div>
+                                     <label className="text-[10px] uppercase text-cyan-600">Target</label>
+                                     <input 
+                                         type="number" 
+                                         value={editBonusForm.target} 
+                                         onChange={e => setEditBonusForm({...editBonusForm, target: Number(e.target.value)})}
+                                         className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                     />
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="text-[10px] uppercase text-cyan-600">Reward</label>
+                                 <input 
+                                     type="text" 
+                                     value={editBonusForm.reward} 
+                                     onChange={e => setEditBonusForm({...editBonusForm, reward: e.target.value})}
+                                     className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                 />
+                             </div>
+                             <div className="flex justify-end gap-2">
+                                 <button onClick={() => setIsEditingBonus(false)} className="p-1 text-red-500 hover:bg-white/10 rounded"><X size={16} /></button>
+                                 <button onClick={handleSaveBonus} className="p-1 text-green-500 hover:bg-white/10 rounded"><Save size={16} /></button>
+                             </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center justify-between mb-4 text-cyan-300">
+                                <div className="flex items-center gap-2">
+                                    <Zap size={24} className="text-yellow-400" />
+                                    <span className="text-base font-bold uppercase tracking-wider">Class Bonus</span>
+                                </div>
+                                <span className="text-sm text-yellow-400 font-bold">{bonusConfig.current.toLocaleString()} / {bonusConfig.target.toLocaleString()}</span>
                             </div>
-                            <span className="text-xs text-yellow-400 font-bold">{bonusConfig.current.toLocaleString()} / {bonusConfig.target.toLocaleString()}</span>
-                        </div>
-                        
-                        <div className="w-full bg-gray-900 rounded-full h-4 mb-2 border border-cyan-500/20 relative overflow-hidden">
-                            <div className="absolute inset-0 bg-yellow-400/10 animate-pulse"></div>
-                            <div 
-                                className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(250,204,21,0.5)]"
-                                style={{ width: `${Math.min((bonusConfig.current / bonusConfig.target) * 100, 100)}%` }}
-                            ></div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <div className="text-xs text-yellow-400/80 italic truncate max-w-[150px]">{bonusConfig.reward}</div>
-                            <div className="text-xs text-cyan-500/60 uppercase tracking-widest">Shields Charging...</div>
-                        </div>
-                    </>
-                )}
+                            
+                            <div className="w-full bg-gray-900 rounded-full h-6 mb-4 border border-cyan-500/20 relative overflow-hidden">
+                                <div className="absolute inset-0 bg-yellow-400/10 animate-pulse"></div>
+                                <div 
+                                    className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(250,204,21,0.5)]"
+                                    style={{ width: `${Math.min((bonusConfig.current / bonusConfig.target) * 100, 100)}%` }}
+                                ></div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-sm text-yellow-400/90 italic truncate font-bold">{bonusConfig.reward}</div>
+                                <div className="text-[10px] text-cyan-500/60 uppercase tracking-widest">Shields Charging...</div>
+                            </div>
+                        </>
+                    )}
+                 </div>
              </div>
 
-             {/* Placeholder for future sidebar items (since Comms moved) */}
-             <div className="border border-cyan-500/30 bg-black/60 rounded-xl p-4 min-h-[200px] flex items-center justify-center text-cyan-500/30 text-xs uppercase tracking-widest border-dashed">
-                 Auxiliary Systems
+             {/* Row 2: Quick Command Modules */}
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <QuickAction 
+                    title="Manage Roster" 
+                    icon={<Users size={28} />} 
+                    desc="View & Edit Cadets"
+                    href="/teacher/roster"
+                    color="text-blue-400"
+                    borderColor="border-blue-500/30"
+                />
+                <QuickAction 
+                    title="Award XP" 
+                    icon={<Award size={28} />} 
+                    desc="Grant Rewards"
+                    href="/teacher/rewards"
+                    color="text-yellow-400"
+                    borderColor="border-yellow-500/30"
+                />
+                 <QuickAction 
+                    title="Mission Control" 
+                    icon={<Target size={28} />} 
+                    desc="Approve & Create"
+                    href="/teacher/missions"
+                    color="text-red-400"
+                    borderColor="border-red-500/30"
+                />
+                 <QuickAction 
+                    title="Hyper Map" 
+                    icon={<Map size={28} />} 
+                    desc="Navigate Sector"
+                    href="/teacher/map"
+                    color="text-green-400"
+                    borderColor="border-green-500/30"
+                />
              </div>
+             
+             {/* Row 3: Auxiliary / Status */}
+              <div className="border border-dashed border-cyan-900/50 rounded-xl p-4 text-center text-cyan-700/50 uppercase tracking-widest text-xs flex items-center justify-center">
+                System Diagnostics Running... No Alerts.
+             </div>
+
           </div>
 
        </main>
@@ -227,6 +266,26 @@ function NavButton({ icon, label, href, isActive = false }: any) {
                 {icon}
             </div>
             <span className="font-bold tracking-wider">{label}</span>
+        </Link>
+    )
+}
+
+function QuickAction({ title, icon, desc, href, color, borderColor }: any) {
+    return (
+        <Link href={href} className={`flex flex-col gap-3 p-6 rounded-xl border ${borderColor} bg-black/40 hover:bg-white/5 transition-all group relative overflow-hidden`}>
+            {/* Hover Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
+            
+            <div className={`p-3 rounded-lg bg-white/5 w-fit ${color} group-hover:scale-110 transition-transform duration-300`}>
+                {icon}
+            </div>
+            <div>
+                <h3 className={`font-bold text-lg text-white group-hover:text-cyan-300 transition-colors`}>{title}</h3>
+                <p className="text-xs text-cyan-400/50 group-hover:text-cyan-400/80">{desc}</p>
+            </div>
+             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0">
+                <ExternalLink size={14} className="text-cyan-500" />
+            </div>
         </Link>
     )
 }
