@@ -1010,24 +1010,28 @@ export default function SolarSystem() {
        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-[60]">
            {/* Teacher Command Toggle */}
            {(userData?.role === 'teacher' || userData?.email === 'andrewpcarlson85@gmail.com') && (
-               <button 
-                    onClick={() => setIsCommandMode(!isCommandMode)}
-                    className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isCommandMode ? 'bg-orange-600 text-white border-orange-500 animate-pulse' : 'bg-black/50 border-white/20 text-orange-400 hover:bg-white/10'}`}
-                    title="Fleet Command Override"
-               >
-                   <Gamepad2 size={24} />
-               </button>
+               <div id="map-btn-command">
+                   <button 
+                        onClick={() => setIsCommandMode(!isCommandMode)}
+                        className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isCommandMode ? 'bg-orange-600 text-white border-orange-500 animate-pulse' : 'bg-black/50 border-white/20 text-orange-400 hover:bg-white/10'}`}
+                        title="Fleet Command Override"
+                   >
+                    <Gamepad2 size={24} />
+                   </button>
+               </div>
            )}
 
            {/* Class Grid Toggle - Teacher Only */}
            {userData?.role === 'teacher' && (
-               <button 
-                    onClick={() => setIsGridVisible(!isGridVisible)}
-                    className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isGridVisible ? 'bg-cyan-500 text-white border-cyan-400' : 'bg-black/50 border-white/20 text-cyan-400 hover:bg-white/10'}`}
-                    title="Class Manifest"
-               >
-                   <LayoutGrid size={24} />
-               </button>
+               <div id="map-btn-grid">
+                   <button 
+                        onClick={() => setIsGridVisible(!isGridVisible)}
+                        className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isGridVisible ? 'bg-cyan-500 text-white border-cyan-400' : 'bg-black/50 border-white/20 text-cyan-400 hover:bg-white/10'}`}
+                        title="Class Manifest"
+                   >
+                    <LayoutGrid size={24} />
+                   </button>
+               </div>
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">

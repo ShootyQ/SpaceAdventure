@@ -3,10 +3,14 @@
 import SolarSystem from '@/components/SolarSystem';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import MapTutorial from './MapTutorial';
 
 export default function ClassroomMapDisplay() {
   return (
     <div className="w-screen h-screen bg-black relative overflow-hidden">
+        
+        <MapTutorial />
+
         {/* Full Screen Solar System with Award Overlays */}
         <div className="absolute inset-0 z-0">
             <SolarSystem />
