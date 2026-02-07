@@ -246,7 +246,7 @@ export default function RosterPage() {
             {/* New Student Modal */}
             {isAddingStudent && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <form onSubmit={handleAddStudent} className="w-full max-w-md bg-slate-900 border border-cyan-500/50 p-6 rounded-2xl shadow-[0_0_50px_rgba(0,255,255,0.1)] relative">
+                    <form onSubmit={handleAddStudent} className="w-full max-w-md bg-slate-900 border border-cyan-500/50 p-6 rounded-2xl shadow-[0_0_50px_rgba(0,255,255,0.1)] relative max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <button 
                             type="button" 
                             onClick={() => setIsAddingStudent(false)}

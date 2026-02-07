@@ -94,11 +94,18 @@ export default function TeacherConsole() {
                 )}
              </div>
           </div>
-          <div className="flex gap-4 text-xs tracking-wider">
-             <div className="flex flex-col items-end">
+          <div className="flex gap-4 text-xs tracking-wider items-center">
+             <div className="flex flex-col items-end mr-4">
                  <span className="text-cyan-600">STATUS</span>
                  <span className="text-green-400">ONLINE</span>
              </div>
+             <button 
+                onClick={logout}
+                className="bg-black/40 hover:bg-red-950/30 border border-white/10 hover:border-red-500/50 text-white/50 hover:text-red-400 px-3 py-2 rounded-lg transition-all flex items-center gap-2"
+             >
+                <Power size={16} />
+                <span className="hidden sm:inline">LOGOUT</span>
+             </button>
           </div>
        </header>
 

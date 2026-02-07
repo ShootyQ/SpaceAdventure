@@ -153,7 +153,7 @@ export default function Home() {
                     className="absolute bottom-20 left-10 w-48 h-48 z-20"
                   >
                       <Image
-                        src="/images/ships/spaceship_red.png" 
+                        src="/images/ships/finalship.png" 
                         alt="Spaceship"
                         fill
                         className="object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"

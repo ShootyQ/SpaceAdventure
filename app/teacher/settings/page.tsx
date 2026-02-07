@@ -1439,6 +1439,8 @@ function SettingsContent() {
         }
     };
 
+    const { logout } = useAuth(); // Add logout logic
+
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono pb-20 overflow-x-hidden">
             {/* Background Grid Animation */}
@@ -1446,27 +1448,37 @@ function SettingsContent() {
             <div className="max-w-7xl mx-auto relative z-10">
 
                 {/* Header Navigation */}
-                <div className="flex items-center gap-4 mb-8">
-                    {view === "cockpit" ? (
-                        <Link href="/teacher" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
-                            <ArrowLeft size={20} />
-                            <span className="sr-only">Exit Cockpit</span>
-                        </Link>
-                    ) : (
-                        <button onClick={() => setView(view === "avatar-config" ? "avatar" : "cockpit")} className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
-                            <LayoutDashboard size={20} />
-                        </button>
-                    )}
-
-                    <div>
-                        <h1 className="text-3xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
-                            <Crosshair className="text-cyan-500 animate-spin-slow" />
-                            {getTitle()}
-                        </h1>
-                        <div className="text-xs text-cyan-500/50 uppercase tracking-[0.3em]">
-                            System Status: Normal
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        {view === "cockpit" ? (
+                            <Link href="/teacher" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                                <ArrowLeft size={20} />
+                                <span className="sr-only">Exit Cockpit</span>
+                            </Link>
+                        ) : (
+                            <button onClick={() => setView(view === "avatar-config" ? "avatar" : "cockpit")} className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                                <LayoutDashboard size={20} />
+                            </button>
+                        )}
+                        
+                        <div>
+                            <h1 className="text-3xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
+                                <Crosshair className="text-cyan-500 animate-spin-slow" />
+                                {getTitle()}
+                            </h1>
+                            <div className="text-xs text-cyan-500/50 uppercase tracking-[0.3em]">
+                                System Status: Normal
+                            </div>
                         </div>
                     </div>
+
+                    <button 
+                        onClick={logout}
+                        className="p-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all flex items-center gap-2"
+                        title="Sign Out"
+                    >
+                         <LogOut size={20} />
+                    </button>
                 </div>
 
                 {/* Main Content Area */}

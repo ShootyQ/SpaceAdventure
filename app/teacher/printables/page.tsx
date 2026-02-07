@@ -13,16 +13,16 @@ import { useRouter } from "next/navigation";
 
 // Default ranks if none loaded
 const DEFAULT_RANKS: Rank[] = [
-    { id: "1", name: "Recruit", minXP: 0, image: getAssetPath("/images/badges/Recruit.png") },
-    { id: "2", name: "Cadet", minXP: 100, image: getAssetPath("/images/badges/Cadet.png") },
-    { id: "3", name: "Ensign", minXP: 300, image: getAssetPath("/images/badges/Ensign.png") },
-    { id: "4", name: "Lieutenant", minXP: 600, image: getAssetPath("/images/badges/Lieutenant.png") },
-    { id: "5", name: "Commander", minXP: 1000, image: getAssetPath("/images/badges/Commander.png") },
-    { id: "6", name: "Captain", minXP: 1500, image: getAssetPath("/images/badges/Captain.png") },
-    { id: "7", name: "Admiral", minXP: 2200, image: getAssetPath("/images/badges/Admiral.png") },
-    { id: "8", name: "Fleet Admiral", minXP: 3000, image: getAssetPath("/images/badges/FleetAdmiral.png") },
-    { id: "9", name: "Master Chief", minXP: 4000, image: getAssetPath("/images/badges/MasterChief.png") },
-    { id: "10", name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
+    { id: '1', name: "Space Cadet", minXP: 0, image: getAssetPath("/images/badges/cadet.png") },
+    { id: '2', name: "Rookie Pilot", minXP: 100, image: getAssetPath("/images/badges/RookiePilot.png") },
+    { id: '3', name: "Star Scout", minXP: 300, image: getAssetPath("/images/badges/StarScout.png") },
+    { id: '4', name: "Nebula Navigator", minXP: 600, image: getAssetPath("/images/badges/NebulaNavigator.png") },
+    { id: '5', name: "Solar Specialist", minXP: 1000, image: getAssetPath("/images/badges/SolarSpecialist.png") },
+    { id: '6', name: "Comet Captain", minXP: 1500, image: getAssetPath("/images/badges/CometCaptain.png") },
+    { id: '7', name: "Galaxy Guardian", minXP: 2200, image: getAssetPath("/images/badges/GalaxyGuardian.png") },
+    { id: '8', name: "Cosmic Commander", minXP: 3000, image: getAssetPath("/images/badges/CosmicCommander.png") },
+    { id: '9', name: "Void Admiral", minXP: 4000, image: getAssetPath("/images/badges/VoidAdmiral.png") },
+    { id: '10', name: "Grand Star Admiral", minXP: 5000, image: getAssetPath("/images/badges/GrandStarAdmiral.png") }
 ];
 
 export default function PrintablesPage() {

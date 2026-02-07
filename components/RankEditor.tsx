@@ -102,7 +102,7 @@ export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClo
                                    )}
                                </div>
                                
-                               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                                    <div>
                                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1 block">Rank Title</label>
                                        <input 
@@ -145,20 +145,6 @@ export default function RankEditor({ isOpen, onClose }: { isOpen: boolean, onClo
                                                setDraftRanks(newRanks);
                                            }}
                                            className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white/90 text-sm focus:border-cyan-500 focus:outline-none font-mono"
-                                       />
-                                   </div>
-                                    <div className="hidden lg:block">
-                                       <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1 block">Image Path</label>
-                                       <input 
-                                           type="text" 
-                                           value={rank.image}
-                                            onChange={(e) => {
-                                               const newRanks = [...draftRanks];
-                                               const index = newRanks.findIndex(r => (r.id === rank.id));
-                                               newRanks[index] = { ...newRanks[index], image: e.target.value };
-                                               setDraftRanks(newRanks);
-                                           }}
-                                           className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-gray-400 text-xs focus:border-cyan-500 focus:outline-none font-mono"
                                        />
                                    </div>
                                </div>
