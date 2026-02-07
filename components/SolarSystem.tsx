@@ -102,20 +102,46 @@ export default function SolarSystem() {
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
+  const [showBonusVictory, setShowBonusVictory] = useState(false);
+  const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
+  const [className, setClassName] = useState("");
 
   useEffect(() => {
     if (!userData) return;
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId) return;
 
+    // Fetch Class Bonus
     const unsub = onSnapshot(doc(db, `users/${teacherId}/settings`, "classBonus"), (d) => {
         if (d.exists()) setBonusConfig(d.data() as ClassBonusConfig);
     });
+
+    // Fetch Class Name
+    if (userData.role === 'teacher') {
+        setClassName(userData.schoolName || "");
+    } else {
+        getDoc(doc(db, "users", teacherId)).then(snap => {
+            if(snap.exists()) {
+                 setClassName(snap.data().schoolName || "");
+            }
+        });
+    }
+
     return () => unsub();
   }, [userData]);
 
+  // Trigger Bonus Victory
+  useEffect(() => {
+     if (bonusConfig && bonusConfig.current >= bonusConfig.target && !bonusVictoryDismissed) {
+         setShowBonusVictory(true);
+     } else {
+         setShowBonusVictory(false);
+     }
+  }, [bonusConfig, bonusVictoryDismissed]);
+
   useEffect(() => {
     if (!userData) return;
+
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId) return;
 
@@ -696,6 +722,24 @@ export default function SolarSystem() {
   const isAsteroidDestroyed = asteroidStatus && asteroidStatus.gained >= asteroidEvent!.targetXP;
   const isAsteroidTimeOut = asteroidStatus && asteroidStatus.timeLeft <= 0 && !isAsteroidDestroyed;
 
+  // Auto-close Asteroid Event on Victory after 5 seconds
+  useEffect(() => {
+    // Only the teacher (owner of the event) performs the database write
+    if (isAsteroidDestroyed && asteroidEvent?.active && userData?.role === 'teacher') {
+      const timer = setTimeout(async () => {
+         try {
+             // Derive event ID from teacher's UID
+             const eventId = `asteroidEvent_${userData.uid}`; 
+             const eventRef = doc(db, 'game-config', eventId);
+             await updateDoc(eventRef, { active: false, status: 'success' });
+         } catch (err) {
+             console.error("Failed to auto-close asteroid event", err);
+         }
+      }, 5000); 
+      return () => clearTimeout(timer);
+    }
+  }, [isAsteroidDestroyed, asteroidEvent?.active, userData]);
+
   // Handle mouse wheel zoom
   const handleWheel = (e: React.WheelEvent) => {
     setIsAutoFit(false);
@@ -748,6 +792,14 @@ export default function SolarSystem() {
     >
        {/* Hidden Audio Element */}
        <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
+
+       {/* Class Name HUD */}
+       <div className="absolute top-6 left-6 z-40 pointer-events-none">
+           <div className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-bold mb-1">Sector Control</div>
+           <div className="text-xl md:text-3xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
+               {className || "Deep Space Network"}
+           </div>
+       </div>
 
        {/* Sound Toggle */}
        <button 
@@ -1646,6 +1698,65 @@ export default function SolarSystem() {
                     )}
                 </div>
             )}
+       </AnimatePresence>
+
+       {/* CLASS BONUS VICTORY OVERLAY */}
+       <AnimatePresence>
+          {showBonusVictory && bonusConfig && (
+              <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md"
+              >
+                  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                       {/* Confetti / Particle Effects */}
+                       {[...Array(20)].map((_, i) => (
+                           <motion.div
+                              key={i}
+                              initial={{ y: -100, x: `${Math.random() * 100}vw`, opacity: 1 }}
+                              animate={{ y: "110vh", rotate: 360 }}
+                              transition={{ duration: 2 + Math.random() * 3, repeat: Infinity, ease: "linear" }}
+                              className="absolute w-4 h-4 rounded-sm"
+                              style={{ 
+                                  left: 0, 
+                                  backgroundColor: ['#fbbf24', '#3b82f6', '#ef4444', '#10b981'][Math.floor(Math.random() * 4)] 
+                              }}
+                           />
+                       ))}
+                  </div>
+
+                  <div className="relative z-10 text-center max-w-4xl p-12 bg-gradient-to-b from-gray-900 via-gray-900 to-black border border-yellow-500/30 rounded-3xl shadow-[0_0_100px_rgba(234,179,8,0.3)]">
+                      <motion.div 
+                        animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="mb-8 inline-block"
+                      >
+                           <Crown size={120} className="text-yellow-400 drop-shadow-[0_0_30px_rgba(234,179,8,0.6)]" />
+                      </motion.div>
+                      
+                      <h1 className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 uppercase tracking-tighter mb-4 filter drop-shadow-[0_0_20px_rgba(234,179,8,0.4)]">
+                          Goal Achieved!
+                      </h1>
+                      
+                      <p className="text-2xl text-yellow-100 font-mono mb-8 tracking-widest uppercase">Class Bonus Unlocked</p>
+                      
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-8 mb-10 transform hover:scale-105 transition-transform">
+                          <div className="text-sm text-yellow-500 uppercase font-bold tracking-[0.2em] mb-3">Reward Granted</div>
+                          <div className="text-4xl md:text-5xl font-bold text-white drop-shadow-md">
+                              {bonusConfig.reward}
+                          </div>
+                      </div>
+
+                      <button 
+                          onClick={() => setBonusVictoryDismissed(true)}
+                          className="px-10 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl uppercase tracking-widest rounded-full shadow-[0_0_30px_rgba(234,179,8,0.4)] hover:shadow-[0_0_50px_rgba(234,179,8,0.6)] transition-all transform hover:-translate-y-1 active:scale-95"
+                      >
+                          Claim Reward
+                      </button>
+                  </div>
+              </motion.div>
+          )}
        </AnimatePresence>
 
     </div>

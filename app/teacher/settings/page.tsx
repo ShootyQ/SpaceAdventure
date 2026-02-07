@@ -7,7 +7,7 @@ import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs, query, where, 
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import {
-    ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2,
+    ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2, LogOut, Edit2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
 import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
@@ -96,7 +96,22 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 // --- Subviews ---
 
 function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (view: string) => void, ranks: Rank[], onOpenRankEditor: () => void }) {
-    const { userData } = useAuth();
+    const { userData, logout } = useAuth();
+    const [className, setClassName] = useState(userData?.schoolName || "");
+    const [isEditingName, setIsEditingName] = useState(false);
+
+    const handleSaveClassName = async () => {
+        if (!userData?.uid) return;
+        try {
+            await updateDoc(doc(db, "users", userData.uid), {
+                schoolName: className
+            });
+            setIsEditingName(false);
+        } catch (e) {
+            console.error("Error saving class name:", e);
+        }
+    };
+
     const MENU_ITEMS = [
         { id: "ship", title: "Hangar Bay", icon: Rocket, color: "text-cyan-400", border: "border-cyan-500", bg: "bg-cyan-950/30" },
         { id: "inventory", title: "Cargo Hold", icon: Box, color: "text-amber-400", border: "border-amber-500", bg: "bg-amber-950/30" },
@@ -183,6 +198,27 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                  <div className="border-b border-white/10 pb-4 text-center pb-6">
                      <h2 className="text-white/70 uppercase tracking-[0.3em] text-xs font-bold mb-1">Active Personnel</h2>
                      <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Commander"}</div>
+                     
+                     {/* Class Name Editor */}
+                     <div className="flex justify-center items-center gap-2 mb-3">
+                        {isEditingName ? (
+                            <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
+                                <input 
+                                    value={className}
+                                    onChange={(e) => setClassName(e.target.value)}
+                                    className="bg-transparent border-none text-cyan-400 text-sm font-bold uppercase tracking-wider w-32 text-center focus:outline-none"
+                                    placeholder="CLASS NAME"
+                                />
+                                <button onClick={handleSaveClassName} className="p-1 hover:bg-green-500/20 text-green-400 rounded"><Check size={14} /></button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer group" onClick={() => setIsEditingName(true)}>
+                                <span className="text-sm font-bold uppercase tracking-widest">{userData?.schoolName || "Set Class Name"}</span>
+                                <Edit2 size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        )}
+                     </div>
+
                      <div className="flex justify-center gap-4 text-[10px] uppercase font-bold tracking-widest text-cyan-400/80">
                         <span>{currentRank.name}</span>
                         <span className="text-white/30"></span>
@@ -252,6 +288,16 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                            <span className="absolute bottom-2 text-[10px] text-yellow-500/50 uppercase tracking-widest font-bold z-10">Current Designation</span>
                        </div>
                  </div>
+
+                 {/* Logout Button */}
+                 <button 
+                    onClick={logout}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300 transition-all uppercase tracking-widest text-xs font-bold"
+                 >
+                    <LogOut size={16} />
+                    System Logout
+                 </button>
+
             </div>
         </div>
     );

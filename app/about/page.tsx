@@ -29,6 +29,16 @@ export default function AboutPage() {
             <p className="text-xl text-slate-400 leading-relaxed">
                 We build immersive, gamified simulations that wrap standard curriculum in epic narratives. By transforming the classroom into a spaceship, a frontier town, or a magical kingdom, we turn "assignments" into "missions" and "grades" into "experience points".
             </p>
+
+            <div className="mt-12 p-8 bg-indigo-950/20 border border-indigo-500/20 rounded-2xl relative">
+                <Quote className="absolute top-8 left-6 w-8 h-8 text-indigo-500/20" />
+                <p className="text-lg text-indigo-200 italic leading-relaxed pl-8">
+                    "I dreamed of creating something like this 12 years ago when I was a teacher. I wanted to 'gamify' my room and had written pages on it, imagining a world where students weren't just learning, but exploring."
+                </p>
+                <div className="mt-4 pl-8 text-sm font-bold text-indigo-400 uppercase tracking-widest">
+                    — Founder's Note
+                </div>
+            </div>
         </section>
 
         {/* How It Works Section */}

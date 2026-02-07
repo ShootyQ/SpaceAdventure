@@ -288,10 +288,6 @@ export default function RewardsPage() {
                                                     className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none"
                                                     required
                                                 />
-                                                <div className="flex gap-1">
-                                                     <button type="button" onClick={() => setNewXp(50)} className="px-2 bg-cyan-900/40 rounded border border-cyan-800 text-xs hover:bg-cyan-800">+50</button>
-                                                     <button type="button" onClick={() => setNewXp(-50)} className="px-2 bg-red-900/40 rounded border border-red-800 text-xs hover:bg-red-800 text-red-300">-50</button>
-                                                </div>
                                             </div>
                                         </div>
                                         <button className="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 md:py-2 rounded text-xs uppercase tracking-wider shadow-lg">
