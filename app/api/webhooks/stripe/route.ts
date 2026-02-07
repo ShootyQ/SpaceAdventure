@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         stripeSubscriptionId: subscription.id,
         stripeCustomerId: subscription.customer as string,
         stripePriceId: subscription.items.data[0].price.id,
-        stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
     });
   }
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     if(session.metadata?.userId) {
         await adminDb.collection('users').doc(session.metadata.userId).update({
-            stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
         }); 
     }
   }
