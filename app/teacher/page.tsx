@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getAssetPath } from '@/lib/utils';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import DashboardTutorial from './DashboardTutorial';
 
 interface ClassBonusConfig {
     current: number;
@@ -54,6 +55,8 @@ export default function TeacherConsole() {
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono">
        
+       <DashboardTutorial />
+
        {/* Background Image & Overlay */}
        <div className="absolute inset-0 z-0 pointer-events-none">
            <img 
@@ -81,34 +84,9 @@ export default function TeacherConsole() {
        </header>
 
        {/* Main Viewport (The Window to Space) */}
-       <main className="flex-1 relative z-10 p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+       <main className="flex-1 relative z-10 p-4 md:p-6 max-w-7xl mx-auto w-full flex flex-col gap-6">
 
-          {/* Left Panel - Navigation */}
-          <nav className="col-span-1 md:col-span-3 lg:col-span-2 flex flex-col gap-4">
-             <NavButton icon={<Users />} label="Roster" href="/teacher/roster" isActive={pathname === '/teacher/roster'} />
-             <NavButton icon={<Target />} label="Missions" href="/teacher/missions" isActive={pathname === '/teacher/missions'} />
-             <NavButton icon={<Map />} label="Star Map" href="/teacher/map" isActive={pathname === '/teacher/map'} />
-             <NavButton icon={<Globe />} label="Planets" href="/teacher/planets" isActive={pathname === '/teacher/planets'} />
-             <NavButton icon={<Award />} label="Rewards" href="/teacher/rewards" isActive={pathname === '/teacher/rewards'} />
-             <div className="mt-auto">
-                {/* 
-                <NavButton icon={<Settings />} label="Config" href="/teacher/settings" isActive={pathname === '/teacher/settings'} />
-                */}
-
-                <button
-                    onClick={logout}
-                    className="w-full mt-4 flex items-center gap-3 p-4 rounded-xl border border-red-500/30 bg-red-900/10 hover:bg-red-900/30 text-red-400 transition-all hover:scale-105 group text-left"
-                >
-                    <Power size={24} />
-                    <span className="font-bold tracking-wider">LOGOUT</span>
-                </button>
-             </div>
-          </nav>
-
-          {/* Center Panel - Dashboard Content (Replaces previous Center + Right logic) */}
-          <div className="col-span-1 md:col-span-9 lg:col-span-10 flex flex-col gap-6">
-             
-             {/* Row 1: Welcome & Bonus Widget */}
+          {/* Top Panel - Welcome & Bonus */}
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                  
                  {/* Welcome Message */}
@@ -205,95 +183,108 @@ export default function TeacherConsole() {
              </div>
 
              {/* Row 2: Quick Command Modules */}
-             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20">
                 <QuickAction 
-                    title="Manage Roster" 
+                    title="Student Roster" 
                     icon={<Users size={28} />} 
-                    desc="View & Edit Cadets"
+                    desc="Manage Students"
                     href="/teacher/roster"
                     color="text-blue-400"
                     borderColor="border-blue-500/30"
                 />
-                <QuickAction 
-                    title="Award XP" 
-                    icon={<Award size={28} />} 
-                    desc="Grant Rewards"
-                    href="/teacher/rewards"
-                    color="text-yellow-400"
-                    borderColor="border-yellow-500/30"
-                />
                  <QuickAction 
-                    title="Mission Control" 
-                    icon={<Target size={28} />} 
-                    desc="Create Lessons"
-                    href="/teacher/missions"
-                    color="text-red-400"
-                    borderColor="border-red-500/30"
-                />
-                 <QuickAction 
-                    title="Solar System Map" 
-                    icon={<Globe size={28} />} 
-                    desc="Navigate Sector"
-                    href="/teacher/map"
-                    color="text-green-400"
-                    borderColor="border-green-500/30"
-                />
-                 <QuickAction 
-                    title="Subscriptions" 
-                    icon={<CreditCard size={28} />} 
-                    desc="Manage Plan & Billing"
-                    href="/teacher/settings?mode=billing"
-                    color="text-emerald-400"
-                    borderColor="border-emerald-500/30"
-                />
-                <QuickAction 
-                    title="Launch Asteroid" 
-                    icon={<AlertTriangle size={28} />} 
-                    desc="Global Event"
-                    href="/teacher/settings?mode=asteroids"
-                    color="text-orange-400"
-                    borderColor="border-orange-500/30"
-                />
-                <QuickAction 
-                    title="Co-Teachers" 
-                    icon={<UserPlus size={28} />} 
-                    desc="Manage Access"
-                    href="/teacher/settings?mode=team"
-                    color="text-indigo-400"
-                    borderColor="border-indigo-500/30"
-                />
-                <QuickAction 
-                    title="Rank Protocols" 
+                    title="Rank Thresholds" 
                     icon={<Shield size={28} />} 
-                    desc="Edit Clearance Levels"
+                    desc="Edit XP Levels"
                     href="/teacher/settings?mode=ranks"
                     color="text-purple-400"
                     borderColor="border-purple-500/30"
                 />
                 <QuickAction 
-                    title="Print Visuals"
+                    title="Behavior Settings" 
+                    icon={<Zap size={28} />} 
+                    desc="Edit Protocols"
+                    href="/teacher/rewards"
+                    color="text-yellow-400"
+                    borderColor="border-yellow-500/30"
+                />
+                <QuickAction 
+                    title="My Teacher Avatar"
+                    icon={<Settings size={28} />}
+                    desc="Personal Config"
+                    href="/teacher/settings"
+                    color="text-cyan-400"
+                    borderColor="border-cyan-500/30"
+                />
+
+                <QuickAction 
+                    title="Lesson Plans" 
+                    icon={<Target size={28} />} 
+                    desc="Assign Missions"
+                    href="/teacher/missions"
+                    color="text-red-400"
+                    borderColor="border-red-500/30"
+                />
+                 <QuickAction 
+                    title="Classroom Display" 
+                    icon={<Globe size={28} />} 
+                    desc="Solar System Map"
+                    href="/teacher/map"
+                    color="text-green-400"
+                    borderColor="border-green-500/30"
+                />
+                 <QuickAction 
+                    title="Planet Rewards" 
+                    icon={<Award size={28} />} 
+                    desc="Edit Milestones"
+                    href="/teacher/planets"
+                    color="text-teal-400"
+                    borderColor="border-teal-500/30"
+                />
+                <QuickAction 
+                    title="Asteroid Event" 
+                    icon={<AlertTriangle size={28} />} 
+                    desc="Launch Challenge"
+                    href="/teacher/settings?mode=asteroids"
+                    color="text-orange-400"
+                    borderColor="border-orange-500/30"
+                />
+                
+                 <QuickAction 
+                    title="Subscriptions" 
+                    icon={<CreditCard size={28} />} 
+                    desc="Billing"
+                    href="/teacher/settings?mode=billing"
+                    color="text-emerald-400"
+                    borderColor="border-emerald-500/30"
+                />
+                <QuickAction 
+                    title="Manage Team" 
+                    icon={<UserPlus size={28} />} 
+                    desc="Co-Teachers"
+                    href="/teacher/settings?mode=team"
+                    color="text-indigo-400"
+                    borderColor="border-indigo-500/30"
+                />
+                <QuickAction 
+                    title="Print Center"
                     icon={<Printer size={28} />}
-                    desc="Badges & Credentials"
+                    desc="Badges & Cards"
                     href="/teacher/printables"
                     color="text-pink-400"
                     borderColor="border-pink-500/30"
                 />
                 <QuickAction 
-                    title="Config"
-                    icon={<Settings size={28} />}
-                    desc="Modify Teacher Spaceship"
-                    href="/teacher/settings"
-                    color="text-cyan-400"
-                    borderColor="border-cyan-500/30"
+                    title="Award Points" 
+                    icon={<Zap size={28} />} 
+                    desc="Mobile Tool"
+                    href="/teacher/rewards"
+                    color="text-yellow-400"
+                    borderColor="border-yellow-500/30"
                 />
              </div>
              
-             {/* Row 3: Auxiliary / Status */}
-              <div className="border border-dashed border-cyan-900/50 rounded-xl p-4 text-center text-cyan-700/50 uppercase tracking-widest text-xs flex items-center justify-center">
-                System Diagnostics Running... No Alerts.
-             </div>
-
-          </div>
+             {/* Row 3: Auxiliary / Status removed as requested for simplified UI */}
 
        </main>
     </div>
