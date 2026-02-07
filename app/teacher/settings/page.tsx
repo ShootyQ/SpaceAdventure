@@ -958,7 +958,12 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                             <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Unlimited Duration</li>
                         </ul>
                      </div>
-                     {userData?.subscriptionStatus !== "active" && <button disabled className="w-full py-3 rounded-xl bg-white/10 text-white/50 font-bold cursor-not-allowed border border-white/10">Current Plan</button>}
+                     {/* Free Trial Badge - Not a button */}
+                     {userData?.subscriptionStatus !== "active" && (
+                        <div className="w-full py-3 rounded-xl bg-white/5 text-white/40 font-bold border border-white/10 text-center uppercase tracking-wider text-xs">
+                            Current Status
+                        </div>
+                     )}
                  </div>
 
                  <div className="bg-gradient-to-br from-green-900/20 to-black rounded-2xl p-6 border border-green-500/50 flex flex-col relative overflow-hidden">
@@ -1003,10 +1008,21 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         </ul>
                      </div>
                      {userData?.subscriptionStatus === "active" ? (
-                         <button disabled className="w-full py-3 rounded-xl bg-green-500/20 text-green-400 font-bold cursor-not-allowed border border-green-500/50">Active Plan</button>
+                         <div className="w-full py-3 rounded-xl bg-green-500/20 text-green-400 font-bold border border-green-500/50 text-center uppercase tracking-wider flex items-center justify-center gap-2">
+                             <Check size={18} /> Plan Active
+                         </div>
                      ) : (
-                         <button onClick={handleSubscribe} className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold transition-all border border-green-400 shadow-[0_0_20px_rgba(22,163,74,0.3)]">
-                            {loading ? "Processing..." : `Upgrade (${cycle})`}
+                         <button 
+                            onClick={handleSubscribe} 
+                            disabled={loading}
+                            className={`w-full py-3 rounded-xl font-bold transition-all border shadow-[0_0_20px_rgba(22,163,74,0.3)]
+                                ${loading 
+                                    ? "bg-gray-700 text-gray-400 border-gray-600 cursor-wait" 
+                                    : "bg-green-600 hover:bg-green-500 text-white border-green-400 active:scale-95"
+                                }
+                            `}
+                        >
+                            {loading ? "Initializing..." : `Upgrade (${cycle})`}
                          </button>
                      )}
                  </div>
