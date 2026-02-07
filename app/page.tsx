@@ -84,9 +84,14 @@ export default function Home() {
                   What Journey Do You <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">CRAVE?</span>
                 </h1>
                 
-                <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                <p className="text-xl text-slate-400 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
                   Transform your daily curriculum into an immersive campaign. Engage students with XP, ranks, and collaborative missions that make learning unforgettable.
                 </p>
+
+                <div className="mb-10 p-4 border border-yellow-500/30 bg-yellow-900/10 rounded-xl max-w-lg mx-auto lg:mx-0">
+                    <p className="text-yellow-400 text-sm font-bold mb-1 uppercase tracking-wide">⚠ Under Development</p>
+                    <p className="text-slate-400 text-xs leading-relaxed">System Launch Sequence initiated for <span className="text-white font-bold">February 2026</span>. For early access inquiries, contact <a href="mailto:classcrave@gmail.com" className="text-indigo-400 hover:underline">classcrave@gmail.com</a>.</p>
+                </div>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                    <Link href="/start" className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-2">

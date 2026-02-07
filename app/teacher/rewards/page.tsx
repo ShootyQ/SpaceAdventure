@@ -343,7 +343,8 @@ export default function RewardsPage() {
                             </div>
                          ) : (
                              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-24">
-                                <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 auto-rows-fr">
+                                {/* Density adjustments for mobile: grid-cols-4, smaller gap */}
+                                <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4 auto-rows-fr">
                                     {students.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
                                         const isSelected = selectedIds.has(student.uid);
@@ -353,34 +354,37 @@ export default function RewardsPage() {
                                             key={student.uid}
                                             onClick={() => toggleSelection(student.uid)}
                                             className={`
-                                                relative w-full aspect-square flex flex-col p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all cursor-pointer group overflow-hidden
+                                                relative w-full aspect-square md:aspect-square flex flex-col p-1 md:p-4 rounded-lg md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
                                                 ${isSelected 
-                                                    ? 'bg-cyan-900/40 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' 
+                                                    ? 'bg-cyan-900/60 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
                                                     : 'bg-black/40 border-cyan-900/50 hover:bg-cyan-900/40 hover:border-cyan-400'}
                                             `}
                                         >
                                             {/* CHECKMARK for Selection */}
-                                            <div className={`absolute top-2 left-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
-                                                 {isSelected && <Check size={14} className="text-black stroke-[4]" />}
+                                            <div className={`absolute top-1 left-1 md:top-2 md:left-2 z-20 w-4 h-4 md:w-6 md:h-6 rounded-full border md:border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
+                                                 {isSelected && <Check size={12} className="text-black stroke-[4] block md:hidden" />}
+                                                 {isSelected && <Check size={14} className="text-black stroke-[4] hidden md:block" />}
                                             </div>
 
-                                            {/* Corner Accents */}
-                                            <div className="absolute top-0 left-0 w-6 h-6 md:w-8 md:h-8 border-t-2 border-l-2 border-white/5 rounded-tl-xl group-hover:border-cyan-400/50 transition-colors" />
-                                            <div className="absolute bottom-0 right-0 w-6 h-6 md:w-8 md:h-8 border-b-2 border-r-2 border-white/5 rounded-br-xl group-hover:border-cyan-400/50 transition-colors" />
+                                            {/* (Desktop Only) Corner Accents */}
+                                            <div className="hidden md:block absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white/5 rounded-tl-xl group-hover:border-cyan-400/50 transition-colors" />
+                                            <div className="hidden md:block absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white/5 rounded-br-xl group-hover:border-cyan-400/50 transition-colors" />
 
-                                            {/* Rank Badge */}
-                                            <div className="absolute top-2 left-8 md:top-3 md:left-10 flex items-center gap-1 text-[9px] md:text-[10px] uppercase font-bold text-cyan-700 group-hover:text-cyan-400">
+                                            {/* (Desktop Only) Rank Badge */}
+                                            <div className="hidden md:flex absolute top-3 left-10 items-center gap-1 text-[10px] uppercase font-bold text-cyan-700 group-hover:text-cyan-400">
                                                 {rank?.name || 'Cadet'}
                                             </div>
 
-                                            {/* XP Counter */}
-                                            <div className="absolute top-2 right-2 md:top-3 md:right-3 text-[10px] md:text-xs font-mono font-bold text-cyan-600 group-hover:text-cyan-300">
+                                            {/* (Desktop Only) XP Counter */}
+                                            <div className="hidden md:block absolute top-3 right-3 text-xs font-mono font-bold text-cyan-600 group-hover:text-cyan-300">
                                                 {student.xp || 0} XP
                                             </div>
 
-                                            {/* Center Content */}
-                                            <div className="flex-1 flex flex-col items-center justify-center w-full z-10 space-y-1 md:space-y-2 mt-4">
-                                                <div className={`w-20 h-20 md:w-28 md:h-28 rounded-full flex items-center justify-center bg-gradient-to-b from-white/10 to-transparent group-hover:from-cyan-500/20 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 group-hover:border-cyan-400/30 overflow-hidden relative`}>
+                                            {/* Content Container */}
+                                            <div className="flex-1 flex flex-col items-center justify-center w-full z-10 md:space-y-2 md:mt-4">
+                                                
+                                                {/* (Desktop Only) Avatar Circle */}
+                                                <div className="hidden md:flex w-28 h-28 rounded-full items-center justify-center bg-gradient-to-b from-white/10 to-transparent group-hover:from-cyan-500/20 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 group-hover:border-cyan-400/30 overflow-hidden relative">
                                                     <img 
                                                         src={getAssetPath("/images/ships/finalship.png")}
                                                         className="w-full h-full object-contain relative z-20 scale-75"
@@ -390,11 +394,15 @@ export default function RewardsPage() {
                                                         <UserAvatar userData={student} className="w-full h-full scale-[1.35] translate-y-1" />
                                                     </div>
                                                 </div>
-                                                <div className="text-center w-full">
-                                                    <h3 className="text-white font-bold text-sm md:text-lg truncate w-full px-1 tracking-wide">
-                                                        {student.displayName}
+
+                                                {/* Name Display */}
+                                                <div className="text-center w-full h-full flex flex-col justify-center md:block md:h-auto">
+                                                    <h3 className="text-white font-bold text-[10px] sm:text-xs md:text-lg leading-tight md:leading-normal w-full px-0.5 break-words md:truncate">
+                                                        {student.displayName?.split(' ')[0]} {/* Show first name mainly on mobile to save space, depends on preference, but helps fit */}
+                                                        <span className="md:hidden inline-block w-full">{student.displayName?.split(' ')[1]?.charAt(0)}</span> {/* Last initial mobile */}
+                                                        <span className="hidden md:inline">{student.displayName?.split(' ').slice(1).join(' ')}</span> {/* Full name desktop */}
                                                     </h3>
-                                                    <p className="text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
+                                                    <p className="hidden md:block text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
                                                         {student.spaceship?.name || 'USS Unknown'}
                                                     </p>
                                                 </div>
@@ -409,10 +417,10 @@ export default function RewardsPage() {
                          <AnimatePresence>
                              {selectedIds.size > 0 && (
                                  <motion.div 
-                                    initial={{ y: 100 }}
+                                    initial={{ y: 200 }}
                                     animate={{ y: 0 }}
-                                    exit={{ y: 100 }}
-                                    className="absolute bottom-4 left-4 right-4 bg-cyan-900/90 backdrop-blur-md border border-cyan-500/50 p-4 rounded-xl flex items-center justify-between shadow-2xl z-40"
+                                    exit={{ y: 200 }}
+                                    className="fixed bottom-4 left-4 right-4 md:absolute md:bottom-4 md:left-4 md:right-4 bg-cyan-900/90 backdrop-blur-md border border-cyan-500/50 p-4 rounded-xl flex items-center justify-between shadow-2xl z-50 md:z-40"
                                  >
                                      <div className="flex items-center gap-4">
                                          <div className="flex -space-x-2">
