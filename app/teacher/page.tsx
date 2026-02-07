@@ -17,7 +17,7 @@ interface ClassBonusConfig {
 }
 
 export default function TeacherConsole() {
-  const { logout, user } = useAuth();
+  const { logout, user, userData } = useAuth();
   const pathname = usePathname();
 
   // Class Bonus State
@@ -68,12 +68,31 @@ export default function TeacherConsole() {
        </div>
 
        {/* Top HUD Bar */}
-       <header className="z-10 flex justify-between items-center p-4 border-b border-cyan-500/30 bg-black/40 backdrop-blur-md">
+       <header className="z-10 flex flex-col md:flex-row justify-between items-center p-4 border-b border-cyan-500/30 bg-black/40 backdrop-blur-md gap-4">
           <div className="flex items-center gap-4">
              <div className="animate-pulse bg-cyan-500/20 p-2 rounded-full border border-cyan-400">
                 <Activity size={20} />
              </div>
-             <h1 className="text-xl font-bold tracking-widest uppercase">Command Deck // Teacher</h1>
+             <div>
+                <h1 className="text-xl font-bold tracking-widest uppercase flex items-center gap-3">
+                    Command Deck // Teacher
+                    {userData?.subscriptionStatus === 'active' ? (
+                        <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/50 px-2 py-0.5 rounded uppercase tracking-widest font-normal">
+                            Subscribed
+                        </span>
+                    ) : (
+                        <Link href="/teacher/settings?mode=billing" className="text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/50 px-2 py-0.5 rounded uppercase tracking-widest font-normal flex items-center gap-1 transition-colors">
+                            Trial Version <span className="hidden sm:inline">- Upgrade</span>
+                        </Link>
+                    )}
+                </h1>
+                {/* Optional Expiry Date Display (Mocked for layout as requested) */}
+                {userData?.subscriptionStatus === 'active' && (
+                    <div className="text-[10px] text-cyan-500/60 uppercase tracking-widest ml-1">
+                        Active until: {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                    </div>
+                )}
+             </div>
           </div>
           <div className="flex gap-4 text-xs tracking-wider">
              <div className="flex flex-col items-end">
@@ -86,25 +105,47 @@ export default function TeacherConsole() {
        {/* Main Viewport (The Window to Space) */}
        <main className="flex-1 relative z-10 p-4 md:p-6 max-w-7xl mx-auto w-full flex flex-col gap-6">
 
-          {/* Top Panel - Welcome & Bonus */}
+          {/* Top Panel - Solar System & Bonus */}
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                  
-                 {/* Welcome Message */}
-                 <div className="lg:col-span-2 border border-cyan-500/30 rounded-2xl bg-black/50 backdrop-blur-sm p-8 relative overflow-hidden flex flex-col justify-center min-h-[220px]">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-900/20 to-cyan-900/10 pointer-events-none" />
+                 {/* Solar System MAP (Primary Action) */}
+                 <div id="tile-map" className="lg:col-span-2 border border-cyan-500/30 rounded-2xl bg-black/80 backdrop-blur-sm relative overflow-hidden flex flex-col min-h-[220px] group transition-all hover:border-cyan-400/50 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]">
+                    {/* Background Preview */}
+                    <div className="absolute inset-0 z-0">
+                         <div className="absolute inset-0 bg-[url('/images/teacherbackground.png')] bg-cover bg-center opacity-40 group-hover:scale-105 transition-transform duration-700" />
+                         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent" />
+                    </div>
                     
-                    {/* Decorative Lines */}
-                    <div className="absolute top-0 right-0 p-4 opacity-50">
-                        <div className="w-20 h-1 bg-cyan-500/20 mb-1" />
-                        <div className="w-10 h-1 bg-cyan-500/20 ml-auto" />
+                    {/* Content */}
+                    <div className="relative z-10 p-8 flex flex-col justify-center h-full items-start">
+                        <div className="flex items-center gap-3 mb-2">
+                             <div className="p-2 bg-cyan-500/20 rounded-lg border border-cyan-500/50 text-cyan-300">
+                                 <Globe size={24} />
+                             </div>
+                             <span className="text-cyan-400 font-bold uppercase tracking-widest text-sm">Main Display</span>
+                        </div>
+                        <h2 className="text-3xl font-bold text-white mb-2 group-hover:text-cyan-100 transition-colors">Solar System Map</h2>
+                        <p className="text-cyan-300/60 text-base max-w-md mb-6">
+                            Launch the primary classroom display. View student ships, current mission status, and planetary progress.
+                        </p>
+                        
+                        <Link 
+                            href="/teacher/map"
+                            className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-sm flex items-center gap-2 shadow-lg shadow-cyan-900/20 hover:shadow-cyan-500/40 transition-all active:scale-95 border border-cyan-400/20"
+                        >
+                            <Target className="animate-pulse" size={18} />
+                            Launch Big Screen
+                        </Link>
                     </div>
 
-                    <div className="relative z-10">
-                        <h2 className="text-3xl font-bold text-white mb-2">Welcome Back, Commander.</h2>
-                        <p className="text-cyan-300/80 text-lg max-w-lg">
-                            All classroom systems are operational. Warp drive is primed. 
-                            Your cadets are awaiting orders.
-                        </p>
+                    {/* Decorative Data Lines */}
+                    <div className="absolute top-8 right-8 flex flex-col gap-2 items-end opacity-50">
+                        <div className="flex items-center gap-2 text-[10px] text-cyan-500 uppercase">
+                            <span>Orbit Sync</span>
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        </div>
+                        <div className="w-32 h-px bg-gradient-to-l from-cyan-500/50 to-transparent" />
+                        <div className="w-20 h-px bg-gradient-to-l from-cyan-500/30 to-transparent" />
                     </div>
                  </div>
 
@@ -239,16 +280,7 @@ export default function TeacherConsole() {
                         borderColor="border-red-500/30"
                     />
                 </div>
-                <div id="tile-map">
-                     <QuickAction 
-                        title="Classroom Display" 
-                        icon={<Globe size={28} />} 
-                        desc="Solar System Map"
-                        href="/teacher/map"
-                        color="text-green-400"
-                        borderColor="border-green-500/30"
-                    />
-                </div>
+                {/* Classroom Display moved to top banner */}
                 <div id="tile-planets">
                      <QuickAction 
                         title="Planet Rewards" 
