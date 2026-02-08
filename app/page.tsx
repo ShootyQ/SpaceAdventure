@@ -57,7 +57,7 @@ export default function Home() {
       <nav className="w-full border-b border-white/5 bg-[#020617]/90 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
            <div className="flex items-center gap-2 font-bold text-xl tracking-tight relative">
-              <div className="relative w-48 h-16 md:w-64 md:h-20">
+              <div className="relative w-64 h-24 md:w-80 md:h-32 -ml-2">
                 <Image 
                     src="/images/logos/classcrave logo.png" 
                     alt="ClassCrave Logo" 
