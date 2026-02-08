@@ -9,7 +9,7 @@ const assetPrefix = '';
 const basePath = '';
 
 const nextConfig = {
-  output: 'export',
+  // output: 'export', // Disabled to allow PDF generation and API Routes
   images: { unoptimized: true },
   basePath: basePath,
   assetPrefix: assetPrefix,
