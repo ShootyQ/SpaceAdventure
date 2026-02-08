@@ -102,15 +102,16 @@ export default function Home() {
                    </Link>
                 </div>
                 
-                <div className="mt-10 flex items-center justify-center lg:justify-start gap-4 text-sm text-slate-500">
-                    <div className="flex -space-x-2">
-                        {[1,2,3,4].map(i => (
-                            <div key={i} className="w-8 h-8 rounded-full bg-slate-800 border-2 border-[#020617] flex items-center justify-center text-xs">
-                                <User size={12} />
-                            </div>
-                        ))}
+                <div className="mt-10 flex flex-col items-center lg:items-start gap-4 text-sm text-slate-500">
+                    <div className="flex items-center gap-4">
+                         <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold border-2 border-indigo-400">
+                             <span className="text-xs">KC</span>
+                         </div>
+                         <div>
+                             <p className="text-slate-300 italic mb-1">"It was excellent and the kids responded well to it"</p>
+                             <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Joined by 1 Educator This Month</p>
+                         </div>
                     </div>
-                    <p>Joined by 150+ Educators this month</p>
                 </div>
               </motion.div>
 
