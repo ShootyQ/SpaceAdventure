@@ -1,10 +1,51 @@
 "use client";
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Rocket, Sparkles, ArrowRight, BookOpen, User, Star, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Home() {
+  const [educatorCount, setEducatorCount] = useState(1);
+  const [educatorInitials, setEducatorInitials] = useState("KC");
+
+  useEffect(() => {
+    const fetchEducators = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "teacher"));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            setEducatorCount(querySnapshot.size);
+            
+            // Pick a random educator to show initials
+            const teachers = querySnapshot.docs.map(doc => doc.data());
+            const validTeachers = teachers.filter(t => t.displayName);
+            
+            if (validTeachers.length > 0) {
+                const randomTeacher = validTeachers[Math.floor(Math.random() * validTeachers.length)];
+                const names = randomTeacher.displayName.trim().split(' ');
+                let initials = "KC";
+                
+                if (names.length >= 2) {
+                    initials = `${names[0][0]}${names[names.length - 1][0]}`;
+                } else if (names.length === 1 && names[0].length >= 2) {
+                    initials = names[0].substring(0, 2);
+                } else if (names.length === 1) {
+                    initials = names[0];
+                }
+                setEducatorInitials(initials.toUpperCase());
+            }
+        }
+      } catch (error) {
+        console.error("Error fetching educator stats:", error);
+      }
+    };
+    
+    fetchEducators();
+  }, []);
   
   const jsonLd = {
     "@context": "https://schema.org",
@@ -105,11 +146,11 @@ export default function Home() {
                 <div className="mt-10 flex flex-col items-center lg:items-start gap-4 text-sm text-slate-500">
                     <div className="flex items-center gap-4">
                          <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold border-2 border-indigo-400">
-                             <span className="text-xs">KC</span>
+                             <span className="text-xs">{educatorInitials}</span>
                          </div>
                          <div>
                              <p className="text-slate-300 italic mb-1">"It was excellent and the kids responded well to it"</p>
-                             <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Joined by 1 Educator This Month</p>
+                             <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Joined by {educatorCount} Educator{educatorCount !== 1 ? 's' : ''}</p>
                          </div>
                     </div>
                 </div>
