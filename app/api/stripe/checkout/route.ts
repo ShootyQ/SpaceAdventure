@@ -1,11 +1,20 @@
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 
+export async function GET() {
+    return NextResponse.json({ status: "Stripe Checkout API is online" });
+}
+
 export async function POST(req: Request) {
+    console.log("[STRIPE_CHECKOUT] POST request received");
     try {
-        const { priceId, userId, email } = await req.json();
+        const body = await req.json();
+        const { priceId, userId, email } = body;
+        
+        console.log("[STRIPE_CHECKOUT] Body:", { priceId, userId, email });
 
         if (!userId || !email) {
+            console.log("[STRIPE_CHECKOUT] Missing fields");
             return new NextResponse("Missing required fields", { status: 400 });
         }
 
