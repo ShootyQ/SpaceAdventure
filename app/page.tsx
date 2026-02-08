@@ -4,8 +4,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Rocket, Sparkles, ArrowRight, BookOpen, User, Star, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Home() {
   const [educatorCount, setEducatorCount] = useState(1);
@@ -14,30 +12,12 @@ export default function Home() {
   useEffect(() => {
     const fetchEducators = async () => {
       try {
-        const q = query(collection(db, "users"), where("role", "==", "teacher"));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-            setEducatorCount(querySnapshot.size);
-            
-            // Pick a random educator to show initials
-            const teachers = querySnapshot.docs.map(doc => doc.data());
-            const validTeachers = teachers.filter(t => t.displayName);
-            
-            if (validTeachers.length > 0) {
-                const randomTeacher = validTeachers[Math.floor(Math.random() * validTeachers.length)];
-                const names = randomTeacher.displayName.trim().split(' ');
-                let initials = "KC";
-                
-                if (names.length >= 2) {
-                    initials = `${names[0][0]}${names[names.length - 1][0]}`;
-                } else if (names.length === 1 && names[0].length >= 2) {
-                    initials = names[0].substring(0, 2);
-                } else if (names.length === 1) {
-                    initials = names[0];
-                }
-                setEducatorInitials(initials.toUpperCase());
-            }
+        // Fetch from server-side API to bypass Firestore client-side permission issues
+        const res = await fetch('/api/educators/stats');
+        if (res.ok) {
+            const data = await res.json();
+            setEducatorCount(data.count);
+            setEducatorInitials(data.initials);
         }
       } catch (error) {
         console.error("Error fetching educator stats:", error);
