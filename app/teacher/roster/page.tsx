@@ -451,7 +451,7 @@ export default function RosterPage() {
                                                              >
                                                                  <UserAvatar 
                                                                     hue={0} skinHue={0} bgHue={240} bgSat={50} bgLight={20}
-                                                                    activeHat="none" avatarId={opt.id} className="w-full h-full" 
+                                                                    hat="none" avatarId={opt.id} className="w-full h-full" 
                                                                  />
                                                              </button>
                                                         ))}
