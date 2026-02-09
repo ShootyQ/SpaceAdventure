@@ -10,13 +10,15 @@ import { UserData, PLANETS, SpaceshipConfig } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
-import { UserAvatar, AVATAR_PRESETS } from "@/components/UserAvatar";
+import { UserAvatar, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
-    { id: 'scout', name: 'Stellar Scout', src: '/images/ships/finalship.png', type: 'scout' },
-    { id: 'interceptor', name: 'Void Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
-    { id: 'cruiser', name: 'Star Cruiser', src: '/images/ships/finalship.png', type: 'cruiser' },
+    { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
+    { id: 'alienship', name: 'Alien Scout', src: '/images/ships/alienship.png', type: 'scout' },
+    { id: 'jellyalienship', name: 'Bio-Cruiser', src: '/images/ships/jellyalienship.png', type: 'cruiser' },
+    { id: 'coconutship', name: 'Tropical Drifter', src: '/images/ships/coconutship.png', type: 'cruiser' },
+    { id: 'dragoneggship', name: 'Dragon Scale Pod', src: '/images/ships/dragoneggship.png', type: 'scout' },
 ];
 
 export default function RosterPage() {
@@ -27,7 +29,7 @@ export default function RosterPage() {
   // Student Creation State
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
-  const [selectedPresetId, setSelectedPresetId] = useState(AVATAR_PRESETS[0].id);
+  const [selectedAvatarId, setSelectedAvatarId] = useState(AVATAR_OPTIONS[0].id);
   const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
@@ -35,6 +37,8 @@ export default function RosterPage() {
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<UserData>>({});
+  const [showEditVisuals, setShowEditVisuals] = useState(false); // Toggle for full editor within row
+
 
   const fetchRoster = async () => {
     if (!user) return;
@@ -88,7 +92,6 @@ export default function RosterPage() {
           const uid = await createStudentAuthAccount(email, newStudentData.password);
 
           // Get the selected configs
-          const selectedPreset = AVATAR_PRESETS.find(p => p.id === selectedPresetId) || AVATAR_PRESETS[0];
           const selectedShip = SHIP_OPTIONS.find(s => s.id === selectedShipId) || SHIP_OPTIONS[0];
           
           // 3. Create Firestore Document
@@ -111,9 +114,18 @@ export default function RosterPage() {
                   color: 'text-blue-400',
                   type: selectedShip.type,
                   speed: 1,
-                  modelId: selectedShip.id // Store the ship model ID if needed later
+                  modelId: selectedShip.id,
+                  id: selectedShip.id
               },
-              avatar: selectedPreset.config,
+              avatar: {
+                 avatarId: selectedAvatarId,
+                 hue: 0,
+                 skinHue: 0,
+                 bgHue: 240,
+                 bgSat: 50,
+                 bgLight: 20,
+                 activeHat: 'none'
+              },
               // Storing credentials for classroom management features (Print Cards)
               username: newStudentData.username,
               password: newStudentData.password
@@ -123,7 +135,7 @@ export default function RosterPage() {
           
           setStudents(prev => [...prev, newStudent]);
           setNewStudentData({ name: "", username: "", password: "" });
-          setSelectedPresetId(AVATAR_PRESETS[0].id);
+          setSelectedAvatarId(AVATAR_OPTIONS[0].id);
           setSelectedShipId(SHIP_OPTIONS[0].id);
           setIsAddingStudent(false);
       } catch (e: any) {
@@ -146,26 +158,10 @@ export default function RosterPage() {
           fuel: student.fuel || 500,
           location: student.location || 'earth',
           status: student.status,
-          avatar: student.avatar
+          avatar: student.avatar,
+          spaceship: student.spaceship // Include spaceship
       });
-  };
-
-  const handleCycleAvatar = () => {
-      if (!editForm.avatar) return;
-      const currentId = editForm.avatar.avatarId || 'bunny';
-      const currentIndex = AVATAR_PRESETS.findIndex(p => p.config.avatarId === currentId);
-      // Actually AVATAR_PRESETS are "Identity Presets" which include colors. 
-      // If we just cycle through presets, we might lose custom colors if the student customized them?
-      // But for the roster, picking a preset is a safe "Reset/assignment". 
-      // Let's cycle through presets.
-      
-      const nextIndex = (currentIndex + 1) % AVATAR_PRESETS.length;
-      const nextPreset = AVATAR_PRESETS[nextIndex];
-      
-      setEditForm({
-          ...editForm,
-          avatar: nextPreset.config
-      });
+      setShowEditVisuals(false); // default to closed
   };
 
   const saveEdit = async () => {
@@ -174,10 +170,27 @@ export default function RosterPage() {
           await updateDoc(doc(db, "users", editingId), editForm);
           setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...editForm } : s));
           setEditingId(null);
+          setShowEditVisuals(false);
       } catch (e) {
           console.error("Error saving student:", e);
           alert("Failed to save changes.");
       }
+  };
+
+  const handleUpdateAvatar = (avatarId: string) => {
+      if (!editForm.avatar) return;
+      setEditForm(prev => ({
+          ...prev,
+          avatar: { ...prev.avatar, avatarId }
+      }));
+  };
+
+  const handleUpdateShip = (shipId: string) => {
+      if (!editForm.spaceship) return;
+      setEditForm(prev => ({
+          ...prev,
+          spaceship: { ...prev.spaceship!, id: shipId, modelId: shipId }
+      }));
   };
 
   const handleDelete = async (uid: string) => {
@@ -295,31 +308,31 @@ export default function RosterPage() {
                             <div>
                                 <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Identity</label>
                                 <div className="grid grid-cols-4 gap-2">
-                                    {AVATAR_PRESETS.map((preset) => (
+                                    {AVATAR_OPTIONS.map((opt) => (
                                         <button
-                                            key={preset.id}
-                                            type="button" // Prevent form submission
-                                            onClick={() => setSelectedPresetId(preset.id)}
+                                            key={opt.id}
+                                            type="button" 
+                                            onClick={() => setSelectedAvatarId(opt.id)}
                                             className={`
                                                 relative aspect-square rounded-lg border-2 overflow-hidden bg-black/50 transition-all
-                                                ${selectedPresetId === preset.id ? 'border-cyan-400 ring-2 ring-cyan-500/20 scale-105' : 'border-white/10 hover:border-white/30'}
+                                                ${selectedAvatarId === opt.id ? 'border-cyan-400 ring-2 ring-cyan-500/20 scale-105' : 'border-white/10 hover:border-white/30'}
                                             `}
                                         >
                                             <UserAvatar 
-                                                hue={preset.config.hue}
-                                                skinHue={preset.config.skinHue}
-                                                bgHue={preset.config.bgHue}
-                                                bgSat={preset.config.bgSat}
-                                                bgLight={preset.config.bgLight}
-                                                hat={preset.config.activeHat}
-                                                avatarId={preset.config.avatarId}
+                                                hue={0}
+                                                skinHue={0}
+                                                bgHue={240}
+                                                bgSat={50}
+                                                bgLight={20}
+                                                hat='none'
+                                                avatarId={opt.id}
                                                 className="w-full h-full"
                                             />
                                         </button>
                                     ))}
                                 </div>
                                 <div className="text-center mt-1 text-xs text-cyan-300 font-bold uppercase tracking-widest">
-                                    {AVATAR_PRESETS.find(p => p.id === selectedPresetId)?.name}
+                                    {AVATAR_OPTIONS.find(p => p.id === selectedAvatarId)?.name}
                                 </div>
                             </div>
 
@@ -399,76 +412,129 @@ export default function RosterPage() {
                         `}>
                             {/* Editing Overlay */}
                             {editingId === student.uid ? (
-                                <>
-                                    <div className="col-span-3 flex items-center gap-2">
-                                        {/* Avatar Cycler */}
-                                        <button 
-                                            onClick={handleCycleAvatar}
-                                            className="w-10 h-10 rounded-full border-2 border-cyan-500 overflow-hidden relative shrink-0 hover:scale-110 transition-transform bg-cyan-900/30"
-                                            title="Click to change identity"
-                                        >
-                                            <UserAvatar userData={{ avatar: editForm.avatar }} className="w-full h-full" />
-                                        </button>
+                                <div className="col-span-12 grid grid-cols-1 md:grid-cols-12 gap-4">
+                                    <div className="col-span-12 md:col-span-3 flex flex-col gap-2">
+                                         <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => setShowEditVisuals(!showEditVisuals)}
+                                                className="w-10 h-10 rounded-full border-2 border-cyan-500 overflow-hidden relative shrink-0 hover:scale-110 transition-transform bg-cyan-900/30"
+                                                title="Configure Visuals"
+                                            >
+                                                <UserAvatar userData={{ avatar: editForm.avatar }} className="w-full h-full" />
+                                            </button>
+                                            <input 
+                                                value={editForm.displayName || ""} 
+                                                onChange={e => setEditForm({...editForm, displayName: e.target.value})}
+                                                className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
+                                            />
+                                         </div>
+                                         <button 
+                                             onClick={() => setShowEditVisuals(!showEditVisuals)}
+                                             className="text-[10px] text-cyan-400 uppercase font-bold tracking-wider hover:text-white text-left px-1"
+                                         >
+                                             {showEditVisuals ? "- Close Visuals" : "+ Change Avatar / Ship"}
+                                         </button>
+                                    </div>
 
-                                        <input 
-                                            value={editForm.displayName || ""} 
-                                            onChange={e => setEditForm({...editForm, displayName: e.target.value})}
-                                            className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <select
-                                            value={editForm.status}
-                                            onChange={e => setEditForm({...editForm, status: e.target.value as any})}
-                                            className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs"
-                                        >
-                                            <option value="active">Active</option>
-                                            <option value="pending_approval">Pending</option>
-                                            <option value="rejected">Suspended</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <div className="flex items-center gap-1">
-                                            <Trophy size={14} className="text-yellow-500" />
-                                            <input 
-                                                type="number"
-                                                value={editForm.xp} 
-                                                onChange={e => setEditForm({...editForm, xp: parseInt(e.target.value) || 0})}
-                                                className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
-                                            />
+                                    {/* Visual Editor Expanded Area */}
+                                    {showEditVisuals && (
+                                        <div className="col-span-12 bg-black/60 border border-cyan-500/30 rounded-xl p-4 mb-2">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <h4 className="text-xs text-white uppercase font-bold mb-2">Avatar</h4>
+                                                    <div className="grid grid-cols-5 gap-2">
+                                                        {AVATAR_OPTIONS.map(opt => (
+                                                             <button
+                                                                key={opt.id}
+                                                                onClick={() => handleUpdateAvatar(opt.id)}
+                                                                className={`aspect-square rounded border overflow-hidden ${editForm.avatar?.avatarId === opt.id ? 'border-cyan-400 ring-1 ring-cyan-500' : 'border-white/10 opacity-50 hover:opacity-100'}`}
+                                                             >
+                                                                 <UserAvatar 
+                                                                    hue={0} skinHue={0} bgHue={240} bgSat={50} bgLight={20}
+                                                                    activeHat="none" avatarId={opt.id} className="w-full h-full" 
+                                                                 />
+                                                             </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs text-white uppercase font-bold mb-2">Spaceship</h4>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {SHIP_OPTIONS.map(ship => (
+                                                             <button
+                                                                key={ship.id}
+                                                                onClick={() => handleUpdateShip(ship.id)}
+                                                                className={`p-1 rounded border flex flex-col items-center justify-center ${ (editForm.spaceship?.modelId || editForm.spaceship?.id) === ship.id ? 'border-cyan-400 bg-cyan-900/20' : 'border-white/10 opacity-50 hover:opacity-100'}`}
+                                                             >
+                                                                 <img src={getAssetPath(ship.src)} className="w-8 h-8 object-contain" />
+                                                                 <span className="text-[8px] uppercase mt-1 text-center">{ship.name}</span>
+                                                             </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <div className="flex items-center gap-1">
-                                            <Fuel size={14} className="text-orange-500" />
-                                            <input 
-                                                type="number"
-                                                value={editForm.fuel} 
-                                                onChange={e => setEditForm({...editForm, fuel: parseInt(e.target.value) || 0})}
-                                                className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <select
-                                            value={editForm.location}
-                                            onChange={e => setEditForm({...editForm, location: e.target.value})}
-                                            className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs uppercase"
-                                        >
-                                            <option value="earth">Earth</option>
-                                            {PLANETS.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="col-span-1 flex justify-end gap-2">
+                                    )}
+                                    
+                                    {!showEditVisuals && (
+                                        <>
+                                            <div className="col-span-12 md:col-span-2">
+                                                <select
+                                                    value={editForm.status}
+                                                    onChange={e => setEditForm({...editForm, status: e.target.value as any})}
+                                                    className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs"
+                                                >
+                                                    <option value="active">Active</option>
+                                                    <option value="pending_approval">Pending</option>
+                                                    <option value="rejected">Suspended</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-span-12 md:col-span-2">
+                                                <div className="flex items-center gap-1">
+                                                    <Trophy size={14} className="text-yellow-500" />
+                                                    <input 
+                                                        type="number"
+                                                        value={editForm.xp} 
+                                                        onChange={e => setEditForm({...editForm, xp: parseInt(e.target.value) || 0})}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="col-span-12 md:col-span-2">
+                                                <div className="flex items-center gap-1">
+                                                    <Fuel size={14} className="text-orange-500" />
+                                                    <input 
+                                                        type="number"
+                                                        value={editForm.fuel} 
+                                                        onChange={e => setEditForm({...editForm, fuel: parseInt(e.target.value) || 0})}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="col-span-12 md:col-span-2">
+                                                <select
+                                                    value={editForm.location}
+                                                    onChange={e => setEditForm({...editForm, location: e.target.value})}
+                                                    className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs uppercase"
+                                                >
+                                                    <option value="earth">Earth</option>
+                                                    {PLANETS.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
+                                    
+                                    <div className="col-span-12 md:col-span-1 flex justify-end gap-2">
                                         <button onClick={saveEdit} className="p-2 bg-green-600 rounded text-white hover:bg-green-500"><Save size={16} /></button>
                                         <button onClick={() => setEditingId(null)} className="p-2 bg-red-600 rounded text-white hover:bg-red-500"><X size={16} /></button>
                                     </div>
-                                </>
+                                </div>
                             ) : (
                                 <>
                                     {/* Display Mode */}
+
                                     <div className="col-span-12 md:col-span-3 flex items-center gap-4">
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden border ${student.status === 'pending_approval' ? 'bg-yellow-900 border-yellow-500' : 'bg-cyan-900/30 border-cyan-500/30'}`}>
                                             <UserAvatar userData={student} className="w-full h-full" />

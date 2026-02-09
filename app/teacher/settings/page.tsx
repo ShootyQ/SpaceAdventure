@@ -312,6 +312,8 @@ const SHIP_OPTIONS = [
     { id: "finalship", name: "Standard Interceptor" },
     { id: "alienship", name: "Alien Scout" },
     { id: "jellyalienship", name: "Bio-Cruiser" },
+    { id: "coconutship", name: "Tropical Drifter" },
+    { id: "dragoneggship", name: "Dragon Scale Pod" },
 ];
 
 function ShipSettings({ userData, user }: { userData: any, user: any }) {
