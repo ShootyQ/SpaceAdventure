@@ -566,18 +566,23 @@ export default function SolarSystem() {
 
     // 3. Validation & Confirmation
     const currentFuel = userData.fuel !== undefined ? userData.fuel : 500; // Default to 500 (migration)
-    const hasEnoughFuel = currentFuel >= fuelCost;
+    
+    // TEMPORARILY DISABLED FUEL CHECK
+    // const hasEnoughFuel = currentFuel >= fuelCost;
+    const hasEnoughFuel = true; 
     
     if (!isOverride) {
+        /* 
         if (!hasEnoughFuel) {
             alert(`Insufficient Fuel.\nRequired: ${fuelCost} Units\nCurrent: ${currentFuel} Units\n\nRequest resupply via completed missions.`);
             return;
         }
+        */
 
         const confirmMsg = `Plotting course to ${selectedPlanet.name}...\n\n` +
                            `Distance: ${Math.round(dist)} AU\n` +
                            `Estimated Time: ${formatDuration(travelMinutes)}\n` +
-                           `Fuel Cost: ${fuelCost} Units ${boosterLevel > 0 ? `(Booster Lv.${boosterLevel})` : ''}\n\n` +
+                           // `Fuel Cost: ${fuelCost} Units ${boosterLevel > 0 ? `(Booster Lv.${boosterLevel})` : ''}\n\n` +
                            `Engage Hyperdrive?`;
         
         if (!confirm(confirmMsg)) return;
@@ -600,6 +605,7 @@ export default function SolarSystem() {
         };
         
         // Deduct Fuel - Teacher can choose to waive it
+        /* TEMPORARILY DISABLED
         if (!isOverride || confirm("Deduct fuel from student reserves?")) {
              // Handle Migration: If fuel is undefined in DB, it defaults to 500 (Full Tank)
              if (userData.fuel === undefined) {
@@ -608,6 +614,7 @@ export default function SolarSystem() {
                  updates.fuel = increment(-fuelCost);
              }
         }
+        */
 
         await updateDoc(userRef, updates);
         

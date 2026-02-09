@@ -39,6 +39,7 @@ export interface SpaceshipConfig {
     type: "scout" | "fighter" | "cargo" | "cruiser";
     speed: number;
     modelId?: string;
+    id?: string;
 }
   
 export interface Rank {
