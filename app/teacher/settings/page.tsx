@@ -10,7 +10,7 @@ import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2, LogOut, Edit2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
 import RankEditor from "@/components/RankEditor";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,14 +18,19 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 // Custom Icon for Ship
-const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
-    <img
-        src={getAssetPath("/images/ships/finalship.png")}
-        alt="Rocket"
-        className={`object-contain ${className}`}
-        style={{ width: size, height: size }}
-    />
-);
+const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
+    const { userData } = useAuth();
+    const shipId = userData?.spaceship?.id || "finalship";
+    
+    return (
+        <img
+            src={getAssetPath(`/images/ships/${shipId}.png`)}
+            alt="Rocket"
+            className={`object-contain ${className}`}
+            style={{ width: size, height: size }}
+        />
+    );
+};
 
 const SHIP_COLORS = [
     { name: "Nebula Blue", class: "text-blue-400", bg: "bg-blue-400" },
@@ -303,18 +308,24 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
     );
 }
 
+const SHIP_OPTIONS = [
+    { id: "finalship", name: "Standard Interceptor" },
+    { id: "alienship", name: "Alien Scout" },
+    { id: "jellyalienship", name: "Bio-Cruiser" },
+];
+
 function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [loading, setLoading] = useState(false);
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
-    // const [selectedType, setSelectedType] = useState("scout"); // Removed Chassis Logic
+    const [selectedShipId, setSelectedShipId] = useState("finalship");
 
     useEffect(() => {
         if (userData?.spaceship) {
             setShipName(userData.spaceship.name);
             const col = SHIP_COLORS.find(c => c.class === userData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
-            // setSelectedType(userData.spaceship.type);
+            setSelectedShipId(userData.spaceship.id || "finalship");
         }
     }, [userData]);
 
@@ -326,7 +337,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
             await updateDoc(userRef, {
                 "spaceship.name": shipName,
                 "spaceship.color": selectedColor.class,
-                // "spaceship.type": selectedType
+                "spaceship.id": selectedShipId
             });
             alert("Ship specifications updated, Commander.");
         } catch (e) {
@@ -354,7 +365,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src={getAssetPath("/images/ships/finalship.png")}
+                        src={getAssetPath(`/images/ships/${selectedShipId}.png`)}
                         alt="Ship"
                         className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />
@@ -407,6 +418,24 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
 
                 <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
                     <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
+                        <Rocket size={16} /> Chassis Selector
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                         {SHIP_OPTIONS.map(opt => (
+                            <button
+                                key={opt.id}
+                                onClick={() => setSelectedShipId(opt.id)}
+                                className={`p-2 rounded border flex flex-col items-center gap-2 transition-all ${selectedShipId === opt.id ? "bg-cyan-500/20 border-cyan-400" : "bg-black/40 border-cyan-900 hover:border-cyan-700"}`}
+                            >
+                                <img src={getAssetPath(`/images/ships/${opt.id}.png`)} alt={opt.name} className="w-12 h-12 object-contain" />
+                                <span className={`text-[10px] uppercase font-bold text-center ${selectedShipId === opt.id ? "text-white" : "text-gray-500"}`}>{opt.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
+                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
                         <Palette size={16} /> Hull Nanocoating
                     </label>
                     <div className="grid grid-cols-3 gap-3">
@@ -443,6 +472,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                 >
                     <Save size={20} />
                     {loading ? "Calibrating..." : "Save Configuration"}
+
                 </button>
             </div>
         </div>
@@ -484,17 +514,10 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || "none");
     const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || "bunny");
 
-    const handleSelectPreset = (presetId: string) => {
-        const preset = AVATAR_PRESETS.find(p => p.id === presetId);
-        if (preset) {
-            setHue(preset.config.hue);
-            setSkinHue(preset.config.skinHue);
-            setBgHue(preset.config.bgHue);
-            setBgSat(preset.config.bgSat);
-            setBgLight(preset.config.bgLight);
-            setActiveHat(preset.config.activeHat);
-            setAvatarId(preset.config.avatarId);
-        }
+    const handleSelectAvatar = (id: string) => {
+         setAvatarId(id);
+         setHue(0);
+         setSkinHue(0);
     };
 
     const handleSave = async () => {
@@ -550,26 +573,26 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         <span className="uppercase tracking-wider">Select Identity</span>
                     </h3>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        {AVATAR_PRESETS.map(preset => (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {AVATAR_OPTIONS.map(opt => (
                             <button
-                                key={preset.id}
-                                onClick={() => handleSelectPreset(preset.id)}
-                                className="group relative p-4 rounded-xl border border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50 transition-all flex flex-col items-center gap-3"
+                                key={opt.id}
+                                onClick={() => handleSelectAvatar(opt.id)}
+                                className={`group relative p-4 rounded-xl border transition-all flex flex-col items-center gap-3 ${avatarId === opt.id ? "bg-purple-900/40 border-purple-400" : "border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50"}`}
                             >
                                 <div className="w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden relative group-hover:scale-110 transition-transform">
                                     <UserAvatar
-                                        hue={preset.config.hue}
-                                        skinHue={preset.config.skinHue}
-                                        bgHue={preset.config.bgHue}
-                                        bgSat={preset.config.bgSat}
-                                        bgLight={preset.config.bgLight}
-                                        hat={preset.config.activeHat}
-                                        avatarId={preset.config.avatarId}
+                                        hue={0}
+                                        skinHue={0}
+                                        bgHue={240}
+                                        bgSat={50}
+                                        bgLight={20}
+                                        hat={activeHat} 
+                                        avatarId={opt.id}
                                         className="w-full h-full"
                                     />
                                 </div>
-                                <span className="text-xs font-bold uppercase tracking-wider text-purple-300 group-hover:text-white">{preset.name}</span>
+                                <span className={`text-xs font-bold uppercase tracking-wider ${avatarId === opt.id ? "text-white" : "text-purple-300 group-hover:text-white"}`}>{opt.name}</span>
                             </button>
                         ))}
                     </div>

@@ -16,6 +16,10 @@ export const AVATAR_OPTIONS = [
     { id: 'raccoon', name: 'Rocket Raccoon', src: '/images/avatar/spaceraccoon.png' },
     { id: 'otter', name: 'Orbit Otter', src: '/images/avatar/spaceotter.png' },
     { id: 'pup', name: 'Pluto Pup', src: '/images/avatar/spacepup.png' },
+    { id: 'hamster', name: 'Hyper Hamster', src: '/images/avatar/spacehamster.png' },
+    { id: 'owl', name: 'Omega Owl', src: '/images/avatar/spaceowl.png' },
+    { id: 'penguin', name: 'Power Penguin', src: '/images/avatar/spacepenguin.png' },
+    { id: 'turtle', name: 'Turbo Turtle', src: '/images/avatar/spaceturtle.png' },
 ];
 
 export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[] = [
