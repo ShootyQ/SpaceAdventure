@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 export default function Home() {
   const [educatorCount, setEducatorCount] = useState(1);
   const [educatorInitials, setEducatorInitials] = useState("KC");
+  const [activeStudents, setActiveStudents] = useState(24);
+  const [weeklyMissions, setWeeklyMissions] = useState(5);
 
   useEffect(() => {
     const fetchEducators = async () => {
@@ -18,6 +20,8 @@ export default function Home() {
             const data = await res.json();
             setEducatorCount(data.count);
             setEducatorInitials(data.initials);
+            if (data.activeStudents) setActiveStudents(data.activeStudents);
+            if (data.weeklyMissions) setWeeklyMissions(data.weeklyMissions);
         }
       } catch (error) {
         console.error("Error fetching educator stats:", error);
@@ -55,8 +59,8 @@ export default function Home() {
       
       {/* Navigation */}
       <nav className="w-full border-b border-black/10 bg-white/70 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="relative w-56 h-16">
+        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
+          <Link href="/" className="relative w-80 h-20">
             <Image
               src="/images/logos/classcrave logo.png"
               alt="ClassCrave Logo"
@@ -66,6 +70,7 @@ export default function Home() {
             />
           </Link>
           <div className="hidden md:flex gap-8 text-sm font-medium text-slate-600 items-center">
+            <Link href="/space" className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">Classroom Login</Link>
             <Link href="/about" className="hover:text-slate-900 transition-colors">Product</Link>
             <Link href="#games" className="hover:text-slate-900 transition-colors">Games</Link>
             <Link href="/educators" className="hover:text-slate-900 transition-colors">Educators</Link>
@@ -121,33 +126,39 @@ export default function Home() {
                   <p className="text-xs text-slate-500">Early access enrollment for 2026 launches.</p>
                 </div>
               </div>
-            </motion.div>
-
+              </Link>
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
               className="hidden lg:block"
             >
-              <div className="bg-white/80 border border-black/10 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
-                <div className="flex items-center justify-between border-b border-black/5 pb-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ClassCrave Overview</p>
-                    <h2 className="font-heading text-2xl font-semibold text-slate-900">Classroom Snapshot</h2>
+              <Link href="/space" className="block group cursor-pointer">
+                <div className="bg-white/80 border border-black/10 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] transition-transform group-hover:scale-[1.02]">
+                  <div className="flex items-center justify-between border-b border-black/5 pb-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Demo</p>
+                      <h2 className="font-heading text-2xl font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">Classroom Snapshot</h2>
+                    </div>
+                    <div className="text-xs text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 group-hover:bg-emerald-200 transition-colors">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Live Now
+                    </div>
                   </div>
-                  <div className="text-xs text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">Live</div>
-                </div>
-                <div className="mt-6 grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                    <p className="text-xs text-slate-500 uppercase">Active Students</p>
-                    <p className="text-3xl font-semibold text-slate-900 mt-2">24</p>
-                    <p className="text-xs text-slate-500 mt-2">On-task rate: 91%</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                    <p className="text-xs text-slate-500 uppercase">Weekly Missions</p>
-                    <p className="text-3xl font-semibold text-slate-900 mt-2">5</p>
-                    <p className="text-xs text-slate-500 mt-2">Completion: 84%</p>
-                  </div>
+                  <div className="mt-6 grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                      <p className="text-xs text-slate-500 uppercase">Active Students</p>
+                      <p className="text-3xl font-semibold text-slate-900 mt-2">{activeStudents}</p>
+                      <p className="text-xs text-slate-500 mt-2">On-task rate: 91%</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                      <p className="text-xs text-slate-500 uppercase">Weekly Missions</p>
+                      <p className="text-3xl font-semibold text-slate-900 mt-2">{weeklyMissions}</p>
+                      <p className="text-xs text-slate-500 mt-2">Completion: 84%</p>
+                    </div>
                   <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 col-span-2">
                     <p className="text-xs text-slate-500 uppercase">Teacher Actions</p>
                     <div className="mt-3 space-y-2">
