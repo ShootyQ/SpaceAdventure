@@ -126,7 +126,8 @@ export default function Home() {
                   <p className="text-xs text-slate-500">Early access enrollment for 2026 launches.</p>
                 </div>
               </div>
-              </Link>
+            </motion.div>
+
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -178,6 +179,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            </Link>
             </motion.div>
           </div>
         </div>
