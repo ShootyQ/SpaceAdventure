@@ -26,3 +26,5 @@ jobs:
           projectId: spaceadventure-7d540
           channelId: live
           entryPoint: .
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks
