@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 11, 13, 23;
-  --background-end-rgb: 0, 0, 0;
+  --foreground-rgb: 24, 24, 24;
+  --background-start-rgb: 247, 244, 239;
+  --background-end-rgb: 238, 232, 221;
+  --font-body: system-ui;
+  --font-heading: serif;
 }
 
 body {
@@ -16,6 +18,14 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
-    overflow-x: hidden;
-    min-height: 100vh;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-heading {
+  font-family: var(--font-heading);
 }

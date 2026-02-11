@@ -1,10 +1,10 @@
 # Deploy Next.js (Firebase Hosting + Functions) to production on main
 
-name: Deploy to Firebase Hosting (live)
+name: Deploy to Firebase Hosting
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
   workflow_dispatch:
 
 permissions:
@@ -12,7 +12,8 @@ permissions:
   id-token: write
 
 jobs:
-  deploy:
+  deploy-live:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,6 +35,33 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
           projectId: spaceadventure-7d540
           channelId: live
+          entryPoint: .
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks
+
+  deploy-dev-preview:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy to Firebase Hosting (preview: dev)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+          projectId: spaceadventure-7d540
+          channelId: dev
           entryPoint: .
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
