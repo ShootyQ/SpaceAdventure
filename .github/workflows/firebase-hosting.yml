@@ -1,4 +1,4 @@
-# Deploy Next.js (Firebase Hosting + Functions) to production on main
+# Deploy Next.js (Firebase Hosting + Functions) on main and dev
 
 name: Deploy to Firebase Hosting
 
@@ -22,8 +22,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -49,8 +49,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
