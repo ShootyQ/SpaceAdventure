@@ -425,29 +425,20 @@ export default function SolarSystem() {
                         
                         const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
-                        // Unlock detection (per-planet XP thresholds)
+                        // Unlock detection (currently only Jupiter -> Jovi)
                         const planetId = (shipData.locationId || '').toLowerCase();
                         const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
                         const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
                         const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
 
                         let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
-                        if (unlockConfig && newPlanetXP > oldPlanetXP) {
-                            const shipsCfg = (unlockConfig.ships || {}) as Record<string, number>;
-                            const avatarsCfg = (unlockConfig.avatars || {}) as Record<string, number>;
+                        if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
+                            const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
+                            const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
 
-                            const newlyShips = Object.entries(shipsCfg)
-                                .filter(([, threshold]) => Number(threshold) > 0 && oldPlanetXP < Number(threshold) && newPlanetXP >= Number(threshold))
-                                .map(([id]) => id);
-
-                            const newlyAvatars = Object.entries(avatarsCfg)
-                                .filter(([, threshold]) => Number(threshold) > 0 && oldPlanetXP < Number(threshold) && newPlanetXP >= Number(threshold))
-                                .map(([id]) => id);
-
-                            if (newlyShips.length || newlyAvatars.length) {
+                            if (joviUnlockedNow) {
                                 unlocks = {
-                                    ships: newlyShips.length ? newlyShips : undefined,
-                                    avatars: newlyAvatars.length ? newlyAvatars : undefined,
+                                    avatars: ['jovi'],
                                 };
                             }
                         }
@@ -507,11 +498,9 @@ export default function SolarSystem() {
      const unsub = onSnapshot(q, (snapshot) => {
          const d = new Map();
          snapshot.forEach(doc => {
-             // We use the internal ID stored in the doc, not the document key (which is composite)
              const data = doc.data();
-             if (data.id) {
-                 d.set(data.id, data);
-             }
+             const planetKey = data.id || doc.id;
+             d.set(planetKey, data);
          });
          setDynamicPlanets(d);
      });
@@ -791,7 +780,7 @@ export default function SolarSystem() {
   const handleWheel = (e: React.WheelEvent) => {
     setIsAutoFit(false);
     const newZoom = zoom - e.deltaY * 0.001;
-        setZoom(Math.min(Math.max(0.05, newZoom), 3.5));
+        setZoom(Math.min(Math.max(0.05, newZoom), 5));
   };
 
   // Pan Handlers
@@ -860,6 +849,28 @@ export default function SolarSystem() {
       }
 
       return undefined;
+  };
+
+  const buildFallbackFlag = (subject: unknown): FlagConfig => {
+      const avatarColor =
+          subject && typeof subject === 'object' && 'avatarColor' in subject
+              ? String((subject as { avatarColor?: unknown }).avatarColor || '')
+              : '';
+
+      let primaryColor = 'blue';
+      if (avatarColor.includes('red')) primaryColor = 'red';
+      else if (avatarColor.includes('green')) primaryColor = 'green';
+      else if (avatarColor.includes('yellow')) primaryColor = 'yellow';
+      else if (avatarColor.includes('purple')) primaryColor = 'purple';
+      else if (avatarColor.includes('cyan')) primaryColor = 'blue';
+
+      return {
+          pole: 'silver',
+          shape: 'pennant',
+          primaryColor,
+          secondaryColor: 'white',
+          pattern: 'solid'
+      };
   };
 
   return (
@@ -961,14 +972,14 @@ export default function SolarSystem() {
                               />
                           ) : (
                                                             <div 
-                                                                className="relative w-28 h-28 flex items-center justify-center"
+                                                                className="relative w-20 h-20 flex items-center justify-center"
                                 style={{ transform: `rotate(${rotationData + 45}deg)` }}
                               >
                                   <div className="relative w-full h-full">
                                       <img 
                                             src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                             alt="Traveling Ship"
-                                          className="w-full h-full object-contain [image-rendering:crisp-edges] drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
+                                          className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
@@ -1075,15 +1086,23 @@ export default function SolarSystem() {
                        {/* Docked Ships Indicators */}
                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
                           {/* Parking Orbit Ring */}
-                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length > 0 && (
-                                <div 
-                                    className="absolute rounded-full border border-cyan-500/30 border-dashed animate-[spin_60s_linear_infinite]"
-                                    style={{
-                                        width: planet.pixelSize + 80, // radius + 40
-                                        height: planet.pixelSize + 80,
-                                    }}
-                                />
-                          )}
+                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length > 0 && (() => {
+                              const dockedCount = ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length;
+                              const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
+                              const crowdPadding = dockedCount > 10 ? 20 : dockedCount > 6 ? 12 : 0;
+                              const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
+                              const diameter = radius * 2;
+
+                              return (
+                                  <div
+                                      className="absolute rounded-full border border-cyan-500/30 border-dashed animate-[spin_60s_linear_infinite]"
+                                      style={{
+                                          width: diameter,
+                                          height: diameter,
+                                      }}
+                                  />
+                              );
+                          })()}
 
                           {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').map((ship, idx, arr) => {
                               // Distribute ships evenly around the planet + Animation
@@ -1092,20 +1111,25 @@ export default function SolarSystem() {
                               const startAngle = (idx * (360 / Math.max(arr.length, 1))) - 90; 
                               
                               const currentAngle = startAngle + timeOffset;
-                              const radius = (planet.pixelSize / 2) + 40; // Increased distance
+                              const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
+                              const crowdPadding = arr.length > 10 ? 20 : arr.length > 6 ? 12 : 0;
+                              const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
                               
                               return (
                                 <div 
                                     key={ship.id} 
                                     className="absolute flex flex-col items-center justify-center" 
+                                    title={ship.cadetName}
                                     style={{ 
                                         transform: `rotate(${currentAngle}deg) translate(${radius}px) rotate(${-currentAngle}deg)`,
                                         zIndex: 30
                                     }} 
                                 >
-                                    <span className="text-[10px] font-bold text-white bg-black/70 px-2 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm">
-                                        {ship.cadetName}
-                                    </span>
+                                    {arr.length <= 8 && (
+                                        <span className="text-[10px] font-bold text-white bg-black/70 px-2 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm">
+                                            {ship.cadetName}
+                                        </span>
+                                    )}
                                     {ship.role === 'teacher' ? (
                                         <Crown 
                                             size={24} 
@@ -1114,14 +1138,14 @@ export default function SolarSystem() {
                                         />
                                     ) : (
                                         <div 
-                                            className="relative w-28 h-28 flex items-center justify-center -mb-1"
+                                            className="relative w-20 h-20 flex items-center justify-center"
                                             style={{ transform: 'rotate(-45deg)' }}
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
                                                     src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                                     alt="Docked Ship"
-                                                    className="w-full h-full object-contain [image-rendering:crisp-edges] drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
+                                                    className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
                                                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
                                                     <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
@@ -1181,7 +1205,7 @@ export default function SolarSystem() {
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 3.5)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 5)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
                <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, 0.05)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
                <div className="w-full h-px bg-white/20 my-1" />
                <button onClick={() => { setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
@@ -1677,7 +1701,7 @@ export default function SolarSystem() {
                         className="origin-bottom-left"
                      >
                          <div className="transform scale-[3] drop-shadow-2xl">
-                              {landingSubject.flag ? <TinyFlag config={landingSubject.flag} /> : <div className="w-4 h-8 bg-gray-400" />}
+                            <TinyFlag config={(landingSubject as any).flag || buildFallbackFlag(landingSubject)} />
                          </div>
                      </motion.div>
 

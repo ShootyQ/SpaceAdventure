@@ -298,8 +298,6 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
     const [selectedShipId, setSelectedShipId] = useState("finalship");
-    const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
-    const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(["finalship"]));
     // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
 
     useEffect(() => {
@@ -311,39 +309,6 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
             // setSelectedType(userData.spaceship.type);
         }
     }, [userData]);
-
-    useEffect(() => {
-        const teacherId = userData?.teacherId;
-        if (!teacherId) return;
-
-        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
-            const map: Record<string, Record<string, number>> = {};
-            snap.forEach((d) => {
-                const data = d.data() as any;
-                map[d.id] = (data?.unlocks?.ships || {}) as Record<string, number>;
-            });
-            setPlanetShipUnlocks(map);
-        });
-
-        return () => unsub();
-    }, [userData?.teacherId]);
-
-    useEffect(() => {
-        const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
-        const planetXP = (userData?.planetXP || {}) as Record<string, number>;
-
-        const unlocked = new Set<string>(["finalship", currentShip]);
-        for (const [planetId, shipUnlocks] of Object.entries(planetShipUnlocks)) {
-            const xpOnPlanet = Number(planetXP?.[planetId] || 0);
-            for (const [shipId, threshold] of Object.entries(shipUnlocks || {})) {
-                const t = Number(threshold);
-                if (Number.isFinite(t) && t > 0 && xpOnPlanet >= t) unlocked.add(shipId);
-            }
-        }
-
-        setUnlockedShipIds(unlocked);
-        if (!unlocked.has(selectedShipId)) setSelectedShipId(currentShip);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, selectedShipId]);
 
     const handleSave = async () => {
         if (!user) return;
@@ -425,10 +390,10 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
             <div className="space-y-6">
                 <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
                     <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
-                        <Shield size={16} /> Unlocked Ship Models
+                        <Shield size={16} /> Ship Models
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                        {SHIP_OPTIONS.filter((opt) => unlockedShipIds.has(opt.id)).map((opt) => (
+                        {SHIP_OPTIONS.map((opt) => (
                             <button
                                 key={opt.id}
                                 type="button"
@@ -545,7 +510,10 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             const map: Record<string, Record<string, number>> = {};
             snap.forEach((d) => {
                 const data = d.data() as any;
-                map[d.id] = (data?.unlocks?.avatars || {}) as Record<string, number>;
+                if (d.id === "jupiter") {
+                    const joviThreshold = Number(data?.unlocks?.avatars?.jovi || 0);
+                    map[d.id] = joviThreshold > 0 ? { jovi: joviThreshold } : {};
+                }
             });
             setPlanetAvatarUnlocks(map);
         });
@@ -555,15 +523,12 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
     useEffect(() => {
         const currentAvatar = userData?.avatar?.avatarId || "bunny";
-        const planetXP = (userData?.planetXP || {}) as Record<string, number>;
-
         const unlocked = new Set<string>(["bunny", currentAvatar]);
-        for (const [planetId, avatarUnlocks] of Object.entries(planetAvatarUnlocks)) {
-            const xpOnPlanet = Number(planetXP?.[planetId] || 0);
-            for (const [id, threshold] of Object.entries(avatarUnlocks || {})) {
-                const t = Number(threshold);
-                if (Number.isFinite(t) && t > 0 && xpOnPlanet >= t) unlocked.add(id);
-            }
+
+        const jupiterXP = Number((userData?.planetXP || {})?.jupiter || 0);
+        const joviThreshold = Number(planetAvatarUnlocks?.jupiter?.jovi || 0);
+        if (joviThreshold > 0 && jupiterXP >= joviThreshold) {
+            unlocked.add("jovi");
         }
 
         setUnlockedAvatarIds(unlocked);
