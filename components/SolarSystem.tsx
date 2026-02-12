@@ -793,6 +793,38 @@ export default function SolarSystem() {
 
   const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
 
+  const getSubjectLocationId = (subject: unknown): string | undefined => {
+      if (!subject || typeof subject !== 'object') return undefined;
+
+      if ('locationId' in subject) {
+          const value = (subject as { locationId?: unknown }).locationId;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      if ('location' in subject) {
+          const value = (subject as { location?: unknown }).location;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      return undefined;
+  };
+
+  const getSubjectUserId = (subject: unknown): string | undefined => {
+      if (!subject || typeof subject !== 'object') return undefined;
+
+      if ('id' in subject) {
+          const value = (subject as { id?: unknown }).id;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      if ('uid' in subject) {
+          const value = (subject as { uid?: unknown }).uid;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      return undefined;
+  };
+
   return (
     <div 
         className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
@@ -892,7 +924,7 @@ export default function SolarSystem() {
                               />
                           ) : (
                               <div 
-                                className="relative w-12 h-12 flex items-center justify-center"
+                                                                className="relative w-48 h-48 flex items-center justify-center"
                                 style={{ transform: `rotate(${rotationData + 45}deg)` }}
                               >
                                   <div className="relative w-full h-full">
@@ -1045,7 +1077,7 @@ export default function SolarSystem() {
                                         />
                                     ) : (
                                         <div 
-                                            className="relative w-12 h-12 flex items-center justify-center -mb-2"
+                                            className="relative w-48 h-48 flex items-center justify-center -mb-2"
                                             style={{ transform: 'rotate(-45deg)' }}
                                         >
                                             <div className="relative w-full h-full">
@@ -1268,7 +1300,7 @@ export default function SolarSystem() {
                
                {/* Action Buttons */}
                {(() => {
-                   const isAtLocation = (landingSubject?.locationId || landingSubject?.location) === selectedPlanet.id;
+                   const isAtLocation = getSubjectLocationId(landingSubject) === selectedPlanet.id;
 
                    if (isCommandMode && controlledShipId) {
                         if (isAtLocation) {
@@ -1624,8 +1656,8 @@ export default function SolarSystem() {
                  >
                      <h3 className="text-white/50 uppercase tracking-widest text-xs font-bold mb-4 border-b border-white/10 pb-2">Previous Explorers</h3>
                      <div className="flex flex-wrap gap-2">
-                        {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== (landingSubject.id || landingSubject.uid)).length > 0 ? (
-                            ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== (landingSubject.id || landingSubject.uid)).map(s => (
+                        {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== getSubjectUserId(landingSubject)).length > 0 ? (
+                            ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== getSubjectUserId(landingSubject)).map(s => (
                                 <div key={s.id} className="relative group cursor-help">
                                     <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black">
                                        <div className={`w-full h-full ${s.avatarColor.replace('text', 'bg').replace('400', '900')}`} />

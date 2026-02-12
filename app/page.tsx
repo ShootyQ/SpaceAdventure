@@ -101,11 +101,11 @@ export default function Home() {
               </div>
 
               <h1 className="font-heading text-4xl md:text-6xl font-bold tracking-tight text-slate-900 leading-tight">
-                Classroom management that feels organized, not chaotic.
+                Classroom management games that make routines stick.
               </h1>
 
               <p className="mt-6 text-lg text-slate-600 max-w-xl leading-relaxed">
-                ClassCrave is a multi-game platform for educators who want clarity, consistency, and student buy-in. Set expectations, reward progress, and run the same system across every game.
+                ClassCrave is a library of classroom management games (Space, Frontier, Fantasy and more) powered by one consistent system: expectations, XP, ranks, and rewards. Keep the structure teachers need—give students a world they want to show up for.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
@@ -217,25 +217,33 @@ export default function Home() {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
               <div>
                 <h2 className="font-heading text-3xl md:text-4xl font-semibold text-slate-900">Multiple games. One student profile.</h2>
-                <p className="text-slate-600 mt-2 max-w-xl">ClassCrave is built for a growing library. Start with our live game, then expand without changing your routines.</p>
+                <p className="text-slate-600 mt-2 max-w-xl">Same classroom expectations, same XP and ranks—different worlds to explore. Start with Space Adventure, then plug in new games as they launch.</p>
               </div>
               <Link href="/space" className="inline-flex items-center gap-2 text-emerald-700 font-semibold">
                 Play the current game <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-white/80 border border-black/10 rounded-3xl p-6">
                 <div className="flex items-center justify-between">
                   <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">Live Now</div>
                   <Gamepad2 className="text-emerald-600" />
                 </div>
                 <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6">Space Adventure</h3>
-                <p className="text-slate-600 mt-2">Explore missions, award XP, and guide students through collaborative goals.</p>
+                <p className="text-slate-600 mt-2">Students customize ships, earn XP, rank up, and travel to planets with teacher-set rewards.</p>
+                <p className="text-slate-500 text-sm mt-3">Coming next: deeper RPG upgrades, new solar systems, and group challenges.</p>
               </div>
+
               <div className="bg-white/80 border border-black/10 rounded-3xl p-6">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500 bg-slate-100 px-3 py-1 rounded-full inline-block">Coming Soon</div>
-                <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6">Next Worlds</h3>
-                <p className="text-slate-600 mt-2">New experiences will plug into the same student accounts, rewards, and routines.</p>
+                <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6">Frontier Trail</h3>
+                <p className="text-slate-600 mt-2">Earn points and XP to travel west—customize your wagon, meet historical figures, and progress through the journey.</p>
+              </div>
+
+              <div className="bg-white/80 border border-black/10 rounded-3xl p-6">
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-500 bg-slate-100 px-3 py-1 rounded-full inline-block">Coming Soon</div>
+                <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6">Arcane Academy</h3>
+                <p className="text-slate-600 mt-2">Join an academy house, level up characters, and earn magical rewards—all tied to classroom expectations and lessons.</p>
               </div>
             </div>
           </div>

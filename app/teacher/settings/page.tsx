@@ -972,7 +972,7 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
 
     const PRICE_IDS = {
         monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
-        yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "price_1SxvZNRt6vQIRlSNVgvCKL89" 
+        yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
     };
 
     const handleSubscribe = async () => {
@@ -986,6 +986,7 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     priceId,
+                    cycle,
                     userId: userData.uid,
                     email: userData.email
                 })
@@ -1007,105 +1008,127 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
     };
 
     return (
-        <div className="max-w-4xl mx-auto border border-green-500/30 bg-black/40 rounded-3xl p-8 flex flex-col gap-6">
-             <div className="flex items-center gap-4 border-b border-green-500/30 pb-4">
-                 <div className="p-3 bg-green-500/20 rounded-xl border border-green-500 text-green-400">
-                     <CreditCard size={24} />
-                 </div>
-                 <div>
-                     <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Subscription Management</h2>
-                     <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Plan Status: <span className={userData?.subscriptionStatus === "active" ? "text-green-400 font-bold" : "text-yellow-400 font-bold"}>{userData?.subscriptionStatus || "TRIAL"}</span></p>
-                 </div>
-             </div>
-             
-             <div className="grid md:grid-cols-2 gap-8">
-                 <div className="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col">
-                     <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white mb-2">Free Trial</h3>
-                        <p className="text-gray-400 text-sm mb-4">Perfect for small groups or testing the waters.</p>
-                        <ul className="space-y-3 text-sm text-gray-300 mb-8">
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 5 Students</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Explore All Features</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Unlimited Duration</li>
-                        </ul>
-                     </div>
-                     {/* Free Trial Badge - Not a button */}
-                     {userData?.subscriptionStatus !== "active" && (
-                        <div className="w-full py-3 rounded-xl bg-white/5 text-white/40 font-bold border border-white/10 text-center uppercase tracking-wider text-xs">
-                            Current Status
-                        </div>
-                     )}
-                 </div>
+        <div className="landing-theme max-w-5xl mx-auto relative overflow-hidden rounded-3xl border border-black/10 bg-white/70 backdrop-blur-md p-8">
+            {/* Background Orbs (match landing vibe) */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute -top-32 -right-20 w-[520px] h-[520px] bg-emerald-200/40 blur-[140px] rounded-full" />
+                <div className="absolute -bottom-40 -left-28 w-[560px] h-[560px] bg-amber-200/40 blur-[160px] rounded-full" />
+            </div>
 
-                 <div className="bg-gradient-to-br from-green-900/20 to-black rounded-2xl p-6 border border-green-500/50 flex flex-col relative overflow-hidden">
-                     <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
-                     <div className="flex-1">
-                        <h3 className="text-xl font-bold text-green-400 mb-4">Full Access</h3>
-                        
-                        {/* Toggle */}
-                        <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 w-fit mb-6">
-                            <button 
-                                onClick={() => setCycle("monthly")}
-                                className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${cycle === "monthly" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+            <div className="relative z-10 flex flex-col gap-6">
+                <div className="flex items-start gap-4 border-b border-black/10 pb-6">
+                    <div className="p-3 bg-emerald-100/80 rounded-2xl border border-emerald-200 text-emerald-700 shrink-0">
+                        <CreditCard size={24} />
+                    </div>
+                    <div className="flex-1">
+                        <h2 className="font-heading text-2xl font-semibold text-slate-900">Subscription</h2>
+                        <div className="mt-1 text-sm text-slate-600 flex flex-wrap items-center gap-2">
+                            <span>Plan status:</span>
+                            <span
+                                className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${
+                                    userData?.subscriptionStatus === "active"
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                        : "bg-slate-100 text-slate-700 border-black/10"
+                                }`}
                             >
-                                Monthly
-                            </button>
-                            <button 
-                                onClick={() => setCycle("yearly")}
-                                className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${cycle === "yearly" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
-                            >
-                                Yearly
-                            </button>
+                                {userData?.subscriptionStatus || "TRIAL"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-white/80 border border-black/10 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.08)] flex flex-col">
+                        <div className="flex-1">
+                            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Free Trial</div>
+                            <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-3">Try it with a small group</h3>
+                            <p className="text-slate-600 mt-2">Perfect for testing routines and getting the class bought in.</p>
+
+                            <ul className="space-y-3 text-sm text-slate-700 mt-6">
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Up to 5 students</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Explore all core features</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> No long-term commitment</li>
+                            </ul>
                         </div>
 
-                        {cycle === "yearly" ? (
-                            <div className="flex items-baseline gap-1 mb-4">
-                                <span className="text-3xl font-bold text-white">$100</span>
-                                <span className="text-sm text-gray-400">/year</span>
-                                <span className="text-xs text-green-400 ml-2 font-bold bg-green-900/30 px-2 py-1 rounded">SAVE $20</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-baseline gap-1 mb-4">
-                                <span className="text-3xl font-bold text-white">$10</span>
-                                <span className="text-sm text-gray-400">/month</span>
+                        {userData?.subscriptionStatus !== "active" && (
+                            <div className="mt-8 w-full py-3 rounded-xl bg-slate-100/80 text-slate-700 font-bold border border-black/10 text-center uppercase tracking-wider text-xs">
+                                Current plan
                             </div>
                         )}
+                    </div>
 
-                        <ul className="space-y-3 text-sm text-gray-300 mb-8">
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Up to 30 Students</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Custom Missions & Planets</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Priority Support</li>
-                            <li className="flex items-center gap-2"><Check size={16} className="text-green-400" /> Full Analytic Dashboard</li>
-                        </ul>
-                     </div>
-                     {userData?.subscriptionStatus === "active" ? (
-                         <div className="w-full py-3 rounded-xl bg-green-500/20 text-green-400 font-bold border border-green-500/50 text-center uppercase tracking-wider flex items-center justify-center gap-2">
-                             <Check size={18} /> Plan Active
-                         </div>
-                     ) : (
-                         <button 
-                            onClick={handleSubscribe} 
-                            disabled={loading}
-                            className={`w-full py-3 rounded-xl font-bold transition-all border shadow-[0_0_20px_rgba(22,163,74,0.3)]
-                                ${loading 
-                                    ? "bg-gray-700 text-gray-400 border-gray-600 cursor-wait" 
-                                    : "bg-green-600 hover:bg-green-500 text-white border-green-400 active:scale-95"
-                                }
-                            `}
-                        >
-                            {loading ? "Initializing..." : `Upgrade (${cycle})`}
-                         </button>
-                     )}
-                 </div>
-             </div>
-             
-             <div className="mt-4 p-4 bg-blue-900/10 border border-blue-500/30 rounded-xl flex items-start gap-4">
-                 <Sparkles className="text-blue-400 shrink-0 mt-1" />
-                 <div>
-                     <h4 className="text-blue-300 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
-                     <p className="text-gray-400 text-xs leading-relaxed">We believe in this tool. If you don"t see an increase in student engagement within the first 30 days, we"ll refund your subscription in full. No questions asked.</p>
-                 </div>
-             </div>
+                    <div className="bg-white/80 border border-emerald-200 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.08)] flex flex-col relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
+
+                        <div className="flex-1">
+                            <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full inline-block">Full access</div>
+
+                            {/* Toggle */}
+                            <div className="mt-5 flex bg-slate-100/80 p-1 rounded-xl border border-black/10 w-fit">
+                                <button
+                                    type="button"
+                                    onClick={() => setCycle("monthly")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${cycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                                >
+                                    Monthly
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCycle("yearly")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${cycle === "yearly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                                >
+                                    Yearly
+                                </button>
+                            </div>
+
+                            <div className="mt-6 flex items-baseline gap-2">
+                                <span className="text-5xl font-bold text-slate-900">{cycle === "yearly" ? "$80" : "$10"}</span>
+                                <span className="text-slate-600 font-medium">/{cycle === "yearly" ? "year" : "month"}</span>
+                                {cycle === "yearly" && (
+                                    <span className="ml-2 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        Save $40
+                                    </span>
+                                )}
+                            </div>
+
+                            <ul className="space-y-3 text-sm text-slate-700 mt-6">
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Up to 30 students</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Custom missions & planet rewards</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Priority support</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Full analytics dashboard</li>
+                            </ul>
+                        </div>
+
+                        {userData?.subscriptionStatus === "active" ? (
+                            <div className="mt-8 w-full py-3 rounded-xl bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 text-center uppercase tracking-wider flex items-center justify-center gap-2 text-xs">
+                                <Check size={18} /> Plan active
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleSubscribe}
+                                disabled={loading}
+                                className={`mt-8 w-full py-3 rounded-xl font-bold transition-all border shadow-sm flex items-center justify-center gap-2 ${
+                                    loading
+                                        ? "bg-slate-200 text-slate-500 border-black/10 cursor-wait"
+                                        : "bg-slate-900 hover:bg-emerald-600 text-white border-slate-900 active:scale-95"
+                                }`}
+                            >
+                                <CreditCard size={18} />
+                                {loading ? "Initializing..." : `Upgrade (${cycle})`}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-start gap-4">
+                    <Sparkles className="text-emerald-700 shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="text-slate-900 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
+                        <p className="text-slate-600 text-sm leading-relaxed">If you don’t see an increase in student engagement within the first 30 days, we’ll refund your subscription in full.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

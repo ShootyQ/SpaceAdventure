@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Check, ArrowLeft, Rocket, Shield, Users, Trophy } from 'lucide-react';
@@ -8,6 +9,7 @@ import Link from 'next/link';
 export default function SignUpPage() {
     const { signInWithGoogle, user } = useAuth();
     const router = useRouter();
+    const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
 
     const handleGoogleSignUp = async () => {
         await signInWithGoogle();
@@ -36,7 +38,7 @@ export default function SignUpPage() {
                             Command your<br/>classroom.
                         </h1>
                         <p className="text-xl text-slate-600 mb-10 leading-relaxed">
-                            Turn positive behavior into progress. Manage your fleet, award XP for real-world achievements, and watch your students blast off.
+                            Turn positive behavior into progress with a library of classroom management games. Start in Space Adventure today, and keep the same expectations, XP, and rewards as new worlds launch.
                         </p>
                         
                         <div className="space-y-8 mb-12">
@@ -82,9 +84,32 @@ export default function SignUpPage() {
                                 Early Access
                             </div>
                             <h2 className="font-heading text-2xl font-semibold text-slate-900 mb-3">Teacher License</h2>
+
+                            <div className="flex bg-slate-100/80 p-1 rounded-xl border border-black/5 w-fit mx-auto mb-8">
+                                <button
+                                    type="button"
+                                    onClick={() => setCycle("monthly")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${cycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                                >
+                                    Monthly
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCycle("yearly")}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${cycle === "yearly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                                >
+                                    Yearly
+                                </button>
+                            </div>
+
                             <div className="flex items-baseline justify-center gap-2 mb-10">
-                                <span className="text-6xl font-bold text-slate-900">$0</span>
-                                <span className="text-slate-500 font-medium">/ forever</span>
+                                <span className="text-6xl font-bold text-slate-900">{cycle === "yearly" ? "$80" : "$10"}</span>
+                                <span className="text-slate-500 font-medium">/{cycle === "yearly" ? "year" : "month"}</span>
+                                {cycle === "yearly" && (
+                                    <span className="ml-2 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        Save $40
+                                    </span>
+                                )}
                             </div>
                             
                             <div className="space-y-4 mb-10 text-left max-w-xs mx-auto">
@@ -115,7 +140,7 @@ export default function SignUpPage() {
                                 <ArrowLeft className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-2 group-hover:ml-0 transition-all rotate-180" />
                             </button>
                             <p className="text-center text-xs text-slate-400 mt-6 max-w-xs mx-auto leading-relaxed">
-                                Join 150+ early adopters. No credit card required. Cancel anytime.
+                                Join 150+ early adopters. Secure checkout. Cancel anytime.
                             </p>
                         </div>
                     </div>
