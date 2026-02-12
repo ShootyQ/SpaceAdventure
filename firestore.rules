@@ -14,6 +14,17 @@ service cloud.firestore {
         return request.auth.token.email in teacherDoc.data.coTeacherEmails;
     }
 
+    function isTeacher() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "teacher";
+    }
+
+    // Public, non-sensitive aggregated stats for the marketing homepage.
+    match /public-stats/{docId} {
+      allow read: if docId == "landing";
+      allow write: if docId == "landing" && (isAdmin() || isTeacher());
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && (
         request.auth.uid == userId || 

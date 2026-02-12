@@ -10,8 +10,8 @@ import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, o
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
-import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -99,6 +99,8 @@ export default function SolarSystem() {
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
   const [currentAward, setCurrentAward] = useState<AwardEvent | null>(null);
+
+    const previousPlanetXPRef = useRef<Map<string, Record<string, number>>>(new Map());
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
@@ -318,7 +320,7 @@ export default function SolarSystem() {
           if (awardTimer.current) clearTimeout(awardTimer.current);
           awardTimer.current = setTimeout(() => {
               setAwardQueue([]);
-          }, 15000); 
+          }, awardQueue.length >= 10 ? 30000 : 20000);
       }
       prevQueueLength.current = awardQueue.length;
       return () => {
@@ -383,7 +385,8 @@ export default function SolarSystem() {
                     xp: data.xp || 0,
                     lastXpReason: data.lastXpReason,
                     flag: data.flag,
-                    visitedPlanets: data.visitedPlanets || []
+                    visitedPlanets: data.visitedPlanets || [],
+                    planetXP: data.planetXP || {}
                 };
                 fleet.push(shipData);
             });
@@ -422,13 +425,41 @@ export default function SolarSystem() {
                         
                         const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
+                        // Unlock detection (per-planet XP thresholds)
+                        const planetId = (shipData.locationId || '').toLowerCase();
+                        const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
+                        const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
+                        const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
+
+                        let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
+                        if (unlockConfig && newPlanetXP > oldPlanetXP) {
+                            const shipsCfg = (unlockConfig.ships || {}) as Record<string, number>;
+                            const avatarsCfg = (unlockConfig.avatars || {}) as Record<string, number>;
+
+                            const newlyShips = Object.entries(shipsCfg)
+                                .filter(([, threshold]) => Number(threshold) > 0 && oldPlanetXP < Number(threshold) && newPlanetXP >= Number(threshold))
+                                .map(([id]) => id);
+
+                            const newlyAvatars = Object.entries(avatarsCfg)
+                                .filter(([, threshold]) => Number(threshold) > 0 && oldPlanetXP < Number(threshold) && newPlanetXP >= Number(threshold))
+                                .map(([id]) => id);
+
+                            if (newlyShips.length || newlyAvatars.length) {
+                                unlocks = {
+                                    ships: newlyShips.length ? newlyShips : undefined,
+                                    avatars: newlyAvatars.length ? newlyAvatars : undefined,
+                                };
+                            }
+                        }
+
                         const event: AwardEvent = {
                             id: Math.random().toString(),
                             ship: shipData,
                             xpGained: shipData.xp - oldXP,
                             newRank: isPromotion ? newRank.name : undefined,
                             startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-                            reason: shipData.lastXpReason
+                            reason: shipData.lastXpReason,
+                            unlocks
                         };
                         
                         // Play notification sound safely if enabled
@@ -446,6 +477,7 @@ export default function SolarSystem() {
                  }
                  // Always update ref
                  previousXPRef.current.set(shipData.id, shipData.xp);
+                 previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
             });
             isFirstLoad.current = false;
         },
@@ -456,7 +488,12 @@ export default function SolarSystem() {
   }, [userData]);
 
 
-  const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+    const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+    const dynamicPlanetsRef = useRef<Map<string, any>>(new Map());
+
+    useEffect(() => {
+            dynamicPlanetsRef.current = dynamicPlanets as any;
+    }, [dynamicPlanets]);
 
   // Load Dynamic Planet Stats
   useEffect(() => {
@@ -1444,7 +1481,10 @@ export default function SolarSystem() {
                 />
 
                 {/* Multiple Awards Container */}
-                <div className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-screen overflow-y-auto">
+                <div
+                    className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-[calc(100vh-2rem)] overflow-y-auto cursor-default"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     {awardQueue.map((award, index) => (
                         <motion.div
                             key={award.id}
@@ -1487,17 +1527,17 @@ export default function SolarSystem() {
                             >
                                 <div className={`relative ${awardQueue.length > 1 ? 'w-24 h-24' : 'w-40 h-40'}`}>
                                     <img 
-                                        src={getAssetPath("/images/ships/finalship.png")} 
+                                        src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
                                         alt="Award Ship"
                                         className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] relative z-20"
                                     />
                                     {/* Avatar Window - Using simple color fallback because getting full user avatar data here might be complex without looking up ship again, 
                                         but we have 'ship' object in award.
                                      */}
-                                    <div className={`absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden ${award.ship.avatarColor?.replace('text','bg').replace('400','900')}/40`}>
-                                         {/* If we have avatar data, we could show it, but 'ship' object in award might be minimal.
-                                             Let's check if we can show generic avatar or if we have color.
-                                         */}
+                                    <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
+                                        {award.ship.avatar && (
+                                            <UserAvatar userData={award.ship as any} className="w-full h-full scale-[1.35] translate-y-1" />
+                                        )}
                                     </div>
                                 </div>
                             </motion.div>
@@ -1508,7 +1548,7 @@ export default function SolarSystem() {
                             
                             {award.reason && (
                                 <div className={`text-cyan-400/80 ${awardQueue.length > 1 ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
-                                    // {award.reason}
+                                    {award.reason}
                                 </div>
                             )}
 
@@ -1545,6 +1585,37 @@ export default function SolarSystem() {
                                 </motion.div>
                                 )}
                             </div>
+
+                            {(award.unlocks?.ships?.length || award.unlocks?.avatars?.length) && (
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="mt-6 w-full bg-purple-500/10 border border-purple-400/40 rounded-2xl p-4 relative overflow-hidden"
+                                >
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-700/30 via-transparent to-transparent" />
+                                    <div className="relative z-10">
+                                        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-purple-200 text-center mb-3">
+                                            NEW UNLOCK!
+                                        </div>
+                                        <div className="flex flex-wrap gap-3 items-center justify-center">
+                                            {(award.unlocks.ships || []).map((id) => (
+                                                <div key={`ship-${id}`} className="flex flex-col items-center gap-1">
+                                                    <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-12 h-12 object-contain drop-shadow-md" />
+                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Ship</div>
+                                                </div>
+                                            ))}
+                                            {(award.unlocks.avatars || []).map((id) => (
+                                                <div key={`avatar-${id}`} className="flex flex-col items-center gap-1">
+                                                    <div className="w-12 h-12 rounded-full border border-purple-400/40 overflow-hidden">
+                                                        <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
+                                                    </div>
+                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Avatar</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
                         </motion.div>
                     ))}
                 </div>

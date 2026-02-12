@@ -2,14 +2,19 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { ArrowRight, CheckCircle2, GraduationCap, ShieldCheck, UserCircle2, Gamepad2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
   const [educatorCount, setEducatorCount] = useState(1);
-  const [educatorInitials, setEducatorInitials] = useState("KC");
+  const [educatorInitialsList, setEducatorInitialsList] = useState<string[]>(["CD", "SK"]);
   const [activeStudents, setActiveStudents] = useState(24);
   const [weeklyMissions, setWeeklyMissions] = useState(5);
+  const [focusPointsAwarded, setFocusPointsAwarded] = useState(320);
+  const [awardEvents, setAwardEvents] = useState(12);
+  const [studentsAwarded, setStudentsAwarded] = useState(6);
 
   useEffect(() => {
     const fetchEducators = async () => {
@@ -19,7 +24,11 @@ export default function Home() {
         if (res.ok) {
             const data = await res.json();
             setEducatorCount(data.count);
-            setEducatorInitials(data.initials);
+            if (Array.isArray(data.initialsList) && data.initialsList.length) {
+              setEducatorInitialsList(data.initialsList);
+            } else if (typeof data.initials === 'string' && data.initials) {
+              setEducatorInitialsList([data.initials]);
+            }
             if (data.activeStudents) setActiveStudents(data.activeStudents);
             if (data.weeklyMissions) setWeeklyMissions(data.weeklyMissions);
         }
@@ -29,6 +38,25 @@ export default function Home() {
     };
     
     fetchEducators();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "public-stats", "landing"),
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        if (typeof data.focusPointsAwarded === "number") setFocusPointsAwarded(data.focusPointsAwarded);
+        if (typeof data.awardEvents === "number") setAwardEvents(data.awardEvents);
+        if (typeof data.studentsAwarded === "number") setStudentsAwarded(data.studentsAwarded);
+      },
+      (error) => {
+        // If rules/environments block reads, keep the static demo values.
+        console.warn("Live snapshot stats unavailable:", error);
+      }
+    );
+
+    return () => unsub();
   }, []);
   
   const jsonLd = {
@@ -62,7 +90,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 h-28 flex items-center justify-between">
           <Link href="/" className="relative w-[32rem] h-24">
             <Image
-              src="/images/logos/classcrave logo.png"
+              src="/images/logos/croppedclasscravelogo.png"
               alt="ClassCrave Logo"
               fill
               className="object-contain object-left"
@@ -118,11 +146,22 @@ export default function Home() {
               </div>
 
               <div className="mt-8 flex items-center gap-3 text-sm text-slate-600">
-                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
-                  {educatorInitials}
+                <div className="flex items-center -space-x-2">
+                  {educatorInitialsList.slice(0, 2).map((initials) => (
+                    <div
+                      key={initials}
+                      className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold border-2 border-[#f7f4ef]"
+                      title={initials}
+                    >
+                      {initials}
+                    </div>
+                  ))}
                 </div>
                 <div>
-                  <p className="text-slate-700">Used by {educatorCount} educator{educatorCount !== 1 ? "s" : ""} building consistent routines.</p>
+                  <p className="text-slate-700">
+                    Used by {educatorCount} educator{educatorCount !== 1 ? "s" : ""}
+                    {educatorInitialsList.length ? ` (${educatorInitialsList.slice(0, 2).join(", ")})` : ""} building consistent routines.
+                  </p>
                   <p className="text-xs text-slate-500">Early access enrollment for 2026 launches.</p>
                 </div>
               </div>
@@ -165,15 +204,15 @@ export default function Home() {
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-700">Awarded Focus Points</span>
-                        <span className="text-slate-900 font-semibold">+320</span>
+                        <span className="text-slate-900 font-semibold">+{Math.round(focusPointsAwarded).toLocaleString()}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-700">Behavior Trends Logged</span>
-                        <span className="text-slate-900 font-semibold">12</span>
+                        <span className="text-slate-900 font-semibold">{Math.round(awardEvents).toLocaleString()}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-700">Families Notified</span>
-                        <span className="text-slate-900 font-semibold">6</span>
+                        <span className="text-slate-900 font-semibold">{Math.round(studentsAwarded).toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -280,7 +319,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-slate-500 text-sm">
           <div className="mb-4 md:mb-0">
             <Image
-              src="/images/logos/classcrave logo.png"
+              src="/images/logos/croppedclasscravelogo.png"
               alt="ClassCrave"
               width={120}
               height={30}

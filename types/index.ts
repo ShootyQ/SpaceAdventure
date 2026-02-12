@@ -90,6 +90,7 @@ export interface UserData {
     lastAward?: any;
     lastXpReason?: string;
     visitedPlanets?: string[];
+    planetXP?: Record<string, number>; // XP earned per planet (for unlocks)
     unlockedHats?: string[];
     completedMissions?: string[];
     schoolName?: string;
@@ -118,6 +119,7 @@ export interface Ship {
     lastXpReason?: string;
     flag?: FlagConfig;
     visitedPlanets?: string[];
+    planetXP?: Record<string, number>;
 }
   
 export interface AwardEvent {
@@ -127,6 +129,7 @@ export interface AwardEvent {
       newRank?: string;
       startPos: { x: number, y: number }; // Screen coordinates to fly from
       reason?: string;
+    unlocks?: { ships?: string[]; avatars?: string[] };
 }
   
 export interface Behavior {

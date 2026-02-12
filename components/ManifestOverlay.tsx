@@ -73,6 +73,7 @@ interface ManifestOverlayProps {
 const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void }) => {
     // Memoize rank reset per card to avoid array operations
     const rank = React.useMemo(() => ranks.find(r => student.xp >= r.minXP), [ranks, student.xp]);
+    const shipModelId = (student as any)?.spaceship?.id || (student as any)?.spaceship?.modelId || (student as any)?.shipId || 'finalship';
 
     return (
         <div 
@@ -98,7 +99,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             {/* Avatar */}
             <div className="relative w-32 h-32 mb-4">
                 <img
-                    src={getAssetPath("/images/ships/finalship.png")}
+                    src={getAssetPath(`/images/ships/${shipModelId}.png`)}
                     alt="Ship"
                     className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] relative z-20"
                 />
@@ -289,7 +290,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                     if (newFuel < 0) newFuel = 0;
 
                                                     // 2. Queue User Update
-                                                    transaction.update(studentRef, {
+                                                    const userUpdates: Record<string, any> = {
                                                         xp: increment(xpInput),
                                                         fuel: newFuel,
                                                         lastAward: {
@@ -299,7 +300,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                         },
                                                         // Ensure legacy field is updated too for compatibility
                                                         lastXpReason: reasonInput
-                                                    });
+                                                    };
 
                                                     // 3. Queue Class Bonus Update (If student has a teacher)
                                                     if (data.teacherId && xpInput > 0) {
@@ -317,6 +318,10 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                     
                                                     if (rawLocation && xpInput > 0 && !isTraveling && data.teacherId) {
                                                         const planetId = rawLocation.toLowerCase();
+
+                                                        // Track per-student planet XP for unlocks
+                                                        userUpdates[`planetXP.${planetId}`] = increment(xpInput);
+
                                                         // Planet stats are stored in the teacher's subcollection
                                                         const planetRef = doc(db, `users/${data.teacherId}/planets`, planetId);
                                                         
@@ -325,6 +330,8 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                             id: planetId 
                                                         }, { merge: true });
                                                     }
+
+                                                    transaction.update(studentRef, userUpdates);
                                                 });
                                             } catch (e) {
                                                 console.error(`Failed to update student ${id}:`, e);

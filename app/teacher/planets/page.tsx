@@ -8,6 +8,15 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
+import { UserAvatar, AVATAR_OPTIONS } from "@/components/UserAvatar";
+
+const SHIP_OPTIONS: { id: string; name: string }[] = [
+    { id: "finalship", name: "Standard Interceptor" },
+    { id: "alienship", name: "Alien Scout" },
+    { id: "jellyalienship", name: "Bio-Cruiser" },
+    { id: "coconutship", name: "Tropical Drifter" },
+    { id: "dragoneggship", name: "Dragon Scale Pod" },
+];
 
 // Interface for dynamic data stored in DB
 interface PlanetData {
@@ -16,6 +25,10 @@ interface PlanetData {
     currentXP: number;
     rewardName: string;
     rewardDescription: string;
+    unlocks?: {
+        ships?: Record<string, number>;
+        avatars?: Record<string, number>;
+    };
 }
 
 // Merge of Static + Dynamic
@@ -50,7 +63,8 @@ export default function PlanetManagementPage() {
                      xpGoal: 1000,
                      currentXP: 0,
                      rewardName: "",
-                     rewardDescription: ""
+                     rewardDescription: "",
+                     unlocks: { ships: {}, avatars: {} }
                  };
                  return {
                      ...dynamic, // Dynamic overrides defaults
@@ -69,16 +83,53 @@ export default function PlanetManagementPage() {
         setPlanets(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
+    const handleUnlockChange = (
+        planetId: string,
+        kind: "ships" | "avatars",
+        itemId: string,
+        value: string
+    ) => {
+        const numeric = Number(value);
+        setPlanets(prev => prev.map(p => {
+            if (p.id !== planetId) return p;
+            const unlocks = {
+                ships: { ...(p.unlocks?.ships || {}) },
+                avatars: { ...(p.unlocks?.avatars || {}) },
+            };
+            (unlocks as any)[kind][itemId] = Number.isFinite(numeric) ? numeric : 0;
+            return { ...p, unlocks };
+        }));
+    };
+
     const handleSave = async (planet: PlanetState) => {
         if (!user) return;
         setSaving(planet.id);
         try {
+            const shipsRaw = planet.unlocks?.ships || {};
+            const avatarsRaw = planet.unlocks?.avatars || {};
+
+            const ships: Record<string, number> = {};
+            const avatars: Record<string, number> = {};
+
+            for (const [key, val] of Object.entries(shipsRaw)) {
+                const num = Number(val);
+                if (Number.isFinite(num) && num > 0) ships[key] = num;
+            }
+            for (const [key, val] of Object.entries(avatarsRaw)) {
+                const num = Number(val);
+                if (Number.isFinite(num) && num > 0) avatars[key] = num;
+            }
+
             // Save to subcollection
             await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
                 id: planet.id,
                 xpGoal: Number(planet.xpGoal),
                 rewardName: planet.rewardName,
                 rewardDescription: planet.rewardDescription,
+                unlocks: {
+                    ships,
+                    avatars,
+                },
                 teacherId: user.uid
             }, { merge: true });
             setSaving(null);
@@ -173,6 +224,68 @@ export default function PlanetManagementPage() {
                                             onChange={(e) => handleChange(planet.id, 'rewardDescription', e.target.value)}
                                             className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-xs h-20 resize-none focus:border-yellow-500/50 outline-none transition-colors"
                                          />
+                                     </div>
+
+                                     <div className="border-t border-cyan-900/30 pt-4">
+                                         <label className="block text-xs uppercase tracking-wider text-purple-400 mb-2 flex items-center gap-2">
+                                             <Star size={14} /> Cosmetic Unlocks
+                                         </label>
+                                         <p className="text-[10px] text-gray-500 mb-3">
+                                             Set how much XP earned on this planet unlocks each ship/avatar for students.
+                                         </p>
+
+                                         <div className="space-y-4">
+                                             <div>
+                                                 <div className="text-[10px] text-cyan-600 uppercase tracking-widest font-bold mb-2">Ships</div>
+                                                 <div className="grid grid-cols-2 gap-3">
+                                                     {SHIP_OPTIONS.map((opt) => (
+                                                         <div key={opt.id} className="bg-black/40 border border-white/10 rounded-lg p-3">
+                                                             <div className="flex items-center gap-3">
+                                                                 <img
+                                                                     src={getAssetPath(`/images/ships/${opt.id}.png`)}
+                                                                     alt={opt.name}
+                                                                     className="w-10 h-10 object-contain"
+                                                                 />
+                                                                 <div className="min-w-0 flex-1">
+                                                                     <div className="text-xs text-white font-bold truncate">{opt.name}</div>
+                                                                     <div className="text-[10px] text-gray-500 uppercase">Unlock XP</div>
+                                                                 </div>
+                                                                 <input
+                                                                     type="number"
+                                                                     value={planet.unlocks?.ships?.[opt.id] ?? ""}
+                                                                     onChange={(e) => handleUnlockChange(planet.id, "ships", opt.id, e.target.value)}
+                                                                     className="w-20 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                     placeholder="0"
+                                                                 />
+                                                             </div>
+                                                         </div>
+                                                     ))}
+                                                 </div>
+                                             </div>
+
+                                             <div>
+                                                 <div className="text-[10px] text-purple-400 uppercase tracking-widest font-bold mb-2">Avatars</div>
+                                                 <div className="grid grid-cols-3 gap-3">
+                                                     {AVATAR_OPTIONS.map((opt) => (
+                                                         <div key={opt.id} className="bg-black/40 border border-white/10 rounded-lg p-3">
+                                                             <div className="flex flex-col items-center gap-2">
+                                                                 <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
+                                                                     <UserAvatar avatarId={opt.id} hat="none" className="w-full h-full" />
+                                                                 </div>
+                                                                 <div className="text-[10px] text-white font-bold text-center leading-tight">{opt.name}</div>
+                                                                 <input
+                                                                     type="number"
+                                                                     value={planet.unlocks?.avatars?.[opt.id] ?? ""}
+                                                                     onChange={(e) => handleUnlockChange(planet.id, "avatars", opt.id, e.target.value)}
+                                                                     className="w-full bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                     placeholder="Unlock XP"
+                                                                 />
+                                                             </div>
+                                                         </div>
+                                                     ))}
+                                                 </div>
+                                             </div>
+                                         </div>
                                      </div>
 
                                      <button 

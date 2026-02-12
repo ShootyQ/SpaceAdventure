@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, getDoc, where } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, getDoc, where, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
@@ -113,10 +113,27 @@ export default function StudentMissions() {
                 
                 // Only award XP if not already completed
                 if (!completedMissions.includes(activeMission.id)) {
+                    const locationId = (userData?.location || "").toLowerCase();
+                    const planetXpKey = locationId ? `planetXP.${locationId}` : null;
+
                     await updateDoc(userRef, {
                         completedMissions: arrayUnion(activeMission.id),
-                        xp: increment(activeMission.xpReward)
+                        xp: increment(activeMission.xpReward),
+                        ...(planetXpKey ? { [planetXpKey]: increment(activeMission.xpReward) } : {})
                     });
+
+                    if (activeMission.xpReward > 0) {
+                        await setDoc(
+                            doc(db, "public-stats", "landing"),
+                            {
+                                focusPointsAwarded: increment(activeMission.xpReward),
+                                awardEvents: increment(1),
+                                studentsAwarded: increment(1),
+                                updatedAt: serverTimestamp(),
+                            },
+                            { merge: true }
+                        );
+                    }
                     
                     // Trigger confetti
                     confetti({

@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     siteName: 'ClassCrave',
     images: [
       {
-        url: '/images/logos/classcrave logo.png', // Ideally this should be a large 1200x630 og-image
+        url: '/images/logos/croppedclasscravelogo.png', // Ideally this should be a large 1200x630 og-image
         width: 1200,
         height: 630,
         alt: 'ClassCrave Classroom Adventure',
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: "ClassCrave | Gamified Classroom Learning",
     description: "Boost engagement with XP, ranks, and missions built for educators.",
-    images: ['/images/logos/classcrave logo.png'], // Fallback to logo
+    images: ['/images/logos/croppedclasscravelogo.png'], // Fallback to logo
   },
   robots: {
     index: true,

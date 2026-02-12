@@ -84,6 +84,9 @@ export default function SignUpPage() {
                                 Early Access
                             </div>
                             <h2 className="font-heading text-2xl font-semibold text-slate-900 mb-3">Teacher License</h2>
+                            <p className="text-sm text-slate-600 mb-6 max-w-sm mx-auto leading-relaxed">
+                                Start with a free trial for up to <span className="font-bold text-slate-900">5 students</span>. Upgrade to unlock up to <span className="font-bold text-slate-900">30 students</span>.
+                            </p>
 
                             <div className="flex bg-slate-100/80 p-1 rounded-xl border border-black/5 w-fit mx-auto mb-8">
                                 <button
@@ -112,10 +115,14 @@ export default function SignUpPage() {
                                 )}
                             </div>
                             
-                            <div className="space-y-4 mb-10 text-left max-w-xs mx-auto">
+                            <ul className="space-y-4 mb-10 text-left max-w-xs mx-auto">
                                 <li className="flex items-start gap-3 text-slate-600 group">
                                     <Check className="mt-0.5 w-5 h-5 text-emerald-600 stroke-[3]" />
-                                    <span>Manage up to <span className="font-bold text-slate-900">30 Students</span></span>
+                                    <span>Free trial: Manage up to <span className="font-bold text-slate-900">5 Students</span></span>
+                                </li>
+                                <li className="flex items-start gap-3 text-slate-600 group">
+                                    <Check className="mt-0.5 w-5 h-5 text-emerald-600 stroke-[3]" />
+                                    <span>Upgrade to unlock up to <span className="font-bold text-slate-900">30 Students</span></span>
                                 </li>
                                 <li className="flex items-start gap-3 text-slate-600">
                                     <Check className="mt-0.5 w-5 h-5 text-emerald-600 stroke-[3]" />
@@ -129,7 +136,7 @@ export default function SignUpPage() {
                                     <Check className="mt-0.5 w-5 h-5 text-emerald-600 stroke-[3]" />
                                     <span>Mission Control Dashboard</span>
                                 </li>
-                            </div>
+                            </ul>
 
                             <button 
                                 onClick={handleGoogleSignUp}
@@ -140,7 +147,7 @@ export default function SignUpPage() {
                                 <ArrowLeft className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-2 group-hover:ml-0 transition-all rotate-180" />
                             </button>
                             <p className="text-center text-xs text-slate-400 mt-6 max-w-xs mx-auto leading-relaxed">
-                                Join 150+ early adopters. Secure checkout. Cancel anytime.
+                                Free trial. No card required. Upgrade anytime.
                             </p>
                         </div>
                     </div>

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot, increment } from "firebase/firestore";
+import { Rank, FlagConfig, SpaceshipConfig } from "@/types";
+import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -32,6 +32,14 @@ const SHIP_COLORS = [
     { name: "Starlight Gold", class: "text-yellow-400", bg: "bg-yellow-400" },
     { name: "Void Purple", class: "text-purple-400", bg: "bg-purple-400" },
     { name: "Ice Cyan", class: "text-cyan-400", bg: "bg-cyan-400" },
+];
+
+const SHIP_OPTIONS: { id: string; name: string; type: SpaceshipConfig['type'] }[] = [
+    { id: 'finalship', name: 'Standard Interceptor', type: 'fighter' },
+    { id: 'alienship', name: 'Alien Scout', type: 'scout' },
+    { id: 'jellyalienship', name: 'Bio-Cruiser', type: 'cruiser' },
+    { id: 'coconutship', name: 'Tropical Drifter', type: 'cruiser' },
+    { id: 'dragoneggship', name: 'Dragon Scale Pod', type: 'scout' },
 ];
 
 const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
@@ -289,16 +297,53 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [loading, setLoading] = useState(false);
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
+    const [selectedShipId, setSelectedShipId] = useState("finalship");
+    const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
+    const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(["finalship"]));
     // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
 
     useEffect(() => {
         if (userData?.spaceship) {
             setShipName(userData.spaceship.name);
+            setSelectedShipId(userData.spaceship.id || userData.spaceship.modelId || "finalship");
             const col = SHIP_COLORS.find(c => c.class === userData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
             // setSelectedType(userData.spaceship.type);
         }
     }, [userData]);
+
+    useEffect(() => {
+        const teacherId = userData?.teacherId;
+        if (!teacherId) return;
+
+        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
+            const map: Record<string, Record<string, number>> = {};
+            snap.forEach((d) => {
+                const data = d.data() as any;
+                map[d.id] = (data?.unlocks?.ships || {}) as Record<string, number>;
+            });
+            setPlanetShipUnlocks(map);
+        });
+
+        return () => unsub();
+    }, [userData?.teacherId]);
+
+    useEffect(() => {
+        const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
+        const planetXP = (userData?.planetXP || {}) as Record<string, number>;
+
+        const unlocked = new Set<string>(["finalship", currentShip]);
+        for (const [planetId, shipUnlocks] of Object.entries(planetShipUnlocks)) {
+            const xpOnPlanet = Number(planetXP?.[planetId] || 0);
+            for (const [shipId, threshold] of Object.entries(shipUnlocks || {})) {
+                const t = Number(threshold);
+                if (Number.isFinite(t) && t > 0 && xpOnPlanet >= t) unlocked.add(shipId);
+            }
+        }
+
+        setUnlockedShipIds(unlocked);
+        if (!unlocked.has(selectedShipId)) setSelectedShipId(currentShip);
+    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, selectedShipId]);
 
     const handleSave = async () => {
         if (!user) return;
@@ -308,6 +353,8 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
             await updateDoc(userRef, {
                 "spaceship.name": shipName,
                 "spaceship.color": selectedColor.class,
+                "spaceship.id": selectedShipId,
+                "spaceship.modelId": selectedShipId,
                 // "spaceship.type": selectedType
             });
             alert("Ship specifications updated, Commander.");
@@ -336,7 +383,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src={getAssetPath("/images/ships/finalship.png")}
+                        src={getAssetPath(`/images/ships/${selectedShipId}.png`)}
                         alt="Ship"
                         className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />
@@ -376,6 +423,25 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
 
             {/* Right Column: Controls */}
             <div className="space-y-6">
+                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
+                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
+                        <Shield size={16} /> Unlocked Ship Models
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        {SHIP_OPTIONS.filter((opt) => unlockedShipIds.has(opt.id)).map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setSelectedShipId(opt.id)}
+                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                            >
+                                <img src={getAssetPath(`/images/ships/${opt.id}.png`)} alt={opt.name} className="w-10 h-10 object-contain" />
+                                <span className={`text-xs uppercase font-bold ${selectedShipId === opt.id ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
                     <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-2">Vessel Identification</label>
                     <input
@@ -468,6 +534,42 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
     const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
 
+    const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
+    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(["bunny"]));
+
+    useEffect(() => {
+        const teacherId = userData?.teacherId;
+        if (!teacherId) return;
+
+        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
+            const map: Record<string, Record<string, number>> = {};
+            snap.forEach((d) => {
+                const data = d.data() as any;
+                map[d.id] = (data?.unlocks?.avatars || {}) as Record<string, number>;
+            });
+            setPlanetAvatarUnlocks(map);
+        });
+
+        return () => unsub();
+    }, [userData?.teacherId]);
+
+    useEffect(() => {
+        const currentAvatar = userData?.avatar?.avatarId || "bunny";
+        const planetXP = (userData?.planetXP || {}) as Record<string, number>;
+
+        const unlocked = new Set<string>(["bunny", currentAvatar]);
+        for (const [planetId, avatarUnlocks] of Object.entries(planetAvatarUnlocks)) {
+            const xpOnPlanet = Number(planetXP?.[planetId] || 0);
+            for (const [id, threshold] of Object.entries(avatarUnlocks || {})) {
+                const t = Number(threshold);
+                if (Number.isFinite(t) && t > 0 && xpOnPlanet >= t) unlocked.add(id);
+            }
+        }
+
+        setUnlockedAvatarIds(unlocked);
+        if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
+    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, avatarId]);
+
     const handleSelectPreset = (presetId: string) => {
         const preset = AVATAR_PRESETS.find(p => p.id === presetId);
         if (preset) {
@@ -480,6 +582,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             setAvatarId(preset.config.avatarId);
         }
     };
+
+    const visiblePresets = AVATAR_PRESETS.filter(p => unlockedAvatarIds.has(p.config.avatarId));
 
     const handleSave = async () => {
         if (!user) return;
@@ -535,7 +639,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     </h3>
 
                     <div className="grid grid-cols-2 gap-4">
-                        {AVATAR_PRESETS.map(preset => (
+                        {visiblePresets.map(preset => (
                             <button
                                 key={preset.id}
                                 onClick={() => handleSelectPreset(preset.id)}
@@ -554,6 +658,29 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                     />
                                 </div>
                                 <span className="text-xs font-bold uppercase tracking-wider text-purple-300 group-hover:text-white">{preset.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <User size={20} className="text-purple-400" />
+                        <span className="uppercase tracking-wider">Unlocked Avatars</span>
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                        {AVATAR_OPTIONS.filter(opt => unlockedAvatarIds.has(opt.id)).map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setAvatarId(opt.id)}
+                                className={`group relative p-3 rounded-xl border transition-all flex flex-col items-center gap-2 ${avatarId === opt.id ? 'bg-purple-900/40 border-purple-400' : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'}`}
+                                title={opt.name}
+                            >
+                                <div className="w-14 h-14 rounded-full border-2 border-white/20 overflow-hidden">
+                                    <UserAvatar avatarId={opt.id} hat={activeHat} className="w-full h-full" />
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${avatarId === opt.id ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>{opt.name}</span>
                             </button>
                         ))}
                     </div>

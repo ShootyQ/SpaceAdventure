@@ -20,6 +20,7 @@ export const AVATAR_OPTIONS = [
     { id: 'owl', name: 'Omega Owl', src: '/images/avatar/spaceowl.png' },
     { id: 'penguin', name: 'Power Penguin', src: '/images/avatar/spacepenguin.png' },
     { id: 'turtle', name: 'Turbo Turtle', src: '/images/avatar/spaceturtle.png' },
+    { id: 'jovi', name: 'Jovi', src: '/images/avatar/JUPITER/jovi.png' },
 ];
 
 export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[] = [

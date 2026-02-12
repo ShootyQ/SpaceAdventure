@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
@@ -126,6 +126,8 @@ export default function RewardsPage() {
         
         // Ensure atomic number handling
         const xpAmount = Number(behavior.xp);
+        const awardedStudents = selectedIds.size;
+        const totalAwardedPoints = xpAmount * awardedStudents;
 
         // Play notification sound immediately (User Interaction)
         const audioElement = document.getElementById('notification-audio') as HTMLAudioElement;
@@ -156,18 +158,23 @@ export default function RewardsPage() {
                      if (newFuel > maxFuel) newFuel = maxFuel;
                      if (newFuel < 0) newFuel = 0;
 
-                     // 3. Queue User Update
-                     transaction.update(studentRef, {
-                        xp: increment(xpAmount),
-                        fuel: newFuel,
-                        lastXpReason: behavior.label
-                     });
+                            // 3. Queue User Update
+                            const userUpdates: Record<string, any> = {
+                                xp: increment(xpAmount),
+                                fuel: newFuel,
+                                lastXpReason: behavior.label
+                            };
 
                      // 4. Queue Planet Update (Atomic)
                      const rawLocation = data.location;
+                     const isTraveling = data.travelStatus === 'traveling';
                      
-                     if (rawLocation && xpAmount > 0) {
+                     if (rawLocation && xpAmount > 0 && !isTraveling) {
                          const planetId = rawLocation.toLowerCase();
+
+                         // Track per-student planet XP for unlocks
+                         userUpdates[`planetXP.${planetId}`] = increment(xpAmount);
+
                          // Use subcollection for Planet Progress
                          const planetRef = doc(db, `users/${user.uid}/planets`, planetId);
                          
@@ -178,10 +185,26 @@ export default function RewardsPage() {
                              teacherId: user.uid
                          }, { merge: true });
                      }
+
+                     transaction.update(studentRef, userUpdates);
                 });
             });
 
             await Promise.all(promises);
+
+                        // Update public live-demo stats (non-sensitive aggregate only)
+                        if (totalAwardedPoints > 0) {
+                            await setDoc(
+                                doc(db, "public-stats", "landing"),
+                                {
+                                    focusPointsAwarded: increment(totalAwardedPoints),
+                                    awardEvents: increment(1),
+                                    studentsAwarded: increment(awardedStudents),
+                                    updatedAt: serverTimestamp(),
+                                },
+                                { merge: true }
+                            );
+                        }
 
             console.log(`SUCCESS: Awarded ${xpAmount} XP to ${selectedIds.size} students.`);
             setIsAwarding(false);
