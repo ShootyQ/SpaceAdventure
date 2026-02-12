@@ -2,7 +2,9 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap } from "lucide-react";
+import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft } from "lucide-react";
+import Link from 'next/link';
+import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -789,6 +791,8 @@ export default function SolarSystem() {
     })));
   }, []);
 
+  const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+
   return (
     <div 
         className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
@@ -1066,6 +1070,19 @@ export default function SolarSystem() {
           ))}
        </div>
 
+       {userData?.role === 'teacher' && (
+           <>
+               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none opacity-30">
+                   <h1 className="text-white font-mono text-xs tracking-widest uppercase">Classroom Sensor Feed // Live</h1>
+               </div>
+
+                <Link href="/teacher" className="absolute top-6 left-6 z-40 bg-black/20 hover:bg-black/80 border border-white/10 hover:border-cyan-500 text-white/50 hover:text-cyan-400 px-6 py-3 rounded-full backdrop-blur-sm flex items-center gap-3 transition-all group">
+                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="font-bold tracking-widest uppercase text-sm">Cockpit</span>
+                </Link>
+           </>
+       )}
+
        {/* View Controls */}
        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-[60]">
            {/* Teacher Command Toggle */}
@@ -1250,33 +1267,58 @@ export default function SolarSystem() {
                </div>
                
                {/* Action Buttons */}
-               {isCommandMode && controlledShipId ? (
-                   <button 
-                      onClick={() => handleTravel(controlledShipId)}
-                      className="mt-4 w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] animate-pulse"
-                   >
-                      <Radio size={18} />
-                      EXECUTE REMOTE JUMP
-                   </button>
-               ) : userData?.location === selectedPlanet.id ? (
-                   <button 
-                      onClick={() => {
-                          setIsLanded(true);
-                      }}
-                      className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
-                   >
-                      <Flag size={18} />
-                      LAND ON SURFACE
-                   </button>
-               ) : (
-                   <button 
-                      onClick={() => handleTravel()}
-                      className="mt-4 w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors"
-                   >
-                      <Navigation size={18} />
-                      ENGAGE HYPERDRIVE
-                   </button>
-               )}
+               {(() => {
+                   const isAtLocation = (landingSubject?.locationId || landingSubject?.location) === selectedPlanet.id;
+
+                   if (isCommandMode && controlledShipId) {
+                        if (isAtLocation) {
+                             return (
+                               <button 
+                                  onClick={() => setIsLanded(true)}
+                                  className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
+                               >
+                                  <Flag size={18} />
+                                  LAND ON SURFACE (REMOTE)
+                               </button>
+                             );
+                        } else {
+                             return (
+                               <button 
+                                  onClick={() => handleTravel(controlledShipId)}
+                                  className="mt-4 w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] animate-pulse"
+                               >
+                                  <Radio size={18} />
+                                  EXECUTE REMOTE JUMP
+                               </button>
+                             );
+                        }
+                   } 
+                   
+                   // Regular User Checks
+                   if (userData?.location === selectedPlanet.id) {
+                       return (
+                           <button 
+                              onClick={() => {
+                                  setIsLanded(true);
+                              }}
+                              className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
+                           >
+                              <Flag size={18} />
+                              LAND ON SURFACE
+                           </button>
+                       );
+                   }
+
+                   return (
+                       <button 
+                          onClick={() => handleTravel()}
+                          className="mt-4 w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors"
+                       >
+                          <Navigation size={18} />
+                          ENGAGE HYPERDRIVE
+                       </button>
+                   );
+               })()}
             </motion.div>
          )}
        </AnimatePresence>
@@ -1288,7 +1330,7 @@ export default function SolarSystem() {
                     initial={{ x: -300, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: -300, opacity: 0 }}
-                    className="absolute top-0 left-0 bottom-0 w-72 bg-black/90 backdrop-blur-xl border-r border-orange-500/30 z-50 flex flex-col pointer-events-auto"
+                    className="absolute top-0 left-0 bottom-0 w-72 bg-black/90 backdrop-blur-xl border-r border-orange-500/30 z-[150] flex flex-col pointer-events-auto"
                >
                    <div className="p-4 border-b border-orange-500/30 bg-orange-900/10">
                        <h2 className="text-orange-500 font-bold uppercase tracking-widest flex items-center gap-2">
@@ -1358,7 +1400,7 @@ export default function SolarSystem() {
          {awardQueue.length > 0 && (
             <div 
                 key="award-overlay"
-                className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-auto cursor-pointer"
+                className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-auto cursor-pointer"
                 onClick={() => setAwardQueue([])}
             >
                 {/* Visual Backdrop (Dim the map slightly) */}
@@ -1480,7 +1522,7 @@ export default function SolarSystem() {
 
        {/* LANDING VIEW OVERLAY */}
        <AnimatePresence>
-         {isLanded && selectedPlanet && userData && (
+         {isLanded && selectedPlanet && landingSubject && (
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1532,7 +1574,7 @@ export default function SolarSystem() {
                         className="origin-bottom-left"
                      >
                          <div className="transform scale-[3] drop-shadow-2xl">
-                              {userData.flag ? <TinyFlag config={userData.flag} /> : <div className="w-4 h-8 bg-gray-400" />}
+                              {landingSubject.flag ? <TinyFlag config={landingSubject.flag} /> : <div className="w-4 h-8 bg-gray-400" />}
                          </div>
                      </motion.div>
 
@@ -1546,7 +1588,7 @@ export default function SolarSystem() {
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">
                                <div className="w-full h-full relative overflow-visible">
-                                    <UserAvatar userData={userData} className="w-full h-full" />
+                                    <UserAvatar userData={landingSubject} className="w-full h-full" />
                                </div>
                          </div>
                      </motion.div>
@@ -1582,8 +1624,8 @@ export default function SolarSystem() {
                  >
                      <h3 className="text-white/50 uppercase tracking-widest text-xs font-bold mb-4 border-b border-white/10 pb-2">Previous Explorers</h3>
                      <div className="flex flex-wrap gap-2">
-                        {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== userData.uid).length > 0 ? (
-                            ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== userData.uid).map(s => (
+                        {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== (landingSubject.id || landingSubject.uid)).length > 0 ? (
+                            ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== (landingSubject.id || landingSubject.uid)).map(s => (
                                 <div key={s.id} className="relative group cursor-help">
                                     <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black">
                                        <div className={`w-full h-full ${s.avatarColor.replace('text', 'bg').replace('400', '900')}`} />
@@ -1766,6 +1808,8 @@ export default function SolarSystem() {
               </motion.div>
           )}
        </AnimatePresence>
+
+       {userData?.role === 'teacher' && <MapTutorial />}
 
     </div>
   );
