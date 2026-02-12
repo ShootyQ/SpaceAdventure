@@ -3,7 +3,7 @@ import { ArrowLeft, BookOpen, User, Quote, Users, Layers, Zap, Star, Rocket, Shi
 
 export default function AboutPage() {
   return (
-    <div className="flex min-h-screen flex-col font-sans bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60">
+    <div className="landing-theme flex min-h-screen flex-col font-sans bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60">
       
       {/* Navigation */}
       <nav className="w-full border-b border-black/10 bg-white/70 backdrop-blur-md sticky top-0 z-50">

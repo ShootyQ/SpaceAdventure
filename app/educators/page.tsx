@@ -35,7 +35,7 @@ export default function EducatorsPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col font-sans bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60">
+    <div className="landing-theme flex min-h-screen flex-col font-sans bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60">
        <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}

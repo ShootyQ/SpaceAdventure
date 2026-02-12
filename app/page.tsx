@@ -51,7 +51,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60 overflow-x-hidden">
+    <div className="landing-theme flex min-h-screen flex-col bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60 overflow-x-hidden">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -59,8 +59,8 @@ export default function Home() {
       
       {/* Navigation */}
       <nav className="w-full border-b border-black/10 bg-white/70 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-          <Link href="/" className="relative w-80 h-20">
+        <div className="max-w-7xl mx-auto px-6 h-28 flex items-center justify-between">
+          <Link href="/" className="relative w-[32rem] h-24">
             <Image
               src="/images/logos/classcrave logo.png"
               alt="ClassCrave Logo"
@@ -190,30 +190,23 @@ export default function Home() {
               <h2 className="font-heading text-3xl md:text-4xl font-semibold text-slate-900">Pick the path that matches you</h2>
               <p className="text-slate-600 mt-3">Clear entry points for teachers, students, and administrators.</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
-              <Link href="/teacher" className="group bg-white/80 border border-black/10 rounded-3xl p-6 hover:border-emerald-300 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
-                  <GraduationCap className="w-6 h-6" />
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <Link href="/teacher" className="group bg-white/80 border border-black/10 rounded-3xl p-8 hover:border-emerald-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-6">
+                  <GraduationCap className="w-8 h-8" />
                 </div>
-                <h3 className="font-heading text-xl font-semibold text-slate-900">Teachers</h3>
-                <p className="text-sm text-slate-600 mt-2">Set routines, reward progress, and run missions with clarity.</p>
-                <span className="text-sm text-emerald-700 font-semibold mt-4 inline-flex items-center gap-2">Open teacher tools <ArrowRight className="w-4 h-4" /></span>
+                <h3 className="font-heading text-2xl font-semibold text-slate-900">Teacher Portal</h3>
+                <p className="text-base text-slate-600 mt-3 leading-relaxed">Launch your classroom missions. Manage roster, set expectations, and track behavior.</p>
+                <span className="text-sm text-emerald-700 font-bold uppercase tracking-wider mt-6 inline-flex items-center gap-2 group-hover:gap-3 transition-all">Enter Classroom <ArrowRight className="w-4 h-4" /></span>
               </Link>
-              <Link href="/student" className="group bg-white/80 border border-black/10 rounded-3xl p-6 hover:border-emerald-300 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mb-4">
-                  <UserCircle2 className="w-6 h-6" />
+              
+              <Link href="/student" className="group bg-white/80 border border-black/10 rounded-3xl p-8 hover:border-amber-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mb-6">
+                  <UserCircle2 className="w-8 h-8" />
                 </div>
-                <h3 className="font-heading text-xl font-semibold text-slate-900">Students</h3>
-                <p className="text-sm text-slate-600 mt-2">Track goals, earn ranks, and explore game worlds safely.</p>
-                <span className="text-sm text-amber-700 font-semibold mt-4 inline-flex items-center gap-2">Enter student hub <ArrowRight className="w-4 h-4" /></span>
-              </Link>
-              <Link href="/admin" className="group bg-white/80 border border-black/10 rounded-3xl p-6 hover:border-emerald-300 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center mb-4">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <h3 className="font-heading text-xl font-semibold text-slate-900">Admins</h3>
-                <p className="text-sm text-slate-600 mt-2">Support teachers with consistent expectations and reporting.</p>
-                <span className="text-sm text-slate-700 font-semibold mt-4 inline-flex items-center gap-2">View admin space <ArrowRight className="w-4 h-4" /></span>
+                <h3 className="font-heading text-2xl font-semibold text-slate-900">Student Portal</h3>
+                <p className="text-base text-slate-600 mt-3 leading-relaxed">Join the adventure. Check your rank, view your ship, and contribute to the class fleet.</p>
+                <span className="text-sm text-amber-700 font-bold uppercase tracking-wider mt-6 inline-flex items-center gap-2 group-hover:gap-3 transition-all">Launch Mission <ArrowRight className="w-4 h-4" /></span>
               </Link>
             </div>
           </div>

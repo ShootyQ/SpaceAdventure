@@ -1475,14 +1475,17 @@ function SettingsContent() {
                 {/* Header Navigation */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
-                        {view === "cockpit" ? (
+                        {/* Direct Link to Dashboard for Top-Level Modes */}
+                        {["asteroids", "billing", "team", "cockpit"].includes(view) ? (
                             <Link href="/teacher" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                                 <ArrowLeft size={20} />
-                                <span className="sr-only">Exit Cockpit</span>
+                                <span className="sr-only">Return to Dashboard</span>
                             </Link>
                         ) : (
+                            // Internal Navigation for Nested Helper Views (Hangar, Avatar, etc)
                             <button onClick={() => setView(view === "avatar-config" ? "avatar" : "cockpit")} className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
-                                <LayoutDashboard size={20} />
+                                <ArrowLeft size={20} />
+                                <span className="sr-only">Back</span>
                             </button>
                         )}
                         

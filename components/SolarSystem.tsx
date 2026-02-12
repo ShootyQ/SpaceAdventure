@@ -368,6 +368,7 @@ export default function SolarSystem() {
 
                 const shipData: Ship = {
                     id: doc.id,
+                    shipId: data.spaceship?.id || 'finalship',
                     cadetName: data.spaceship?.name || data.displayName || 'Unknown Traveler',
                     locationId: loc,
                     status: data.travelStatus || 'idle',
@@ -892,7 +893,7 @@ export default function SolarSystem() {
                               >
                                   <div className="relative w-full h-full">
                                       <img 
-                                            src={getAssetPath("/images/ships/finalship.png")}
+                                            src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                             alt="Traveling Ship"
                                             className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
@@ -1045,7 +1046,7 @@ export default function SolarSystem() {
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
-                                                    src={getAssetPath("/images/ships/finalship.png")}
+                                                    src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />

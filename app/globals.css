@@ -10,7 +10,16 @@
   --font-heading: serif;
 }
 
+/* Default to Space Theme (Dark) for the app */
 body {
+  color: white;
+  background: #020617; /* slate-950 */
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Landing Page Theme (Beige/Professional) */
+.landing-theme {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
       to bottom,
@@ -18,7 +27,6 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
-  overflow-x: hidden;
   min-height: 100vh;
 }
 

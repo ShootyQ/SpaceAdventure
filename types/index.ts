@@ -104,6 +104,7 @@ export interface UserData {
   
 export interface Ship {
     id: string;
+    shipId?: string; // e.g. "finalship", "fighter-1", etc.
     cadetName: string;
     locationId: string; // Planet ID
     status: "idle" | "traveling";
