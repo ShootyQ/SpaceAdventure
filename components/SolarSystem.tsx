@@ -791,7 +791,7 @@ export default function SolarSystem() {
   const handleWheel = (e: React.WheelEvent) => {
     setIsAutoFit(false);
     const newZoom = zoom - e.deltaY * 0.001;
-    setZoom(Math.min(Math.max(0.05, newZoom), 2));
+        setZoom(Math.min(Math.max(0.05, newZoom), 3.5));
   };
 
   // Pan Handlers
@@ -908,7 +908,7 @@ export default function SolarSystem() {
        
        {/* Solar System Container with Pan & Zoom */}
        <div 
-            className="relative flex items-center justify-center transition-transform duration-75 ease-linear will-change-transform"
+          className="relative flex items-center justify-center transition-transform duration-75 ease-linear"
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         >
           
@@ -960,15 +960,15 @@ export default function SolarSystem() {
                                     style={{ transform: `rotate(${rotationData}deg)` }}
                               />
                           ) : (
-                              <div 
-                                                                className="relative w-48 h-48 flex items-center justify-center"
+                                                            <div 
+                                                                className="relative w-28 h-28 flex items-center justify-center"
                                 style={{ transform: `rotate(${rotationData + 45}deg)` }}
                               >
                                   <div className="relative w-full h-full">
                                       <img 
                                             src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                             alt="Traveling Ship"
-                                            className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
+                                          className="w-full h-full object-contain [image-rendering:crisp-edges] drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
@@ -1114,14 +1114,14 @@ export default function SolarSystem() {
                                         />
                                     ) : (
                                         <div 
-                                            className="relative w-48 h-48 flex items-center justify-center -mb-2"
+                                            className="relative w-28 h-28 flex items-center justify-center -mb-1"
                                             style={{ transform: 'rotate(-45deg)' }}
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
                                                     src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                                     alt="Docked Ship"
-                                                    className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
+                                                    className="w-full h-full object-contain [image-rendering:crisp-edges] drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
                                                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
                                                     <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
@@ -1181,7 +1181,7 @@ export default function SolarSystem() {
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 2)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 3.5)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
                <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, 0.05)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
                <div className="w-full h-px bg-white/20 my-1" />
                <button onClick={() => { setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
