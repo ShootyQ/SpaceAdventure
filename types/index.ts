@@ -58,14 +58,31 @@ export interface MissionProgress {
 }
 
 export interface PracticeAssignmentConfig {
-    templateId: "math-multiplication-1-12";
+    templateId:
+        | "math-addition-within-20"
+        | "math-addition-1-3-digit"
+        | "math-subtraction-1-3-digit"
+        | "math-multiplication-facts"
+        | "math-division-facts"
+        | "math-multi-digit-multiplication"
+        | "math-long-division"
+        | "math-fraction-add-common-denominator"
+        | "math-decimal-operations"
+        | "math-ratios-and-rates"
+        | "math-one-step-equations"
+        | "math-systems-intro";
     subject: "math";
-    gradeLevel: 3 | 4;
+    gradeLevel: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
     questionCount: number;
-    tableMin: number;
-    tableMax: number;
-    multiplicandMin: number;
-    multiplicandMax: number;
+    numberRangeMin?: number;
+    numberRangeMax?: number;
+    tableMin?: number;
+    tableMax?: number;
+    multiplicandMin?: number;
+    multiplicandMax?: number;
+    denominatorMin?: number;
+    denominatorMax?: number;
+    decimalPlaces?: 0 | 1 | 2 | 3;
     attemptPolicy: "once" | "unlimited";
 }
 

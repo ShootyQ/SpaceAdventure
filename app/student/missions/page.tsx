@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -49,26 +49,53 @@ export default function StudentMissions() {
     const [feedback, setFeedback] = useState<{correct: boolean, score: number, newRank?: string} | null>(null);
     const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[]>([]);
     const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
+    const [showFinished, setShowFinished] = useState(false);
 
     const DEFAULT_PRACTICE_CONFIG: PracticeAssignmentConfig = {
-        templateId: 'math-multiplication-1-12',
+        templateId: 'math-multiplication-facts',
         subject: 'math',
         gradeLevel: 3,
         questionCount: 24,
+        numberRangeMin: 1,
+        numberRangeMax: 100,
         tableMin: 1,
         tableMax: 12,
         multiplicandMin: 1,
         multiplicandMax: 12,
+        denominatorMin: 2,
+        denominatorMax: 12,
+        decimalPlaces: 2,
         attemptPolicy: 'once',
     };
 
     const inferPracticeFromLegacy = (mission: Mission) => {
         const title = String(mission.title || '').toLowerCase();
         const desc = String(mission.description || '').toLowerCase();
+        const templateId = String(mission.practiceConfig?.templateId || '');
         const hasPracticeConfig = !!mission.practiceConfig;
         const hasNoQuestions = !Array.isArray(mission.questions) || mission.questions.length === 0;
-        const looksLikeMultiplication = title.includes('multiplication') || desc.includes('multiplication') || title.includes('math');
-        return mission.type === 'practice' || hasPracticeConfig || (hasNoQuestions && looksLikeMultiplication);
+        const looksLikePractice = title.includes('multiplication') || desc.includes('multiplication') || title.includes('math') || title.includes('fraction') || title.includes('decimal');
+        const legacyTemplate = templateId === 'math-multiplication-1-12';
+        return mission.type === 'practice' || hasPracticeConfig || legacyTemplate || (hasNoQuestions && looksLikePractice);
+    };
+
+    const normalizePracticeAnswer = (value: string) => String(value || '').trim().toLowerCase();
+
+    const isPracticeAnswerCorrect = (question: PracticeQuestion, submittedRaw: string) => {
+        const submitted = normalizePracticeAnswer(submittedRaw);
+        if (!submitted) return false;
+
+        const accepted = [question.answer, ...(question.acceptedAnswers || [])].map(normalizePracticeAnswer);
+        if (accepted.includes(submitted)) return true;
+
+        const submittedNumber = Number(submitted);
+        if (Number.isNaN(submittedNumber)) return false;
+
+        return accepted.some((expected) => {
+            const expectedNumber = Number(expected);
+            if (Number.isNaN(expectedNumber)) return false;
+            return Math.abs(expectedNumber - submittedNumber) < 0.001;
+        });
     };
 
     const normalizeText = (value: unknown) => String(value ?? '').trim().toLowerCase();
@@ -117,10 +144,18 @@ export default function StudentMissions() {
                 const missionData = snapshot.docs.map((docSnap) => {
                     const raw = { id: docSnap.id, ...docSnap.data() } as Mission;
                     const inferredPractice = inferPracticeFromLegacy(raw);
+                    const normalizedPracticeConfig = raw.practiceConfig
+                        ? {
+                            ...raw.practiceConfig,
+                            templateId: String(raw.practiceConfig.templateId || '') === 'math-multiplication-1-12'
+                                ? 'math-multiplication-facts'
+                                : raw.practiceConfig.templateId,
+                        }
+                        : undefined;
                     return {
                         ...raw,
                         type: inferredPractice ? 'practice' : (raw.type || 'read'),
-                        practiceConfig: inferredPractice ? (raw.practiceConfig || DEFAULT_PRACTICE_CONFIG) : raw.practiceConfig,
+                        practiceConfig: inferredPractice ? (normalizedPracticeConfig || DEFAULT_PRACTICE_CONFIG) : normalizedPracticeConfig,
                         questions: Array.isArray(raw.questions) ? raw.questions : [],
                     } as Mission;
                 });
@@ -206,8 +241,7 @@ export default function StudentMissions() {
                 totalQuestions = practiceQuestions.length;
                 practiceQuestions.forEach((question) => {
                     const raw = practiceAnswers[question.id];
-                    const numeric = Number(String(raw || '').trim());
-                    if (!Number.isNaN(numeric) && numeric === question.answer) {
+                    if (isPracticeAnswerCorrect(question, String(raw || ''))) {
                         correctCount += 1;
                     }
                 });
@@ -358,6 +392,103 @@ export default function StudentMissions() {
     }
 
     // Active Mission View
+    const missionCards = useMemo(() => {
+        return missions.map((mission) => {
+            const isPracticeMission = inferPracticeFromLegacy(mission);
+            const progress = missionProgress[mission.id];
+            const isCompleted = completedMissions.includes(mission.id);
+            const missionPracticeConfig = mission.practiceConfig || DEFAULT_PRACTICE_CONFIG;
+            const isOneTime = isPracticeMission && missionPracticeConfig.attemptPolicy === 'once';
+            const attemptsUsed = progress?.attempts || 0;
+            const isLocked = isOneTime && attemptsUsed > 0 && !isCompleted;
+
+            return {
+                mission,
+                isPracticeMission,
+                isCompleted,
+                progress,
+                isOneTime,
+                isLocked,
+            };
+        });
+    }, [missions, missionProgress, completedMissions]);
+
+    const oneTimeMissions = missionCards.filter((card) => card.isOneTime && !card.isCompleted);
+    const repeatableMissions = missionCards.filter((card) => !card.isOneTime && !card.isCompleted);
+    const finishedMissions = missionCards.filter((card) => card.isCompleted);
+
+    const renderMissionSection = (
+        title: string,
+        items: typeof missionCards,
+        emptyText: string,
+        showTitle = true,
+    ) => (
+        <section className="mb-10">
+            {showTitle && <h2 className="text-xl font-bold text-white mb-4 tracking-wide">{title}</h2>}
+            {items.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-cyan-900/50 p-5 text-sm text-cyan-700">{emptyText}</div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {items.map(({ mission, isPracticeMission, isCompleted, progress, isLocked }) => {
+                        const isUnavailable = isLocked;
+                        return (
+                            <div
+                                key={mission.id}
+                                onClick={() => {
+                                    if (!isUnavailable) handleStartMission(mission);
+                                }}
+                                className={`
+                                    relative group p-6 rounded-xl border transition-all overflow-hidden
+                                    ${isUnavailable
+                                        ? 'bg-gray-900/30 border-gray-700/40 opacity-60 cursor-not-allowed'
+                                        : isCompleted
+                                            ? 'bg-green-950/10 border-green-500/30 hover:border-green-500 cursor-pointer'
+                                            : 'bg-black/60 border-cyan-900/50 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] cursor-pointer'}
+                                `}
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className={`p-3 rounded-lg ${mission.type === 'watch' && !isPracticeMission ? 'bg-purple-900/20 text-purple-400' : isPracticeMission ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
+                                        {mission.type === 'watch' && !isPracticeMission ? <Video size={24} /> : isPracticeMission ? <Brain size={24} /> : <BookOpen size={24} />}
+                                    </div>
+                                    {isCompleted ? (
+                                        <span className="flex items-center gap-1 text-green-400 font-bold bg-green-900/20 px-3 py-1 rounded-full border border-green-500/30 text-xs uppercase">
+                                            <CheckCircle size={14} /> Finished
+                                        </span>
+                                    ) : isUnavailable ? (
+                                        <span className="flex items-center gap-1 text-gray-300 font-bold bg-gray-800/60 px-3 py-1 rounded-full border border-gray-600/40 text-xs uppercase">
+                                            Attempt Used
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-500/30 text-xs uppercase">
+                                            <Trophy size={14} /> {mission.xpReward} XP
+                                        </span>
+                                    )}
+                                </div>
+
+                                <h3 className="text-xl font-bold text-white mb-2 line-clamp-1 group-hover:text-cyan-300 transition-colors">
+                                    {mission.title}
+                                </h3>
+                                <p className="text-sm text-gray-400 line-clamp-2 mb-4">{mission.description}</p>
+
+                                {!!progress && (
+                                    <div className="text-xs text-cyan-500 mb-3">
+                                        Attempts: {progress.attempts || 0}
+                                        {typeof progress.lastScore === 'number' ? ` • Last score: ${progress.lastScore}%` : ''}
+                                    </div>
+                                )}
+
+                                <div className="text-xs text-cyan-700 font-bold uppercase tracking-wider flex items-center gap-2">
+                                    {isCompleted ? 'Review Data' : isUnavailable ? 'Unavailable' : 'Click to Initiate'}
+                                    {!isUnavailable && <ArrowLeft className="rotate-180" size={12} />}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </section>
+    );
+
     if (activeMission) {
         const isPracticeMission = inferPracticeFromLegacy(activeMission);
         const isCompleted = completedMissions.includes(activeMission.id);
@@ -434,8 +565,8 @@ export default function StudentMissions() {
                                                 {question.prompt}
                                             </p>
                                             <input
-                                                type="number"
-                                                inputMode="numeric"
+                                                type={question.inputMode === 'text' ? 'text' : 'number'}
+                                                inputMode={question.inputMode === 'text' ? 'text' : 'numeric'}
                                                 value={practiceAnswers[question.id] || ''}
                                                 onChange={(e) => handlePracticeAnswerChange(question.id, e.target.value)}
                                                 className="w-full max-w-xs rounded-lg bg-black/30 border border-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -601,64 +732,26 @@ export default function StudentMissions() {
                      </Link>
                      <div>
                          <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Mission Log</h1>
-                         <p className="text-cyan-600">Active Directives & Available Contracts</p>
+                         <p className="text-cyan-600">One-Time, Repeatable, and Finished Assignments</p>
                      </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {missions.map(mission => {
-                        const isPracticeMission = inferPracticeFromLegacy(mission);
-                        const isCompleted = completedMissions.includes(mission.id);
-                        const progress = missionProgress[mission.id];
-                        const missionPracticeConfig = mission.practiceConfig || DEFAULT_PRACTICE_CONFIG;
-                        const isPracticeOnceLocked = isPracticeMission && missionPracticeConfig.attemptPolicy === 'once' && (progress?.attempts || 0) > 0;
-                        return (
-                            <div 
-                                key={mission.id} 
-                                onClick={() => handleStartMission(mission)}
-                                className={`
-                                    relative group p-6 rounded-xl border transition-all cursor-pointer overflow-hidden
-                                    ${isCompleted 
-                                        ? 'bg-green-950/10 border-green-500/30 hover:border-green-500' 
-                                        : 'bg-black/60 border-cyan-900/50 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]'}
-                                `}
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                                 <div className={`p-3 rounded-lg ${mission.type === 'watch' && !isPracticeMission ? 'bg-purple-900/20 text-purple-400' : isPracticeMission ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
-                                                     {mission.type === 'watch' && !isPracticeMission ? <Video size={24} /> : isPracticeMission ? <Brain size={24} /> : <BookOpen size={24} />}
-                                     </div>
-                                     {isCompleted ? (
-                                         <span className="flex items-center gap-1 text-green-400 font-bold bg-green-900/20 px-3 py-1 rounded-full border border-green-500/30 text-xs uppercase">
-                                             <CheckCircle size={14} /> Completed
-                                         </span>
-                                     ) : (
-                                         <span className="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-500/30 text-xs uppercase">
-                                             <Trophy size={14} /> {mission.xpReward} XP
-                                         </span>
-                                     )}
-                                </div>
+                {renderMissionSection('One-Time Only', oneTimeMissions, 'No one-time assignments available right now.')}
+                {renderMissionSection('Repeatable', repeatableMissions, 'No repeatable assignments available right now.')}
 
-                                <h3 className="text-xl font-bold text-white mb-2 line-clamp-1 group-hover:text-cyan-300 transition-colors">
-                                    {mission.title}
-                                </h3>
-                                <p className="text-sm text-gray-400 line-clamp-2 mb-4">{mission.description}</p>
-
-                                {(progress || isPracticeOnceLocked) && (
-                                    <div className="text-xs text-cyan-500 mb-3">
-                                        Attempts: {progress?.attempts || 0}
-                                        {typeof progress?.lastScore === 'number' ? ` • Last score: ${progress.lastScore}%` : ''}
-                                        {isPracticeOnceLocked ? ' • One-attempt assignment already used' : ''}
-                                    </div>
-                                )}
-                                
-                                <div className="text-xs text-cyan-700 font-bold uppercase tracking-wider flex items-center gap-2">
-                                    {isCompleted ? 'Review Data' : 'Click to Initiate'}
-                                    <ArrowLeft className="rotate-180" size={12} />
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-white tracking-wide">Finished</h2>
+                        <button
+                            type="button"
+                            onClick={() => setShowFinished((prev) => !prev)}
+                            className="text-xs uppercase tracking-wider font-bold text-cyan-400 hover:text-white"
+                        >
+                            {showFinished ? 'Hide Finished' : `Show Finished (${finishedMissions.length})`}
+                        </button>
+                    </div>
+                    {showFinished && renderMissionSection('Finished', finishedMissions, 'No finished assignments yet.', false)}
+                </section>
              </div>
         </div>
     );

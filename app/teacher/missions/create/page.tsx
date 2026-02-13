@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, Video, BookOpen, GripVertical, Loader2 } from "lucide-react";
-import { PracticeAssignmentConfig } from "@/lib/practice";
+import { GradeLevel, PracticeAssignmentConfig, PracticeTemplateId, getPracticeTemplatesForGrade } from "@/lib/practice";
 
 type QuestionType = 'mc' | 'tf' | 'sort';
 type MissionContentType = 'read' | 'watch' | 'practice';
@@ -35,16 +35,38 @@ export default function CreateMissionPage() {
     const [contentUrl, setContentUrl] = useState("");
     const [contentText, setContentText] = useState("");
     const [practiceConfig, setPracticeConfig] = useState<PracticeAssignmentConfig>({
-        templateId: 'math-multiplication-1-12',
+        templateId: 'math-multiplication-facts',
         subject: 'math',
         gradeLevel: 3,
         questionCount: 24,
+        numberRangeMin: 1,
+        numberRangeMax: 100,
         tableMin: 1,
         tableMax: 12,
         multiplicandMin: 1,
         multiplicandMax: 12,
+        denominatorMin: 2,
+        denominatorMax: 12,
+        decimalPlaces: 2,
         attemptPolicy: 'once',
     });
+    const [gradeFilter, setGradeFilter] = useState<GradeLevel | 'all'>('all');
+    const allPracticeTemplates = useMemo(() => getPracticeTemplatesForGrade('all'), []);
+    const selectedTemplate = useMemo(
+        () => allPracticeTemplates.find((template) => template.id === practiceConfig.templateId),
+        [allPracticeTemplates, practiceConfig.templateId]
+    );
+
+    const filteredTemplates = useMemo(() => getPracticeTemplatesForGrade(gradeFilter), [gradeFilter]);
+
+    useEffect(() => {
+        if (!filteredTemplates.some((tpl) => tpl.id === practiceConfig.templateId)) {
+            const fallbackId = filteredTemplates[0]?.id;
+            if (fallbackId) {
+                setPracticeConfig((prev) => ({ ...prev, templateId: fallbackId }));
+            }
+        }
+    }, [filteredTemplates, practiceConfig.templateId]);
 
     // Questions State
     const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
@@ -172,10 +194,18 @@ export default function CreateMissionPage() {
                 setContentUrl(data.contentUrl || '');
                 setContentText(data.contentText || '');
                 if (data.practiceConfig) {
+                    const legacyTemplate = data.practiceConfig.templateId === 'math-multiplication-1-12'
+                        ? 'math-multiplication-facts'
+                        : data.practiceConfig.templateId;
                     setPracticeConfig((prev) => ({
                         ...prev,
                         ...data.practiceConfig,
+                        templateId: legacyTemplate,
                     }));
+                    const configGrade = Number(data.practiceConfig.gradeLevel || 0);
+                    if (configGrade >= 1 && configGrade <= 8) {
+                        setGradeFilter(configGrade as GradeLevel);
+                    }
                 }
 
                 const loadedQuestions: BuilderQuestion[] = (data.questions || []).map((q: any, idx: number) => {
@@ -398,18 +428,65 @@ export default function CreateMissionPage() {
                                 <div className="grid gap-6">
                                     <div className="rounded-lg border border-cyan-800/50 bg-cyan-950/20 p-4">
                                         <h3 className="text-white font-bold mb-1">Practice Drill Setup</h3>
-                                        <p className="text-sm text-cyan-500">Auto-generated math problems (no manual question writing).</p>
+                                        <p className="text-sm text-cyan-500">Auto-generated math problems by grade and skill.</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-6">
                                         <div>
-                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Grade Level</label>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Grade Filter</label>
                                             <select
-                                                value={practiceConfig.gradeLevel}
-                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, gradeLevel: Number(e.target.value) as 3 | 4 })}
+                                                value={gradeFilter}
+                                                onChange={(e) => {
+                                                    const next = e.target.value === 'all' ? 'all' : Number(e.target.value) as GradeLevel;
+                                                    setGradeFilter(next);
+                                                }}
                                                 className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                             >
+                                                <option value="all">All Grades</option>
+                                                <option value={1}>1st Grade</option>
+                                                <option value={2}>2nd Grade</option>
                                                 <option value={3}>3rd Grade</option>
                                                 <option value={4}>4th Grade</option>
+                                                <option value={5}>5th Grade</option>
+                                                <option value={6}>6th Grade</option>
+                                                <option value={7}>7th Grade</option>
+                                                <option value={8}>8th Grade</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Skill Template</label>
+                                            <select
+                                                value={practiceConfig.templateId}
+                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, templateId: e.target.value as PracticeTemplateId })}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            >
+                                                {filteredTemplates.map((template) => (
+                                                    <option key={template.id} value={template.id}>{template.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-cyan-900/60 bg-black/30 p-4">
+                                        <p className="text-sm text-cyan-300 font-semibold">{selectedTemplate?.name || 'Template'}</p>
+                                        <p className="text-xs text-cyan-600 mt-1">{selectedTemplate?.description || ''}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Assignment Grade</label>
+                                            <select
+                                                value={practiceConfig.gradeLevel}
+                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, gradeLevel: Number(e.target.value) as GradeLevel })}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            >
+                                                <option value={1}>1st Grade</option>
+                                                <option value={2}>2nd Grade</option>
+                                                <option value={3}>3rd Grade</option>
+                                                <option value={4}>4th Grade</option>
+                                                <option value={5}>5th Grade</option>
+                                                <option value={6}>6th Grade</option>
+                                                <option value={7}>7th Grade</option>
+                                                <option value={8}>8th Grade</option>
                                             </select>
                                         </div>
                                         <div>
@@ -425,39 +502,126 @@ export default function CreateMissionPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-6">
+                                    {(practiceConfig.templateId === 'math-addition-1-3-digit'
+                                        || practiceConfig.templateId === 'math-subtraction-1-3-digit'
+                                        || practiceConfig.templateId === 'math-multi-digit-multiplication'
+                                        || practiceConfig.templateId === 'math-decimal-operations') && (
                                         <div>
-                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Table Range</label>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Number Range</label>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <input
                                                     type="number"
-                                                    min={1}
-                                                    max={12}
-                                                    value={practiceConfig.tableMin}
-                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMin: Number(e.target.value) || 1 })}
+                                                    value={practiceConfig.numberRangeMin ?? 1}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, numberRangeMin: Number(e.target.value) || 1 })}
                                                     className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                 />
                                                 <input
                                                     type="number"
-                                                    min={1}
-                                                    max={12}
-                                                    value={practiceConfig.tableMax}
-                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMax: Number(e.target.value) || 12 })}
+                                                    value={practiceConfig.numberRangeMax ?? 100}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, numberRangeMax: Number(e.target.value) || 100 })}
                                                     className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                 />
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Attempt Limit</label>
-                                            <select
-                                                value={practiceConfig.attemptPolicy}
-                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, attemptPolicy: e.target.value as 'once' | 'unlimited' })}
-                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
-                                            >
-                                                <option value="once">One Attempt</option>
-                                                <option value="unlimited">Unlimited Attempts</option>
-                                            </select>
+                                    )}
+
+                                    {(practiceConfig.templateId === 'math-multiplication-facts'
+                                        || practiceConfig.templateId === 'math-division-facts') && (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Table Range</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={20}
+                                                        value={practiceConfig.tableMin ?? 1}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMin: Number(e.target.value) || 1 })}
+                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={20}
+                                                        value={practiceConfig.tableMax ?? 12}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMax: Number(e.target.value) || 12 })}
+                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Second Factor/Quotient Range</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={99}
+                                                        value={practiceConfig.multiplicandMin ?? 1}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, multiplicandMin: Number(e.target.value) || 1 })}
+                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={99}
+                                                        value={practiceConfig.multiplicandMax ?? 12}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, multiplicandMax: Number(e.target.value) || 12 })}
+                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
+                                    )}
+
+                                    {practiceConfig.templateId === 'math-fraction-add-common-denominator' && (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Denominator Range</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="number"
+                                                        min={2}
+                                                        max={20}
+                                                        value={practiceConfig.denominatorMin ?? 2}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, denominatorMin: Number(e.target.value) || 2 })}
+                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={2}
+                                                        max={20}
+                                                        value={practiceConfig.denominatorMax ?? 12}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, denominatorMax: Number(e.target.value) || 12 })}
+                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Decimal Precision</label>
+                                                <select
+                                                    value={practiceConfig.decimalPlaces ?? 2}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, decimalPlaces: Number(e.target.value) as 0 | 1 | 2 | 3 })}
+                                                    className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                >
+                                                    <option value={0}>0 places</option>
+                                                    <option value={1}>1 place</option>
+                                                    <option value={2}>2 places</option>
+                                                    <option value={3}>3 places</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Attempt Limit</label>
+                                        <select
+                                            value={practiceConfig.attemptPolicy}
+                                            onChange={(e) => setPracticeConfig({ ...practiceConfig, attemptPolicy: e.target.value as 'once' | 'unlimited' })}
+                                            className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                        >
+                                            <option value="once">One Attempt</option>
+                                            <option value="unlimited">Unlimited Attempts</option>
+                                        </select>
                                     </div>
                                 </div>
                             )}
