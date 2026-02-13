@@ -93,6 +93,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
+    const [planetVisitors, setPlanetVisitors] = useState<Ship[]>([]);
     const [zoom, setZoom] = useState(studentView ? 0.16 : 0.25); // Keep student view readable by default
     const [isAutoFit, setIsAutoFit] = useState(!studentView); // Personal map starts at manual zoom
   const [isLanded, setIsLanded] = useState(false); // New Landing State
@@ -480,6 +481,51 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         return () => unsubscribe();
     }, [userData, isStudentPersonalView]);
 
+  // On-demand visitors feed for selected planet in student personal view (lightweight class read)
+  useEffect(() => {
+    if (!isStudentPersonalView || !userData?.teacherId || !selectedPlanet) {
+        setPlanetVisitors([]);
+        return;
+    }
+
+    const q = query(
+        collection(db, "users"),
+        where("teacherId", "==", userData.teacherId),
+        where("visitedPlanets", "array-contains", selectedPlanet.id)
+    );
+
+    const unsub = onSnapshot(q, {
+        next: (snapshot) => {
+            const visitors: Ship[] = snapshot.docs.map((snap) => {
+                const data: any = snap.data();
+                const loc = data.location || 'earth';
+                return {
+                    id: snap.id,
+                    shipId: data.spaceship?.id || 'finalship',
+                    cadetName: truncateName(data.spaceship?.name || data.displayName || 'Unknown Traveler'),
+                    locationId: loc,
+                    status: data.travelStatus || 'idle',
+                    destinationId: data.destinationId,
+                    travelStart: data.travelStart,
+                    travelEnd: data.travelEnd,
+                    avatarColor: data.spaceship?.color || 'text-cyan-400',
+                    avatar: data.avatar,
+                    role: data.role,
+                    xp: data.xp || 0,
+                    lastXpReason: data.lastXpReason,
+                    flag: data.flag,
+                    visitedPlanets: data.visitedPlanets || [],
+                    planetXP: data.planetXP || {}
+                } as Ship;
+            });
+            setPlanetVisitors(visitors);
+        },
+        error: () => setPlanetVisitors([])
+    });
+
+    return () => unsub();
+  }, [isStudentPersonalView, selectedPlanet, userData]);
+
 
     const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
     const dynamicPlanetsRef = useRef<Map<string, any>>(new Map());
@@ -779,11 +825,35 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [isAsteroidDestroyed, asteroidEvent?.active, userData]);
 
   // Handle mouse wheel zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    setIsAutoFit(false);
-    const newZoom = zoom - e.deltaY * 0.001;
-      setZoom(Math.min(Math.max(MIN_MAP_ZOOM, newZoom), MAX_MAP_ZOOM));
-  };
+    const handleWheel = (e: React.WheelEvent) => {
+        e.preventDefault();
+        setIsAutoFit(false);
+
+        const viewport = containerRef.current;
+        if (!viewport) {
+                const fallbackZoom = zoom - e.deltaY * 0.001;
+                setZoom(Math.min(Math.max(MIN_MAP_ZOOM, fallbackZoom), MAX_MAP_ZOOM));
+                return;
+        }
+
+        const rect = viewport.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const clampedNewZoom = Math.min(Math.max(MIN_MAP_ZOOM, zoom - e.deltaY * 0.001), MAX_MAP_ZOOM);
+        if (clampedNewZoom === zoom) return;
+
+        const worldX = (pointerX - centerX - pan.x) / zoom;
+        const worldY = (pointerY - centerY - pan.y) / zoom;
+
+        const nextPanX = pointerX - centerX - worldX * clampedNewZoom;
+        const nextPanY = pointerY - centerY - worldY * clampedNewZoom;
+
+        setPan({ x: nextPanX, y: nextPanY });
+        setZoom(clampedNewZoom);
+    };
 
   // Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -820,6 +890,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, []);
 
   const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+    const visitorsForSelectedPlanet = selectedPlanet
+        ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
+        : [];
 
   const getSubjectLocationId = (subject: unknown): string | undefined => {
       if (!subject || typeof subject !== 'object') return undefined;
@@ -879,6 +952,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   return (
     <div 
+        ref={containerRef}
         className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -890,7 +964,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
        <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
 
        {/* Class Name HUD */}
-       <div className={`absolute ${userData?.role === 'teacher' ? 'top-6 left-44' : 'top-6 left-6'} z-40 pointer-events-none`}>
+    <div className={`absolute ${userData?.role === 'teacher' ? 'top-6 left-44' : (isStudentPersonalView ? 'top-20 left-6' : 'top-6 left-6')} z-40 pointer-events-none`}>
            <div className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-bold mb-1">Sector Control</div>
            <div className="text-xl md:text-3xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
                {className || "Deep Space Network"}
@@ -1352,10 +1426,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                   <div className="mt-6">
                       <div className="text-xs uppercase tracking-widest text-gray-500 mb-2">Colony Flags Planted</div>
                       <div className="flex flex-wrap gap-2">
-                          {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id)).length === 0 ? (
+                          {visitorsForSelectedPlanet.length === 0 ? (
                              <p className="text-gray-600 italic text-xs">No landings recorded.</p>
                           ) : (
-                             ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id)).map(ship => (
+                             visitorsForSelectedPlanet.map(ship => (
                                  <div key={ship.id} title={`${ship.cadetName} was here`} className="relative group/flag">
                                      {ship.flag ? (
                                          <div className="scale-75"><TinyFlag config={ship.flag} /></div>
@@ -1366,6 +1440,18 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                              ))
                           )}
                       </div>
+                      {visitorsForSelectedPlanet.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                            {visitorsForSelectedPlanet.map((visitor) => (
+                                <div key={`visitor-${visitor.id}`} className="flex items-center gap-2 text-xs text-gray-300">
+                                    <div className="w-4 h-4 rounded-full border border-white/20 overflow-hidden">
+                                        <UserAvatar userData={visitor as any} className="w-full h-full" />
+                                    </div>
+                                    <span className="truncate">{visitor.cadetName}</span>
+                                </div>
+                            ))}
+                        </div>
+                      )}
                   </div>
                </div>
                
@@ -1726,8 +1812,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                      >
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">
-                               <div className="w-full h-full relative overflow-visible">
-                                    <UserAvatar userData={landingSubject} className="w-full h-full" />
+                         <div className="w-full h-full relative overflow-visible">
+                             <UserAvatar userData={landingSubject} transparentBg className="w-full h-full rounded-full" />
                                </div>
                          </div>
                      </motion.div>
@@ -1763,11 +1849,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                  >
                      <h3 className="text-white/50 uppercase tracking-widest text-xs font-bold mb-4 border-b border-white/10 pb-2">Previous Explorers</h3>
                      <div className="flex flex-wrap gap-2">
-                        {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== getSubjectUserId(landingSubject)).length > 0 ? (
-                            ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== getSubjectUserId(landingSubject)).map(s => (
+                        {visitorsForSelectedPlanet.filter(s => s.id !== getSubjectUserId(landingSubject)).length > 0 ? (
+                            visitorsForSelectedPlanet.filter(s => s.id !== getSubjectUserId(landingSubject)).map(s => (
                                 <div key={s.id} className="relative group cursor-help">
-                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black">
-                                       <div className={`w-full h-full ${s.avatarColor.replace('text', 'bg').replace('400', '900')}`} />
+                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black flex items-center justify-center">
+                                       {s.flag ? (
+                                           <div className="scale-[0.55]"><TinyFlag config={s.flag} /></div>
+                                       ) : (
+                                           <UserAvatar userData={s as any} className="w-full h-full" />
+                                       )}
                                     </div>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-[10px] rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
                                         {s.cadetName}

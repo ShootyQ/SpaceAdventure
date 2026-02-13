@@ -3,7 +3,6 @@
 on:
   push:
     branches: ["main", "dev"]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,7 +10,7 @@ permissions:
 
 jobs:
   deploy-live:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,7 +37,7 @@ jobs:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
 
   deploy-dev-preview:
-    if: github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -85,7 +85,8 @@ export default function CreateMissionPage() {
                     correctAnswerIndex: existingIndex >= 0 ? existingIndex : null
                 };
             }
-            return { ...q, type: nextType, options: currentOptions, correctAnswer: '', correctAnswerIndex: null };
+            const sortOptions = q.type === 'tf' ? ['', '', '', ''] : ensureMinOptions(currentOptions, 4);
+            return { ...q, type: nextType, options: sortOptions, correctAnswer: '', correctAnswerIndex: null };
         }));
     };
 
@@ -488,8 +489,23 @@ export default function CreateMissionPage() {
                                                             className="flex-grow bg-black/30 border border-cyan-800/50 rounded p-2 text-sm text-gray-300 focus:border-cyan-500 outline-none"
                                                             placeholder={`Item ${i + 1}`}
                                                         />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeOption(q.id, i)}
+                                                            className="text-red-400 hover:text-red-300"
+                                                            title="Remove item"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addOption(q.id)}
+                                                    className="mt-2 text-xs uppercase tracking-wider text-cyan-400 hover:text-white font-bold"
+                                                >
+                                                    + Add Item
+                                                </button>
                                             </div>
                                         )}
                                     </div>

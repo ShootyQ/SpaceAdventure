@@ -82,6 +82,7 @@ interface UserAvatarProps {
     bgLight?: number;
     hat?: string;
     avatarId?: string;
+    transparentBg?: boolean;
     className?: string;
 }
 
@@ -94,6 +95,7 @@ export const UserAvatar = ({
     bgLight, 
     hat, 
     avatarId,
+    transparentBg = false,
     className = "" 
 }: UserAvatarProps) => {
     // Determine values: prefers direct props if provided (overriding userData), 
@@ -118,7 +120,7 @@ export const UserAvatar = ({
     const hatStyle = hatOption?.style || "scale-100";
     
     return (
-       <div className={`relative ${className}`} style={{ backgroundColor: `hsl(${finalBgHue}, ${finalBgSat}%, ${finalBgLight}%)` }}>
+         <div className={`relative ${className}`} style={{ backgroundColor: transparentBg ? 'transparent' : `hsl(${finalBgHue}, ${finalBgSat}%, ${finalBgLight}%)` }}>
             <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${finalSkinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath(avatarSrc)})`, WebkitMaskImage: `url(${getAssetPath(avatarSrc)})`, maskSize: 'cover' }} />
             <img src={getAssetPath(avatarSrc)} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${finalHue}deg)` }} />
             {hatSrc && (
