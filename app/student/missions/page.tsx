@@ -50,6 +50,27 @@ export default function StudentMissions() {
     const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[]>([]);
     const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
 
+    const DEFAULT_PRACTICE_CONFIG: PracticeAssignmentConfig = {
+        templateId: 'math-multiplication-1-12',
+        subject: 'math',
+        gradeLevel: 3,
+        questionCount: 24,
+        tableMin: 1,
+        tableMax: 12,
+        multiplicandMin: 1,
+        multiplicandMax: 12,
+        attemptPolicy: 'once',
+    };
+
+    const inferPracticeFromLegacy = (mission: Mission) => {
+        const title = String(mission.title || '').toLowerCase();
+        const desc = String(mission.description || '').toLowerCase();
+        const hasPracticeConfig = !!mission.practiceConfig;
+        const hasNoQuestions = !Array.isArray(mission.questions) || mission.questions.length === 0;
+        const looksLikeMultiplication = title.includes('multiplication') || desc.includes('multiplication') || title.includes('math');
+        return mission.type === 'practice' || hasPracticeConfig || (hasNoQuestions && looksLikeMultiplication);
+    };
+
     const normalizeText = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
     const shuffleOptions = (values: string[]) => {
@@ -93,7 +114,16 @@ export default function StudentMissions() {
                 }
 
                 const snapshot = await getDocs(q);
-                const missionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
+                const missionData = snapshot.docs.map((docSnap) => {
+                    const raw = { id: docSnap.id, ...docSnap.data() } as Mission;
+                    const inferredPractice = inferPracticeFromLegacy(raw);
+                    return {
+                        ...raw,
+                        type: inferredPractice ? 'practice' : (raw.type || 'read'),
+                        practiceConfig: inferredPractice ? (raw.practiceConfig || DEFAULT_PRACTICE_CONFIG) : raw.practiceConfig,
+                        questions: Array.isArray(raw.questions) ? raw.questions : [],
+                    } as Mission;
+                });
                 setMissions(missionData);
 
                 // Get fresh user progress (context can be stale)
@@ -112,8 +142,10 @@ export default function StudentMissions() {
     }, [user, userData]);
 
     const handleStartMission = (mission: Mission) => {
+        const isPracticeMission = inferPracticeFromLegacy(mission);
+        const practiceConfig = mission.practiceConfig || DEFAULT_PRACTICE_CONFIG;
         const missionState = missionProgress[mission.id];
-        if (mission.type === 'practice' && mission.practiceConfig?.attemptPolicy === 'once' && (missionState?.attempts || 0) > 0) {
+        if (isPracticeMission && practiceConfig.attemptPolicy === 'once' && (missionState?.attempts || 0) > 0) {
             alert("This assignment is set to one attempt.");
             return;
         }
@@ -127,9 +159,9 @@ export default function StudentMissions() {
             }
         });
         setAnswers(initialAnswers);
-        if (mission.type === 'practice' && mission.practiceConfig) {
+        if (isPracticeMission) {
             const seed = `${user?.uid || 'cadet'}:${mission.id}:${Date.now()}`;
-            const generated = createPracticeQuestions(mission.practiceConfig, seed);
+            const generated = createPracticeQuestions(practiceConfig, seed);
             setPracticeQuestions(generated);
             setPracticeAnswers({});
         } else {
@@ -165,11 +197,12 @@ export default function StudentMissions() {
         setSubmitting(true);
 
         try {
+            const isPracticeMission = inferPracticeFromLegacy(activeMission);
             // Grading
             let correctCount = 0;
             let totalQuestions = 0;
 
-            if (activeMission.type === 'practice') {
+            if (isPracticeMission) {
                 totalQuestions = practiceQuestions.length;
                 practiceQuestions.forEach((question) => {
                     const raw = practiceAnswers[question.id];
@@ -326,6 +359,7 @@ export default function StudentMissions() {
 
     // Active Mission View
     if (activeMission) {
+        const isPracticeMission = inferPracticeFromLegacy(activeMission);
         const isCompleted = completedMissions.includes(activeMission.id);
 
         return (
@@ -344,8 +378,8 @@ export default function StudentMissions() {
                         <div className="p-8 border-b border-cyan-900/50 bg-gradient-to-r from-cyan-950/50 to-transparent">
                             <div className="flex justify-between items-start mb-4">
                                 <span className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 text-cyan-300 rounded text-xs font-bold uppercase tracking-wider border border-cyan-500/20">
-                                    {activeMission.type === 'watch' ? <Video size={14} /> : activeMission.type === 'practice' ? <Brain size={14} /> : <BookOpen size={14} />}
-                                    {activeMission.type === 'watch' ? 'Video Log' : activeMission.type === 'practice' ? 'Math Practice' : 'Intel Report'}
+                                    {activeMission.type === 'watch' && !isPracticeMission ? <Video size={14} /> : isPracticeMission ? <Brain size={14} /> : <BookOpen size={14} />}
+                                    {activeMission.type === 'watch' && !isPracticeMission ? 'Video Log' : isPracticeMission ? 'Math Practice' : 'Intel Report'}
                                 </span>
                                 <div className="flex items-center gap-2 text-yellow-400 font-bold">
                                     <Trophy size={18} />
@@ -377,7 +411,7 @@ export default function StudentMissions() {
                                 </div>
                             )}
 
-                            {activeMission.type === 'practice' && (
+                            {isPracticeMission && (
                                 <div className="mb-8 p-5 rounded-xl border border-cyan-900/30 bg-cyan-950/20">
                                     <p className="text-cyan-200/90 text-sm md:text-base">
                                         Solve each multiplication problem. You need 70% or higher to pass.
@@ -389,11 +423,11 @@ export default function StudentMissions() {
                             <div className="mt-12">
                                 <h3 className="flex items-center gap-2 text-xl font-bold text-white mb-6 pb-2 border-b border-cyan-900">
                                     <Brain className="text-purple-400" />
-                                    {activeMission.type === 'practice' ? 'Practice Drill' : 'Knowledge Check'}
+                                    {isPracticeMission ? 'Practice Drill' : 'Knowledge Check'}
                                 </h3>
 
                                 <div className="space-y-8">
-                                    {activeMission.type === 'practice' ? practiceQuestions.map((question, idx) => (
+                                    {isPracticeMission ? practiceQuestions.map((question, idx) => (
                                         <div key={question.id} className="p-6 bg-black/40 rounded-xl border border-cyan-900/30">
                                             <p className="font-bold text-white mb-4 text-lg">
                                                 <span className="text-cyan-600 mr-2">{idx + 1}.</span>
@@ -523,7 +557,7 @@ export default function StudentMissions() {
                             {!feedback && (
                                 <button 
                                     onClick={submitMission}
-                                    disabled={submitting || (activeMission.type === 'practice'
+                                    disabled={submitting || (isPracticeMission
                                         ? practiceQuestions.length === 0 || practiceQuestions.some((question) => !String(practiceAnswers[question.id] || '').trim())
                                         : activeMission.questions.some((q) => {
                                             const value = answers[q.id];
@@ -534,7 +568,7 @@ export default function StudentMissions() {
                                         }))}
                                     className={`
                                         w-full mt-8 py-4 rounded-xl font-bold text-xl uppercase tracking-widest transition-all
-                                        ${(activeMission.type === 'practice'
+                                        ${(isPracticeMission
                                             ? practiceQuestions.length === 0 || practiceQuestions.some((question) => !String(practiceAnswers[question.id] || '').trim())
                                             : activeMission.questions.some((q) => {
                                                 const value = answers[q.id];
@@ -573,9 +607,11 @@ export default function StudentMissions() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {missions.map(mission => {
+                        const isPracticeMission = inferPracticeFromLegacy(mission);
                         const isCompleted = completedMissions.includes(mission.id);
                         const progress = missionProgress[mission.id];
-                        const isPracticeOnceLocked = mission.type === 'practice' && mission.practiceConfig?.attemptPolicy === 'once' && (progress?.attempts || 0) > 0;
+                        const missionPracticeConfig = mission.practiceConfig || DEFAULT_PRACTICE_CONFIG;
+                        const isPracticeOnceLocked = isPracticeMission && missionPracticeConfig.attemptPolicy === 'once' && (progress?.attempts || 0) > 0;
                         return (
                             <div 
                                 key={mission.id} 
@@ -588,8 +624,8 @@ export default function StudentMissions() {
                                 `}
                             >
                                 <div className="flex justify-between items-start mb-4">
-                                     <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : mission.type === 'practice' ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
-                                        {mission.type === 'watch' ? <Video size={24} /> : mission.type === 'practice' ? <Brain size={24} /> : <BookOpen size={24} />}
+                                                 <div className={`p-3 rounded-lg ${mission.type === 'watch' && !isPracticeMission ? 'bg-purple-900/20 text-purple-400' : isPracticeMission ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
+                                                     {mission.type === 'watch' && !isPracticeMission ? <Video size={24} /> : isPracticeMission ? <Brain size={24} /> : <BookOpen size={24} />}
                                      </div>
                                      {isCompleted ? (
                                          <span className="flex items-center gap-1 text-green-400 font-bold bg-green-900/20 px-3 py-1 rounded-full border border-green-500/30 text-xs uppercase">
