@@ -38,6 +38,9 @@ const DEFAULT_RANKS: Rank[] = [
 
 const DUMMY_SHIPS: Ship[] = [];
 
+const MIN_MAP_ZOOM = 0.05;
+const MAX_MAP_ZOOM = 10;
+
 // Revamped SmallFlag to handle shapes without clipPath IDs collision risk (by just not using clipPath or generated IDs)
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
     const getColor = (id: string) => {
@@ -267,7 +270,7 @@ export default function SolarSystem() {
         let newZoom = Math.min(scaleX, scaleY);
         
         // Clamp bounds
-        newZoom = Math.min(Math.max(newZoom, 0.05), 1.5);
+        newZoom = Math.min(Math.max(newZoom, MIN_MAP_ZOOM), 1.5);
         
         setZoom(newZoom);
     };
@@ -780,7 +783,7 @@ export default function SolarSystem() {
   const handleWheel = (e: React.WheelEvent) => {
     setIsAutoFit(false);
     const newZoom = zoom - e.deltaY * 0.001;
-        setZoom(Math.min(Math.max(0.05, newZoom), 5));
+      setZoom(Math.min(Math.max(MIN_MAP_ZOOM, newZoom), MAX_MAP_ZOOM));
   };
 
   // Pan Handlers
@@ -972,14 +975,14 @@ export default function SolarSystem() {
                               />
                           ) : (
                                                             <div 
-                                                                className="relative w-20 h-20 flex items-center justify-center"
-                                style={{ transform: `rotate(${rotationData + 45}deg)` }}
+                                                                                                                                className="relative w-12 h-12 flex items-center justify-center"
+                                                                style={{ transform: `rotate(${rotationData + 45}deg)` }}
                               >
                                   <div className="relative w-full h-full">
                                       <img 
                                             src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                             alt="Traveling Ship"
-                                          className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
+                                                                                    className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
@@ -1138,7 +1141,7 @@ export default function SolarSystem() {
                                         />
                                     ) : (
                                         <div 
-                                            className="relative w-20 h-20 flex items-center justify-center"
+                                            className="relative w-12 h-12 flex items-center justify-center"
                                             style={{ transform: 'rotate(-45deg)' }}
                                         >
                                             <div className="relative w-full h-full">
@@ -1205,8 +1208,8 @@ export default function SolarSystem() {
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 5)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, 0.05)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, MAX_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, MIN_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
                <div className="w-full h-px bg-white/20 my-1" />
                <button onClick={() => { setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
            </div>

@@ -98,11 +98,11 @@ export default function Home() {
             />
           </Link>
           <div className="hidden md:flex gap-8 text-sm font-medium text-slate-600 items-center">
-            <Link href="/space" className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">Classroom Login</Link>
+            <Link href="/login" className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">Classroom Login</Link>
             <Link href="/about" className="hover:text-slate-900 transition-colors">Product</Link>
             <Link href="#games" className="hover:text-slate-900 transition-colors">Games</Link>
             <Link href="/educators" className="hover:text-slate-900 transition-colors">Educators</Link>
-            <Link href="/start" className="px-4 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-500 transition-all flex items-center gap-2">
+            <Link href="/login" className="px-4 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-500 transition-all flex items-center gap-2">
               Get Started <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -137,7 +137,7 @@ export default function Home() {
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link href="/start" className="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-all flex items-center justify-center gap-2">
+                <Link href="/login" className="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-all flex items-center justify-center gap-2">
                   Get Started <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link href="/about" className="px-6 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:border-slate-400 hover:text-slate-900 transition-all text-center">
@@ -173,7 +173,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="hidden lg:block"
             >
-              <Link href="/space" className="block group cursor-pointer">
+              <Link href="/login" className="block group cursor-pointer">
                 <div className="bg-white/80 border border-black/10 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] transition-transform group-hover:scale-[1.02]">
                   <div className="flex items-center justify-between border-b border-black/5 pb-4">
                     <div>
@@ -258,7 +258,7 @@ export default function Home() {
                 <h2 className="font-heading text-3xl md:text-4xl font-semibold text-slate-900">Multiple games. One student profile.</h2>
                 <p className="text-slate-600 mt-2 max-w-xl">Same classroom expectations, same XP and ranks—different worlds to explore. Start with Space Adventure, then plug in new games as they launch.</p>
               </div>
-              <Link href="/space" className="inline-flex items-center gap-2 text-emerald-700 font-semibold">
+              <Link href="/login" className="inline-flex items-center gap-2 text-emerald-700 font-semibold">
                 Play the current game <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

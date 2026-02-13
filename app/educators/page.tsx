@@ -92,14 +92,14 @@ export default function EducatorsPage() {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-800 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
                     <h3 className="font-heading text-xl font-bold text-white mb-2 relative z-10">Ready to Launch?</h3>
                     <p className="text-emerald-100 mb-6 relative z-10">Start your free trial today. No credit card required.</p>
-                    <Link href="/start" className="inline-block w-full text-center py-4 bg-white text-emerald-900 font-bold rounded-xl hover:bg-emerald-50 transition-colors relative z-10">
+                    <Link href="/login" className="inline-block w-full text-center py-4 bg-white text-emerald-900 font-bold rounded-xl hover:bg-emerald-50 transition-colors relative z-10">
                         Create Teacher Account
                     </Link>
                 </div>
                 
                  <div className="bg-white p-8 rounded-3xl border border-black/5 text-center shadow-sm">
                     <p className="text-slate-600 mb-4">Already have a class?</p>
-                    <Link href="/space" className="text-emerald-600 font-bold hover:text-emerald-800 transition-colors flex items-center justify-center gap-2">
+                    <Link href="/login" className="text-emerald-600 font-bold hover:text-emerald-800 transition-colors flex items-center justify-center gap-2">
                         Login to Dashboard &rarr;
                     </Link>
                 </div>
