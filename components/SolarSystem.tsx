@@ -84,8 +84,13 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
     );
 }
 
-export default function SolarSystem() {
+interface SolarSystemProps {
+        studentView?: boolean;
+}
+
+export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
+    const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
   const [zoom, setZoom] = useState(0.25); // Start zoomed out to see more
@@ -334,6 +339,101 @@ export default function SolarSystem() {
   // Real-time subscription to all star travelers
   useEffect(() => {
     if (!userData) return;
+
+    const mapUserToShip = (id: string, data: any): Ship => {
+        const loc = data.location || 'earth';
+        return {
+            id,
+            shipId: data.spaceship?.id || 'finalship',
+            cadetName: data.spaceship?.name || data.displayName || 'Unknown Traveler',
+            locationId: loc,
+            status: data.travelStatus || 'idle',
+            destinationId: data.destinationId,
+            travelStart: data.travelStart,
+            travelEnd: data.travelEnd,
+            avatarColor: data.spaceship?.color || 'text-cyan-400',
+            avatar: data.avatar,
+            role: data.role,
+            xp: data.xp || 0,
+            lastXpReason: data.lastXpReason,
+            flag: data.flag,
+            visitedPlanets: data.visitedPlanets || [],
+            planetXP: data.planetXP || {}
+        };
+    };
+
+    const processFleet = (fleet: Ship[]) => {
+        setShips(fleet);
+
+        fleet.forEach(shipData => {
+             if (!isFirstLoad.current && !isStudentPersonalView) {
+                const oldXP = previousXPRef.current.get(shipData.id);
+                if (oldXP !== undefined && shipData.xp > oldXP) {
+                    const oldRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => oldXP >= r.minXP);
+                    const newRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => shipData.xp >= r.minXP);
+                    const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
+
+                    const planetId = (shipData.locationId || '').toLowerCase();
+                    const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
+                    const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
+                    const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
+
+                    let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
+                    if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
+                        const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
+                        const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
+
+                        if (joviUnlockedNow) {
+                            unlocks = {
+                                avatars: ['jovi'],
+                            };
+                        }
+                    }
+
+                    const event: AwardEvent = {
+                        id: Math.random().toString(),
+                        ship: shipData,
+                        xpGained: shipData.xp - oldXP,
+                        newRank: isPromotion ? newRank.name : undefined,
+                        startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                        reason: shipData.lastXpReason,
+                        unlocks
+                    };
+
+                    const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
+                    if (audioElement && isSoundOnRef.current) {
+                        audioElement.currentTime = 0;
+                        audioElement.volume = 0.5;
+                        audioElement.play().catch(() => {});
+                    }
+
+                    setAwardQueue(prev => [...prev, event]);
+                }
+             }
+
+             previousXPRef.current.set(shipData.id, shipData.xp);
+             previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
+        });
+
+        isFirstLoad.current = false;
+    };
+
+    if (isStudentPersonalView) {
+        const userRef = doc(db, "users", userData.uid);
+        const unsubscribeOwn = onSnapshot(userRef, {
+            next: (snap) => {
+                if (!snap.exists()) {
+                    setShips([]);
+                    return;
+                }
+                processFleet([mapUserToShip(snap.id, snap.data())]);
+            },
+            error: (e) => console.log("Silent Permission Error", e)
+        });
+
+        return () => unsubscribeOwn();
+    }
+
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId && userData.role !== 'admin') return;
 
@@ -370,116 +470,15 @@ export default function SolarSystem() {
         next: (snapshot) => {
             const fleet: Ship[] = [];
             snapshot.forEach((doc) => {
-                const data = doc.data();
-                const loc = data.location || 'earth';
-
-                const shipData: Ship = {
-                    id: doc.id,
-                    shipId: data.spaceship?.id || 'finalship',
-                    cadetName: data.spaceship?.name || data.displayName || 'Unknown Traveler',
-                    locationId: loc,
-                    status: data.travelStatus || 'idle',
-                    destinationId: data.destinationId,
-                    travelStart: data.travelStart,
-                    travelEnd: data.travelEnd,
-                    avatarColor: data.spaceship?.color || 'text-cyan-400',
-                    avatar: data.avatar, // Including Avatar Config
-                    role: data.role, 
-                    xp: data.xp || 0,
-                    lastXpReason: data.lastXpReason,
-                    flag: data.flag,
-                    visitedPlanets: data.visitedPlanets || [],
-                    planetXP: data.planetXP || {}
-                };
-                fleet.push(shipData);
+                fleet.push(mapUserToShip(doc.id, doc.data()));
             });
-            setShips(fleet);
-
-            // Award & Rank Logic
-            fleet.forEach(shipData => {
-                 if (!isFirstLoad.current) {
-                    const oldXP = previousXPRef.current.get(shipData.id);
-                    // Trigger if XP gained (and not just initialized from undefined)
-                    if (oldXP !== undefined && shipData.xp > oldXP) {
-                        
-                        // 1. Calculate Start Pos
-                        let startX = 0, startY = 0;
-                        
-                        // Find planet position
-                        const planet = PLANETS.find(p => p.id === shipData.locationId);
-                        if (planet) {
-                            const period = planet.orbitDuration * 1000;
-                            let angleDeg = planet.startAngle;
-                            if (period > 0) {
-                                 const tSeconds = Date.now() / 1000;
-                                 const progress = (tSeconds % planet.orbitDuration) / planet.orbitDuration;
-                                 angleDeg += progress * 360; 
-                            }
-                            const angleRad = angleDeg * (Math.PI / 180);
-                            const r = planet.orbitSize / 2; // Using orbitSize from constants
-                             // Map Pan offset? We can't easily get it here without Ref. 
-                             // Let's just default to center for the animation start or a random edge.
-                             // Actually, 0,0 is fine, it will fly in from center.
-                        }
-
-                        // 2. Check Rank Up
-                        const oldRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => oldXP >= r.minXP);
-                        const newRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => shipData.xp >= r.minXP);
-                        
-                        const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
-
-                        // Unlock detection (currently only Jupiter -> Jovi)
-                        const planetId = (shipData.locationId || '').toLowerCase();
-                        const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
-                        const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
-                        const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
-
-                        let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
-                        if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
-                            const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
-                            const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
-
-                            if (joviUnlockedNow) {
-                                unlocks = {
-                                    avatars: ['jovi'],
-                                };
-                            }
-                        }
-
-                        const event: AwardEvent = {
-                            id: Math.random().toString(),
-                            ship: shipData,
-                            xpGained: shipData.xp - oldXP,
-                            newRank: isPromotion ? newRank.name : undefined,
-                            startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-                            reason: shipData.lastXpReason,
-                            unlocks
-                        };
-                        
-                        // Play notification sound safely if enabled
-                        const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
-                        if (audioElement && isSoundOnRef.current) {
-                            console.log("Map: Playing Award Sound");
-                            audioElement.currentTime = 0;
-                            audioElement.volume = 0.5;
-                            audioElement.play().catch(e => console.error("Map audio playback failed (Autoplay blocked? Click map to enable):", e));
-                        }
-                        
-                        // Add to queue
-                        setAwardQueue(prev => [...prev, event]);
-                    }
-                 }
-                 // Always update ref
-                 previousXPRef.current.set(shipData.id, shipData.xp);
-                 previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
-            });
-            isFirstLoad.current = false;
+            processFleet(fleet);
         },
         error: (e) => console.log("Silent Permission Error", e)
     });
     
-    return () => unsubscribe();
-  }, [userData]);
+        return () => unsubscribe();
+    }, [userData, isStudentPersonalView]);
 
 
     const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
@@ -1232,7 +1231,7 @@ export default function SolarSystem() {
        </div>
 
        {/* Class Bonus HUD */}
-       {bonusConfig && (
+       {!isStudentPersonalView && bonusConfig && (
            <div className="absolute top-6 right-6 z-40 bg-black/60 backdrop-blur border border-cyan-500/30 rounded-xl p-4 w-64 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
                 <div className="flex items-center justify-between mb-2 text-cyan-300">
                     <div className="flex items-center gap-2">
@@ -1488,20 +1487,22 @@ export default function SolarSystem() {
           <p className="mt-2 text-blue-400">Scroll to zoom. Drag to pan.</p>
        </div>
 
-       {/* CLASS GRID OVERLAY */}
-       <ManifestOverlay 
-            isVisible={isGridVisible} 
-            onClose={handleCloseManifest}
-            ships={ships}
-            ranks={ranks}
-            selectedIds={selectedIds}
-            setSelectedIds={setSelectedIds}
-            behaviors={behaviors}
-       />
+      {/* CLASS GRID OVERLAY */}
+      {!isStudentPersonalView && (
+         <ManifestOverlay 
+             isVisible={isGridVisible} 
+             onClose={handleCloseManifest}
+             ships={ships}
+             ranks={ranks}
+             selectedIds={selectedIds}
+             setSelectedIds={setSelectedIds}
+             behaviors={behaviors}
+         />
+      )}
 
        {/* AWARD CEREMONY OVERLAY */}
        <AnimatePresence>
-         {awardQueue.length > 0 && (
+         {!isStudentPersonalView && awardQueue.length > 0 && (
             <div 
                 key="award-overlay"
                 className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-auto cursor-pointer"
@@ -1785,7 +1786,7 @@ export default function SolarSystem() {
 
        {/* ASTEROID OVERLAY */}
        <AnimatePresence>
-            {asteroidStatus && asteroidEvent && asteroidEvent.active && (
+            {!isStudentPersonalView && asteroidStatus && asteroidEvent && asteroidEvent.active && (
                 <div className="absolute inset-0 z-[150] pointer-events-none overflow-hidden">
                     {/* Warning Flash */}
                     <div className="absolute inset-0 bg-red-500/10 animate-pulse" />
@@ -1890,7 +1891,7 @@ export default function SolarSystem() {
 
        {/* CLASS BONUS VICTORY OVERLAY */}
        <AnimatePresence>
-          {showBonusVictory && bonusConfig && (
+          {!isStudentPersonalView && showBonusVictory && bonusConfig && (
               <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}

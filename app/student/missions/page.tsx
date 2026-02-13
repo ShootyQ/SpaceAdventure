@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, getDoc, where, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import confetti from 'canvas-confetti';
 
 interface Question {
@@ -30,14 +29,37 @@ interface Mission {
 
 export default function StudentMissions() {
     const { user, userData } = useAuth();
-    const router = useRouter();
     const [missions, setMissions] = useState<Mission[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeMission, setActiveMission] = useState<Mission | null>(null);
-    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
     const [completedMissions, setCompletedMissions] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
-    const [feedback, setFeedback] = useState<{correct: boolean, score: number} | null>(null);
+    const [feedback, setFeedback] = useState<{correct: boolean, score: number, newRank?: string} | null>(null);
+
+    const normalizeText = (value: unknown) => String(value ?? '').trim().toLowerCase();
+
+    const shuffleOptions = (values: string[]) => {
+        const arr = [...values];
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    };
+
+    const DEFAULT_RANKS = [
+        { name: "Space Cadet", minXP: 0 },
+        { name: "Rookie Pilot", minXP: 100 },
+        { name: "Star Scout", minXP: 300 },
+        { name: "Nebula Navigator", minXP: 600 },
+        { name: "Solar Specialist", minXP: 1000 },
+        { name: "Comet Captain", minXP: 1500 },
+        { name: "Galaxy Guardian", minXP: 2200 },
+        { name: "Cosmic Commander", minXP: 3000 },
+        { name: "Void Admiral", minXP: 4000 },
+        { name: "Grand Star Admiral", minXP: 5000 },
+    ];
 
     // Fetch Missions
     useEffect(() => {
@@ -75,13 +97,32 @@ export default function StudentMissions() {
 
     const handleStartMission = (mission: Mission) => {
         setActiveMission(mission);
-        setAnswers({});
+        const initialAnswers: Record<string, string | string[]> = {};
+        mission.questions.forEach((q) => {
+            if (q.type === 'sort') {
+                const source = (q.options || []).map((opt) => String(opt || '').trim()).filter(Boolean);
+                initialAnswers[q.id] = shuffleOptions(source);
+            }
+        });
+        setAnswers(initialAnswers);
         setFeedback(null);
         window.scrollTo(0,0);
     };
 
     const handleAnswerChange = (questionId: string, value: string) => {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
+    };
+
+    const moveSortItem = (questionId: string, fromIndex: number, delta: number) => {
+        setAnswers(prev => {
+            const current = prev[questionId];
+            if (!Array.isArray(current)) return prev;
+            const targetIndex = fromIndex + delta;
+            if (targetIndex < 0 || targetIndex >= current.length) return prev;
+            const reordered = [...current];
+            [reordered[fromIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[fromIndex]];
+            return { ...prev, [questionId]: reordered };
+        });
     };
 
     const submitMission = async () => {
@@ -95,9 +136,24 @@ export default function StudentMissions() {
 
             activeMission.questions.forEach(q => {
                 const answer = answers[q.id];
-                // Simple checking for string based answers (MC/TF)
-                // Arrays (like sorting) would need more complex logic, handling string equality for now
-                if (answer === q.correctAnswer) {
+                if (q.type === 'sort') {
+                    const submittedOrder = Array.isArray(answer)
+                        ? answer.map(normalizeText)
+                        : [];
+                    const expectedOrder = Array.isArray(q.correctAnswer)
+                        ? q.correctAnswer.map(normalizeText)
+                        : (q.options || []).map(normalizeText);
+                    const isCorrectSort = submittedOrder.length === expectedOrder.length
+                        && submittedOrder.every((item, index) => item === expectedOrder[index]);
+                    if (isCorrectSort) {
+                        correctCount++;
+                    }
+                    return;
+                }
+
+                const submitted = normalizeText(answer);
+                const expected = normalizeText(q.correctAnswer);
+                if (submitted && submitted === expected) {
                     correctCount++;
                 }
             });
@@ -105,7 +161,7 @@ export default function StudentMissions() {
             const score = Math.round((correctCount / totalQuestions) * 100);
             const passed = score >= 70; // 70% passing grade
 
-            setFeedback({ correct: passed, score });
+            let newRankName: string | undefined;
 
             if (passed) {
                 // Update User
@@ -115,11 +171,21 @@ export default function StudentMissions() {
                 if (!completedMissions.includes(activeMission.id)) {
                     const locationId = (userData?.location || "").toLowerCase();
                     const planetXpKey = locationId ? `planetXP.${locationId}` : null;
+                    const previousXP = Number(userData?.xp || 0);
+                    const nextXP = previousXP + Number(activeMission.xpReward || 0);
+                    const sortedRanks = [...DEFAULT_RANKS].sort((a, b) => b.minXP - a.minXP);
+                    const oldRank = sortedRanks.find((rank) => previousXP >= rank.minXP);
+                    const newRank = sortedRanks.find((rank) => nextXP >= rank.minXP);
+                    const promoted = !!oldRank && !!newRank && newRank.minXP > oldRank.minXP;
+                    if (promoted) {
+                        newRankName = newRank?.name;
+                    }
 
                     await updateDoc(userRef, {
                         completedMissions: arrayUnion(activeMission.id),
                         xp: increment(activeMission.xpReward),
-                        ...(planetXpKey ? { [planetXpKey]: increment(activeMission.xpReward) } : {})
+                        ...(planetXpKey ? { [planetXpKey]: increment(activeMission.xpReward) } : {}),
+                        lastXpReason: `Mission completed: ${activeMission.title}`
                     });
 
                     if (activeMission.xpReward > 0) {
@@ -145,6 +211,8 @@ export default function StudentMissions() {
                     setCompletedMissions(prev => [...prev, activeMission.id]);
                 }
             }
+
+            setFeedback({ correct: passed, score, newRank: newRankName });
 
         } catch (e) {
             console.error("Error submitting mission:", e);
@@ -271,6 +339,40 @@ export default function StudentMissions() {
                                                         <span className="md:text-lg">{opt}</span>
                                                     </label>
                                                 ))}
+
+                                                {q.type === 'sort' && Array.isArray(answers[q.id]) && (
+                                                    <div className="space-y-2">
+                                                        {(answers[q.id] as string[]).map((opt, index) => (
+                                                            <div
+                                                                key={`${q.id}-sort-${index}`}
+                                                                className="flex items-center justify-between p-3 rounded-lg border border-white/10 bg-black/20"
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-cyan-500 font-bold text-sm w-6 text-center">{index + 1}</span>
+                                                                    <span className="text-gray-200 md:text-lg">{opt}</span>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => moveSortItem(q.id, index, -1)}
+                                                                        disabled={index === 0}
+                                                                        className="px-2 py-1 rounded border border-cyan-700 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        ↑
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => moveSortItem(q.id, index, 1)}
+                                                                        disabled={index === (answers[q.id] as string[]).length - 1}
+                                                                        className="px-2 py-1 rounded border border-cyan-700 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        ↓
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -285,6 +387,7 @@ export default function StudentMissions() {
                                             <CheckCircle className="text-green-500 w-16 h-16 mb-2" />
                                             <h2 className="text-2xl font-bold text-white">Mission Accomplished!</h2>
                                             <p className="text-green-300">Score: {feedback.score}% - You have earned {activeMission.xpReward} XP.</p>
+                                            {feedback.newRank && <p className="text-yellow-300 font-bold">Promotion Unlocked: {feedback.newRank}</p>}
                                             <button onClick={() => setActiveMission(null)} className="mt-4 px-6 py-2 bg-green-600 rounded-full font-bold text-white hover:bg-green-500">Return to Base</button>
                                         </div>
                                     ) : (
@@ -302,10 +405,22 @@ export default function StudentMissions() {
                             {!feedback && (
                                 <button 
                                     onClick={submitMission}
-                                    disabled={submitting || Object.keys(answers).length < activeMission.questions.length}
+                                    disabled={submitting || activeMission.questions.some((q) => {
+                                        const value = answers[q.id];
+                                        if (q.type === 'sort') {
+                                            return !Array.isArray(value) || value.length === 0;
+                                        }
+                                        return typeof value !== 'string' || !value.trim();
+                                    })}
                                     className={`
                                         w-full mt-8 py-4 rounded-xl font-bold text-xl uppercase tracking-widest transition-all
-                                        ${Object.keys(answers).length < activeMission.questions.length
+                                        ${activeMission.questions.some((q) => {
+                                            const value = answers[q.id];
+                                            if (q.type === 'sort') {
+                                                return !Array.isArray(value) || value.length === 0;
+                                            }
+                                            return typeof value !== 'string' || !value.trim();
+                                        })
                                             ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                                             : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-900/50'}
                                     `}

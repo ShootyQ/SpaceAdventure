@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getAssetPath } from '@/lib/utils';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import DashboardTutorial from './DashboardTutorial';
+import DashboardTutorial from '../DashboardTutorial';
 
 interface ClassBonusConfig {
     current: number;

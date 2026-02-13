@@ -38,12 +38,29 @@ export default function CreateMissionPage() {
         setQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q));
     };
 
+    const updateQuestionType = (id: string, nextType: 'mc' | 'tf' | 'sort') => {
+        setQuestions(questions.map(q => {
+            if (q.id !== id) return q;
+            const currentOptions = Array.isArray(q.options) ? q.options : ["", "", "", ""];
+            if (nextType === 'tf') {
+                return { ...q, type: nextType, options: ['True', 'False'], correctAnswer: 'True' };
+            }
+            return { ...q, type: nextType, options: currentOptions, correctAnswer: '' };
+        }));
+    };
+
     const updateOption = (qId: string, index: number, value: string) => {
         setQuestions(questions.map(q => {
             if (q.id !== qId) return q;
             const newOptions = [...(q.options || [])];
+            const previousOptionValue = newOptions[index];
             newOptions[index] = value;
-            return { ...q, options: newOptions };
+            const shouldCarryCorrectAnswer = q.type === 'mc' && q.correctAnswer === previousOptionValue;
+            return {
+                ...q,
+                options: newOptions,
+                correctAnswer: shouldCarryCorrectAnswer ? value : q.correctAnswer
+            };
         }));
     };
 
@@ -57,6 +74,29 @@ export default function CreateMissionPage() {
 
         try {
             if (!user) throw new Error("Not authenticated");
+            const normalizedQuestions = questions.map((q) => {
+                const normalizedOptions = (q.options || []).map((opt: string) => (opt || '').trim());
+                if (q.type === 'tf') {
+                    const normalizedTf = String(q.correctAnswer || '').trim().toLowerCase();
+                    return {
+                        ...q,
+                        options: ['True', 'False'],
+                        correctAnswer: normalizedTf === 'false' ? 'false' : 'true'
+                    };
+                }
+                if (q.type === 'sort') {
+                    return {
+                        ...q,
+                        options: normalizedOptions,
+                        correctAnswer: normalizedOptions.filter(Boolean)
+                    };
+                }
+                return {
+                    ...q,
+                    options: normalizedOptions,
+                    correctAnswer: String(q.correctAnswer || '').trim()
+                };
+            });
             // Add to subcollection
             await addDoc(collection(db, `users/${user.uid}/missions`), {
                 title,
@@ -64,7 +104,7 @@ export default function CreateMissionPage() {
                 type,
                 contentUrl: type === 'watch' ? contentUrl : null,
                 contentText: type === 'read' ? contentText : null,
-                questions,
+                questions: normalizedQuestions,
                 xpReward: Number(xpReward),
                 teacherId: user.uid,
                 createdAt: serverTimestamp()
@@ -207,7 +247,7 @@ export default function CreateMissionPage() {
                                             />
                                             <select 
                                                 value={q.type}
-                                                onChange={(e) => updateQuestion(q.id, 'type', e.target.value)}
+                                                onChange={(e) => updateQuestionType(q.id, e.target.value as 'mc' | 'tf' | 'sort')}
                                                 className="bg-black/30 border border-cyan-800 rounded p-2 text-cyan-400 outline-none"
                                             >
                                                 <option value="mc">Multiple Choice</option>
