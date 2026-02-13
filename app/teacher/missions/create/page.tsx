@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, Video, BookOpen, GripVertical, Loader2 } from "lucide-react";
 
+type QuestionType = 'mc' | 'tf' | 'sort';
+
+type BuilderQuestion = {
+    id: string;
+    text: string;
+    type: QuestionType;
+    options: string[];
+    correctAnswer: string | string[];
+    correctAnswerIndex?: number | null;
+};
+
 export default function CreateMissionPage() {
     const router = useRouter();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [loadingMission, setLoadingMission] = useState(false);
     
     // Mission State
     const [title, setTitle] = useState("");
@@ -22,7 +34,22 @@ export default function CreateMissionPage() {
     const [contentText, setContentText] = useState("");
 
     // Questions State
-    const [questions, setQuestions] = useState<any[]>([]);
+    const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
+
+    const [editMissionId, setEditMissionId] = useState<string | null>(null);
+    const isEditMode = !!editMissionId;
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const missionId = new URLSearchParams(window.location.search).get('edit');
+        setEditMissionId(missionId);
+    }, []);
+
+    const ensureMinOptions = (input: string[], min = 4) => {
+        const next = [...input];
+        while (next.length < min) next.push('');
+        return next;
+    };
 
     const addQuestion = () => {
         setQuestions([...questions, {
@@ -31,21 +58,34 @@ export default function CreateMissionPage() {
             type: "mc",
             options: ["", "", "", ""],
             correctAnswer: "",
+            correctAnswerIndex: null,
         }]);
     };
 
-    const updateQuestion = (id: string, field: string, value: any) => {
+    const updateQuestion = (id: string, field: keyof BuilderQuestion, value: any) => {
         setQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q));
     };
 
-    const updateQuestionType = (id: string, nextType: 'mc' | 'tf' | 'sort') => {
+    const updateQuestionType = (id: string, nextType: QuestionType) => {
         setQuestions(questions.map(q => {
             if (q.id !== id) return q;
             const currentOptions = Array.isArray(q.options) ? q.options : ["", "", "", ""];
             if (nextType === 'tf') {
-                return { ...q, type: nextType, options: ['True', 'False'], correctAnswer: 'True' };
+                return { ...q, type: nextType, options: ['True', 'False'], correctAnswer: 'True', correctAnswerIndex: null };
             }
-            return { ...q, type: nextType, options: currentOptions, correctAnswer: '' };
+            if (nextType === 'mc') {
+                const mcOptions = q.type === 'tf' ? ['', '', '', ''] : ensureMinOptions(currentOptions, 4);
+                const existingCorrect = typeof q.correctAnswer === 'string' ? q.correctAnswer : '';
+                const existingIndex = mcOptions.findIndex(opt => opt === existingCorrect);
+                return {
+                    ...q,
+                    type: nextType,
+                    options: mcOptions,
+                    correctAnswer: existingCorrect,
+                    correctAnswerIndex: existingIndex >= 0 ? existingIndex : null
+                };
+            }
+            return { ...q, type: nextType, options: currentOptions, correctAnswer: '', correctAnswerIndex: null };
         }));
     };
 
@@ -53,13 +93,42 @@ export default function CreateMissionPage() {
         setQuestions(questions.map(q => {
             if (q.id !== qId) return q;
             const newOptions = [...(q.options || [])];
-            const previousOptionValue = newOptions[index];
             newOptions[index] = value;
-            const shouldCarryCorrectAnswer = q.type === 'mc' && q.correctAnswer === previousOptionValue;
+            const isSelected = q.type === 'mc' && q.correctAnswerIndex === index;
             return {
                 ...q,
                 options: newOptions,
-                correctAnswer: shouldCarryCorrectAnswer ? value : q.correctAnswer
+                correctAnswer: isSelected ? value : q.correctAnswer
+            };
+        }));
+    };
+
+    const addOption = (qId: string) => {
+        setQuestions(questions.map(q => {
+            if (q.id !== qId) return q;
+            return { ...q, options: [...(q.options || []), ''] };
+        }));
+    };
+
+    const removeOption = (qId: string, optionIndex: number) => {
+        setQuestions(questions.map(q => {
+            if (q.id !== qId) return q;
+            if ((q.options || []).length <= 2) return q;
+
+            const nextOptions = [...q.options];
+            nextOptions.splice(optionIndex, 1);
+
+            let nextIndex = q.correctAnswerIndex ?? null;
+            if (nextIndex !== null) {
+                if (nextIndex === optionIndex) nextIndex = null;
+                else if (nextIndex > optionIndex) nextIndex = nextIndex - 1;
+            }
+
+            return {
+                ...q,
+                options: nextOptions,
+                correctAnswerIndex: nextIndex,
+                correctAnswer: nextIndex !== null ? (nextOptions[nextIndex] || '') : ''
             };
         }));
     };
@@ -67,6 +136,63 @@ export default function CreateMissionPage() {
     const removeQuestion = (id: string) => {
         setQuestions(questions.filter(q => q.id !== id));
     };
+
+    useEffect(() => {
+        const loadMissionForEdit = async () => {
+            if (!user || !editMissionId) return;
+            setLoadingMission(true);
+            try {
+                const missionRef = doc(db, `users/${user.uid}/missions`, editMissionId);
+                const snap = await getDoc(missionRef);
+                if (!snap.exists()) {
+                    alert('Mission not found.');
+                    router.push('/teacher/missions');
+                    return;
+                }
+
+                const data = snap.data() as any;
+                setTitle(data.title || '');
+                setDescription(data.description || '');
+                setXpReward(Number(data.xpReward || 100));
+                setType(data.type === 'watch' ? 'watch' : 'read');
+                setContentUrl(data.contentUrl || '');
+                setContentText(data.contentText || '');
+
+                const loadedQuestions: BuilderQuestion[] = (data.questions || []).map((q: any, idx: number) => {
+                    const qType: QuestionType = q.type === 'tf' || q.type === 'sort' ? q.type : 'mc';
+                    const rawOptions: string[] = Array.isArray(q.options) ? q.options : [];
+                    const safeOptions = qType === 'tf'
+                        ? ['True', 'False']
+                        : (qType === 'mc' ? ensureMinOptions(rawOptions, 4) : rawOptions);
+
+                    const answerString = typeof q.correctAnswer === 'string' ? q.correctAnswer : '';
+                    const answerIndex = qType === 'mc' ? safeOptions.findIndex(opt => opt === answerString) : -1;
+
+                    return {
+                        id: q.id || `${Date.now()}-${idx}`,
+                        text: q.text || '',
+                        type: qType,
+                        options: safeOptions,
+                        correctAnswer: qType === 'sort'
+                            ? (Array.isArray(q.correctAnswer) ? q.correctAnswer : safeOptions.filter(Boolean))
+                            : (qType === 'tf'
+                                ? (String(q.correctAnswer || '').toLowerCase() === 'false' ? 'False' : 'True')
+                                : answerString),
+                        correctAnswerIndex: qType === 'mc' ? (answerIndex >= 0 ? answerIndex : null) : null,
+                    };
+                });
+
+                setQuestions(loadedQuestions);
+            } catch (error) {
+                console.error('Error loading mission:', error);
+                alert('Failed to load mission.');
+            } finally {
+                setLoadingMission(false);
+            }
+        };
+
+        loadMissionForEdit();
+    }, [editMissionId, router, user]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -91,24 +217,49 @@ export default function CreateMissionPage() {
                         correctAnswer: normalizedOptions.filter(Boolean)
                     };
                 }
+                if (q.type === 'mc') {
+                    const selectedFromIndex = (q.correctAnswerIndex ?? -1) >= 0
+                        ? (normalizedOptions[q.correctAnswerIndex as number] || '')
+                        : '';
+                    const normalizedMc = selectedFromIndex || String(q.correctAnswer || '').trim();
+                    return {
+                        ...q,
+                        options: normalizedOptions,
+                        correctAnswer: normalizedMc,
+                        correctAnswerIndex: null
+                    };
+                }
                 return {
                     ...q,
                     options: normalizedOptions,
                     correctAnswer: String(q.correctAnswer || '').trim()
                 };
             });
-            // Add to subcollection
-            await addDoc(collection(db, `users/${user.uid}/missions`), {
-                title,
-                description,
-                type,
-                contentUrl: type === 'watch' ? contentUrl : null,
-                contentText: type === 'read' ? contentText : null,
-                questions: normalizedQuestions,
-                xpReward: Number(xpReward),
-                teacherId: user.uid,
-                createdAt: serverTimestamp()
-            });
+
+            if (isEditMode && editMissionId) {
+                await updateDoc(doc(db, `users/${user.uid}/missions`, editMissionId), {
+                    title,
+                    description,
+                    type,
+                    contentUrl: type === 'watch' ? contentUrl : null,
+                    contentText: type === 'read' ? contentText : null,
+                    questions: normalizedQuestions,
+                    xpReward: Number(xpReward),
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                await addDoc(collection(db, `users/${user.uid}/missions`), {
+                    title,
+                    description,
+                    type,
+                    contentUrl: type === 'watch' ? contentUrl : null,
+                    contentText: type === 'read' ? contentText : null,
+                    questions: normalizedQuestions,
+                    xpReward: Number(xpReward),
+                    teacherId: user.uid,
+                    createdAt: serverTimestamp()
+                });
+            }
             router.push("/teacher/missions");
         } catch (error) {
             console.error("Error creating mission:", error);
@@ -125,8 +276,15 @@ export default function CreateMissionPage() {
                     <Link href="/teacher/missions" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                         <ArrowLeft size={20} />
                     </Link>
-                    <h1 className="text-3xl font-bold uppercase tracking-widest text-white">New Mission Protocol</h1>
+                    <h1 className="text-3xl font-bold uppercase tracking-widest text-white">{isEditMode ? 'Edit Mission Protocol' : 'New Mission Protocol'}</h1>
                 </div>
+
+                {loadingMission && (
+                    <div className="flex items-center gap-3 text-cyan-400 mb-6">
+                        <Loader2 className="animate-spin" size={18} />
+                        <span className="text-sm uppercase tracking-wider">Loading Mission Data...</span>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-8">
                     
@@ -280,8 +438,12 @@ export default function CreateMissionPage() {
                                                         <input 
                                                             type="radio" 
                                                             name={`q-${q.id}-ans`}
-                                                            checked={q.correctAnswer === opt && opt !== ""}
-                                                            onChange={() => updateQuestion(q.id, 'correctAnswer', opt)}
+                                                            checked={q.correctAnswerIndex === i}
+                                                            onChange={() => setQuestions(questions.map(item => item.id === q.id ? {
+                                                                ...item,
+                                                                correctAnswerIndex: i,
+                                                                correctAnswer: item.options[i] || ''
+                                                            } : item))}
                                                             className="accent-cyan-500"
                                                         />
                                                         <input 
@@ -292,8 +454,23 @@ export default function CreateMissionPage() {
                                                             className="flex-grow bg-black/30 border border-cyan-800/50 rounded p-2 text-sm text-gray-300 focus:border-cyan-500 outline-none"
                                                             placeholder={`Option ${i + 1}`}
                                                         />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeOption(q.id, i)}
+                                                            className="text-red-400 hover:text-red-300"
+                                                            title="Remove option"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addOption(q.id)}
+                                                    className="mt-2 text-xs uppercase tracking-wider text-cyan-400 hover:text-white font-bold"
+                                                >
+                                                    + Add Option
+                                                </button>
                                             </div>
                                         )}
 
@@ -323,11 +500,11 @@ export default function CreateMissionPage() {
 
                     <button 
                         type="submit" 
-                        disabled={loading}
+                        disabled={loading || loadingMission}
                         className="fixed bottom-6 right-6 flex items-center gap-4 bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-8 py-4 rounded-full shadow-lg shadow-cyan-900/50 transition-all z-50 disabled:opacity-50"
                     >
                         {loading ? <Loader2 className="animate-spin" /> : <Save size={24} />}
-                        PUBLISH MISSION
+                        {isEditMode ? 'SAVE MISSION' : 'PUBLISH MISSION'}
                     </button>
                 </form>
             </div>

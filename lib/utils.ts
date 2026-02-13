@@ -18,3 +18,18 @@ export const generateClassCode = () => {
     }
     return result;
 };
+
+export const NAME_MAX_LENGTH = 24;
+
+export const sanitizeName = (value: string, maxLength = NAME_MAX_LENGTH) => {
+    return String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, maxLength);
+};
+
+export const truncateName = (value: string, maxLength = NAME_MAX_LENGTH) => {
+    const safe = String(value || '');
+    if (safe.length <= maxLength) return safe;
+    return `${safe.slice(0, maxLength).trimEnd()}…`;
+};

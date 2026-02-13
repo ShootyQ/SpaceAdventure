@@ -11,7 +11,7 @@ import { UserData, PLANETS, SpaceshipConfig } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
-import { getAssetPath } from "@/lib/utils";
+import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
@@ -95,10 +95,13 @@ export default function RosterPage() {
           const selectedShip = SHIP_OPTIONS.find(s => s.id === selectedShipId) || SHIP_OPTIONS[0];
           
           // 3. Create Firestore Document
+          const safeDisplayName = sanitizeName(newStudentData.name);
+          const safeFirstName = sanitizeName(safeDisplayName.split(' ')[0] || 'Cadet');
+
           const newStudent: UserData = {
               uid: uid,
               email: email,
-              displayName: newStudentData.name,
+              displayName: safeDisplayName,
               photoURL: null,
               role: 'student',
               teacherId: user!.uid,
@@ -110,7 +113,7 @@ export default function RosterPage() {
               fuel: 500,
               travelStatus: 'idle',
               spaceship: {
-                  name: `SS ${newStudentData.name.split(' ')[0]}`,
+                  name: sanitizeName(`SS ${safeFirstName}`),
                   color: 'text-blue-400',
                   type: selectedShip.type,
                   speed: 1,
@@ -167,8 +170,19 @@ export default function RosterPage() {
   const saveEdit = async () => {
       if (!editingId) return;
       try {
-          await updateDoc(doc(db, "users", editingId), editForm);
-          setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...editForm } : s));
+          const normalizedEditForm: Partial<UserData> = {
+              ...editForm,
+              displayName: sanitizeName(String(editForm.displayName || '')),
+              spaceship: editForm.spaceship
+                  ? {
+                        ...editForm.spaceship,
+                        name: sanitizeName(String(editForm.spaceship.name || ''))
+                    }
+                  : editForm.spaceship
+          };
+
+          await updateDoc(doc(db, "users", editingId), normalizedEditForm);
+          setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...normalizedEditForm } : s));
           setEditingId(null);
           setShowEditVisuals(false);
       } catch (e) {
@@ -277,7 +291,8 @@ export default function RosterPage() {
                                     autoFocus
                                     type="text" 
                                     value={newStudentData.name}
-                                    onChange={(e) => setNewStudentData({...newStudentData, name: e.target.value})}
+                                    onChange={(e) => setNewStudentData({...newStudentData, name: e.target.value.slice(0, NAME_MAX_LENGTH)})}
+                                    maxLength={NAME_MAX_LENGTH}
                                     className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
                                     placeholder="e.g. Cadet Tom"
                                 />
@@ -424,7 +439,8 @@ export default function RosterPage() {
                                             </button>
                                             <input 
                                                 value={editForm.displayName || ""} 
-                                                onChange={e => setEditForm({...editForm, displayName: e.target.value})}
+                                                onChange={e => setEditForm({...editForm, displayName: e.target.value.slice(0, NAME_MAX_LENGTH)})}
+                                                maxLength={NAME_MAX_LENGTH}
                                                 className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
                                             />
                                          </div>
@@ -540,7 +556,7 @@ export default function RosterPage() {
                                             <UserAvatar userData={student} className="w-full h-full" />
                                         </div>
                                         <div>
-                                            <div className="font-bold text-white text-lg md:text-base">{student.displayName}</div>
+                                            <div className="font-bold text-white text-lg md:text-base">{truncateName(student.displayName || "Cadet")}</div>
                                             <div className="text-xs text-gray-500 flex items-center gap-2">
                                                 {student.email || <span className="text-gray-600 italic">Offline Account</span>}
                                             </div>

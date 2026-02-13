@@ -103,9 +103,11 @@ export default function MissionsPage() {
                                     <p className="text-cyan-600 text-sm mb-6 line-clamp-3 flex-grow">{mission.description}</p>
                                     
                                     <div className="flex gap-2 mt-auto pt-4 border-t border-cyan-900/30">
-                                        <button className="flex-1 py-2 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-sm transition-colors">
-                                            EDIT
-                                        </button>
+                                        <Link href={`/teacher/missions/create?edit=${mission.id}`} className="flex-1">
+                                            <span className="block w-full text-center py-2 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-sm transition-colors">
+                                                EDIT
+                                            </span>
+                                        </Link>
                                         <button className="p-2 rounded bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors">
                                             <Trash2 size={18} />
                                         </button>

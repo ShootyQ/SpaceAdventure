@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
 import { doc, updateDoc, onSnapshot, setDoc, collection, getDocs, query, where, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getAssetPath } from "@/lib/utils";
+import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2, LogOut, Edit2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
@@ -202,7 +202,7 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
                  {/* ID Card Header */}
                  <div className="border-b border-white/10 pb-4 text-center pb-6">
                      <h2 className="text-white/70 uppercase tracking-[0.3em] text-xs font-bold mb-1">Active Personnel</h2>
-                     <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Commander"}</div>
+                     <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{truncateName(userData?.displayName || "Unknown Commander")}</div>
                      
                      {/* Class Name Editor */}
                      <div className="flex justify-center items-center gap-2 mb-3">
@@ -324,7 +324,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
 
     useEffect(() => {
         if (userData?.spaceship) {
-            setShipName(userData.spaceship.name);
+            setShipName(sanitizeName(userData.spaceship.name));
             const col = SHIP_COLORS.find(c => c.class === userData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
             setSelectedShipId(userData.spaceship.id || "finalship");
@@ -336,11 +336,13 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
         setLoading(true);
         try {
             const userRef = doc(db, "users", user.uid);
+            const safeShipName = sanitizeName(shipName);
             await updateDoc(userRef, {
-                "spaceship.name": shipName,
+                "spaceship.name": safeShipName,
                 "spaceship.color": selectedColor.class,
                 "spaceship.id": selectedShipId
             });
+            setShipName(safeShipName);
             alert("Ship specifications updated, Commander.");
         } catch (e) {
             console.error(e);
@@ -374,7 +376,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                 </motion.div>
 
                 <div className="mt-12 text-center z-10 w-full max-w-md">
-                    <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-6">{shipName || "Unknown Vessel"}</h2>
+                    <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-6">{truncateName(shipName || "Unknown Vessel")}</h2>
                     
                     {/* Fuel Gauge */}
                     <div className="bg-black/60 border border-cyan-900/50 rounded-xl p-4 w-full">
@@ -412,7 +414,8 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     <input
                         type="text"
                         value={shipName}
-                        onChange={(e) => setShipName(e.target.value)}
+                        onChange={(e) => setShipName(e.target.value.slice(0, NAME_MAX_LENGTH))}
+                        maxLength={NAME_MAX_LENGTH}
                         className="w-full bg-black/50 border border-cyan-700 rounded p-3 text-white focus:outline-none focus:border-cyan-400 placeholder-cyan-800 transition-colors font-mono"
                         placeholder="Enter Ship Name"
                     />
@@ -638,14 +641,16 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || { name: "Recruit", minXP: 0 };
 
     useEffect(() => {
-        if (userData?.displayName) setNewName(userData.displayName);
+        if (userData?.displayName) setNewName(sanitizeName(userData.displayName));
     }, [userData]);
 
     const handleSaveName = async () => {
-        if (!user || !newName.trim()) return;
+        const safeName = sanitizeName(newName);
+        if (!user || !safeName) return;
         try {
             const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, { displayName: newName });
+            await updateDoc(userRef, { displayName: safeName });
+            setNewName(safeName);
             setIsEditingName(false);
         } catch (e) {
             console.error(e);
@@ -680,7 +685,8 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                         <input 
                             type="text" 
                             value={newName} 
-                            onChange={(e) => setNewName(e.target.value)}
+                            onChange={(e) => setNewName(e.target.value.slice(0, NAME_MAX_LENGTH))}
+                            maxLength={NAME_MAX_LENGTH}
                             className="bg-black/50 border border-purple-500 text-white font-bold text-2xl px-2 py-1 rounded w-64 text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
                             autoFocus
                         />
@@ -690,7 +696,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                 ) : (
                     <div className="flex items-center gap-3 group/edit">
                         <h2 className="text-2xl font-bold text-white cursor-pointer" onClick={() => setIsEditingName(true)}>
-                            {userData?.displayName || "Cadet Pilot"}
+                            {truncateName(userData?.displayName || "Cadet Pilot")}
                         </h2>
                         <button 
                             onClick={() => setIsEditingName(true)} 

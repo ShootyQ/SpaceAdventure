@@ -11,7 +11,7 @@ import {
 import { doc, getDoc, setDoc, collection, getDocs, query, limit } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { generateClassCode } from "@/lib/utils";
+import { generateClassCode, sanitizeName } from "@/lib/utils";
 
 import { UserData, SpaceshipConfig, FlagConfig, Rank } from "@/types";
 
@@ -77,10 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // so they would already exist in DB.
                 
                 const isSuperAdmin = currentUser.email === "andrewpcarlson85@gmail.com";
+                const safeDisplayName = sanitizeName(currentUser.displayName || 'Commander');
+                const baseShipWord = safeDisplayName.split(' ')[0] || 'Voyager';
                 const newUserData: UserData = {
                     uid: currentUser.uid,
                     email: currentUser.email,
-                    displayName: currentUser.displayName,
+                  displayName: safeDisplayName,
                     photoURL: currentUser.photoURL,
                     role: 'teacher', // Default new Google signups to Teacher
                     classCode: generateClassCode(),
@@ -89,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     schoolName: '',
                     location: 'earth',
                     spaceship: {
-                        name: 'SS ' + (currentUser.displayName?.split(' ')[0] || 'Voyager'),
+                      name: sanitizeName(`SS ${baseShipWord}`),
                         color: 'text-blue-400',
                         type: 'scout',
                         speed: 1

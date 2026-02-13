@@ -8,7 +8,7 @@ import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getAssetPath } from "@/lib/utils";
+import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
@@ -93,8 +93,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
-  const [zoom, setZoom] = useState(0.25); // Start zoomed out to see more
-  const [isAutoFit, setIsAutoFit] = useState(true); // Auto-scale to screen
+    const [zoom, setZoom] = useState(studentView ? 0.16 : 0.25); // Keep student view readable by default
+    const [isAutoFit, setIsAutoFit] = useState(!studentView); // Personal map starts at manual zoom
   const [isLanded, setIsLanded] = useState(false); // New Landing State
   const [isOrbiting, setIsOrbiting] = useState(true); // Default active
   const [mounted, setMounted] = useState(false);
@@ -345,7 +345,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         return {
             id,
             shipId: data.spaceship?.id || 'finalship',
-            cadetName: data.spaceship?.name || data.displayName || 'Unknown Traveler',
+            cadetName: truncateName(data.spaceship?.name || data.displayName || 'Unknown Traveler'),
             locationId: loc,
             status: data.travelStatus || 'idle',
             destinationId: data.destinationId,

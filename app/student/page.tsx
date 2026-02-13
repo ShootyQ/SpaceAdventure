@@ -85,9 +85,11 @@ export default function StudentConsole() {
        </header>
 
        {/* Main Viewport */}
-       <main className="flex-1 relative z-0">
-          {/* We show the map directly as the main view for students */}
-          <SolarSystem studentView />
+         <main className="flex-1 relative z-0 min-h-0">
+             {/* We show the map directly as the main view for students */}
+             <div className="absolute inset-0">
+                <SolarSystem studentView />
+             </div>
           
           {/* Overlay Controls for Student */}
           <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">

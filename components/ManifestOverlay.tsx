@@ -6,7 +6,7 @@ import { LayoutGrid, Check, Crown } from "lucide-react";
 import { Ship, Rank, Behavior } from "@/types";
 import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getAssetPath } from "@/lib/utils";
+import { getAssetPath, truncateName } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
 
 // Reuse TinyFlag - We should probably export this too, but for now I'll duplicate quickly or check if I can export it from SolarSystem (not easy).
@@ -118,7 +118,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
 
             {/* Name */}
             <div className="text-center w-full mb-4">
-                <h3 className="text-white font-bold truncate w-full mb-1">{student.cadetName}</h3>
+                <h3 className="text-white font-bold truncate w-full mb-1">{truncateName(student.cadetName)}</h3>
                 <div className="flex flex-col items-center justify-center gap-1">
                     {rank?.image && <img src={getAssetPath(rank.image)} alt={rank.name} className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-md my-2" />}
                     
