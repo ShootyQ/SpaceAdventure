@@ -7,8 +7,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, Video, BookOpen, GripVertical, Loader2 } from "lucide-react";
+import { PracticeAssignmentConfig } from "@/lib/practice";
 
 type QuestionType = 'mc' | 'tf' | 'sort';
+type MissionContentType = 'read' | 'watch' | 'practice';
 
 type BuilderQuestion = {
     id: string;
@@ -29,9 +31,20 @@ export default function CreateMissionPage() {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [xpReward, setXpReward] = useState(100);
-    const [type, setType] = useState<'read' | 'watch'>('read');
+    const [type, setType] = useState<MissionContentType>('read');
     const [contentUrl, setContentUrl] = useState("");
     const [contentText, setContentText] = useState("");
+    const [practiceConfig, setPracticeConfig] = useState<PracticeAssignmentConfig>({
+        templateId: 'math-multiplication-1-12',
+        subject: 'math',
+        gradeLevel: 3,
+        questionCount: 24,
+        tableMin: 1,
+        tableMax: 12,
+        multiplicandMin: 1,
+        multiplicandMax: 12,
+        attemptPolicy: 'once',
+    });
 
     // Questions State
     const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
@@ -155,9 +168,15 @@ export default function CreateMissionPage() {
                 setTitle(data.title || '');
                 setDescription(data.description || '');
                 setXpReward(Number(data.xpReward || 100));
-                setType(data.type === 'watch' ? 'watch' : 'read');
+                setType(data.type === 'watch' ? 'watch' : data.type === 'practice' ? 'practice' : 'read');
                 setContentUrl(data.contentUrl || '');
                 setContentText(data.contentText || '');
+                if (data.practiceConfig) {
+                    setPracticeConfig((prev) => ({
+                        ...prev,
+                        ...data.practiceConfig,
+                    }));
+                }
 
                 const loadedQuestions: BuilderQuestion[] = (data.questions || []).map((q: any, idx: number) => {
                     const qType: QuestionType = q.type === 'tf' || q.type === 'sort' ? q.type : 'mc';
@@ -201,7 +220,7 @@ export default function CreateMissionPage() {
 
         try {
             if (!user) throw new Error("Not authenticated");
-            const normalizedQuestions = questions.map((q) => {
+            const normalizedQuestions = type === 'practice' ? [] : questions.map((q) => {
                 const normalizedOptions = (q.options || []).map((opt: string) => (opt || '').trim());
                 if (q.type === 'tf') {
                     const normalizedTf = String(q.correctAnswer || '').trim().toLowerCase();
@@ -244,6 +263,7 @@ export default function CreateMissionPage() {
                     type,
                     contentUrl: type === 'watch' ? contentUrl : null,
                     contentText: type === 'read' ? contentText : null,
+                    practiceConfig: type === 'practice' ? practiceConfig : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
                     updatedAt: serverTimestamp()
@@ -255,6 +275,7 @@ export default function CreateMissionPage() {
                     type,
                     contentUrl: type === 'watch' ? contentUrl : null,
                     contentText: type === 'read' ? contentText : null,
+                    practiceConfig: type === 'practice' ? practiceConfig : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
                     teacherId: user.uid,
@@ -341,6 +362,13 @@ export default function CreateMissionPage() {
                                         >
                                             <Video size={16} /> Video
                                         </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => setType('practice')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded transition-all ${type === 'practice' ? 'bg-cyan-600 text-black font-bold' : 'hover:bg-cyan-900/50'}`}
+                                        >
+                                            Basic Math
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -356,7 +384,7 @@ export default function CreateMissionPage() {
                                         placeholder="https://youtube.com/watch?v=..."
                                     />
                                 </div>
-                            ) : (
+                            ) : type === 'read' ? (
                                 <div>
                                     <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Reading Material</label>
                                     <textarea 
@@ -366,11 +394,78 @@ export default function CreateMissionPage() {
                                         placeholder="Enter the lesson text here..."
                                     />
                                 </div>
+                            ) : (
+                                <div className="grid gap-6">
+                                    <div className="rounded-lg border border-cyan-800/50 bg-cyan-950/20 p-4">
+                                        <h3 className="text-white font-bold mb-1">Practice Drill Setup</h3>
+                                        <p className="text-sm text-cyan-500">Auto-generated math problems (no manual question writing).</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Grade Level</label>
+                                            <select
+                                                value={practiceConfig.gradeLevel}
+                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, gradeLevel: Number(e.target.value) as 3 | 4 })}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            >
+                                                <option value={3}>3rd Grade</option>
+                                                <option value={4}>4th Grade</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Problems per Attempt</label>
+                                            <input
+                                                type="number"
+                                                min={5}
+                                                max={60}
+                                                value={practiceConfig.questionCount}
+                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, questionCount: Number(e.target.value) || 24 })}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Table Range</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={12}
+                                                    value={practiceConfig.tableMin}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMin: Number(e.target.value) || 1 })}
+                                                    className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={12}
+                                                    value={practiceConfig.tableMax}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMax: Number(e.target.value) || 12 })}
+                                                    className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Attempt Limit</label>
+                                            <select
+                                                value={practiceConfig.attemptPolicy}
+                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, attemptPolicy: e.target.value as 'once' | 'unlimited' })}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            >
+                                                <option value="once">One Attempt</option>
+                                                <option value="unlimited">Unlimited Attempts</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
 
                     {/* Questions Section */}
+                    {type !== 'practice' && (
                     <div className="bg-black/40 border border-cyan-900/50 rounded-xl p-6 backdrop-blur-sm">
                         <div className="flex justify-between items-center mb-6 border-b border-cyan-900/50 pb-2">
                             <h2 className="text-white font-bold text-xl">2. Assessment</h2>
@@ -513,6 +608,7 @@ export default function CreateMissionPage() {
                             ))}
                         </div>
                     </div>
+                    )}
 
                     <button 
                         type="submit" 

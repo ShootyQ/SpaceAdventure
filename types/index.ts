@@ -49,6 +49,26 @@ export interface Rank {
     image: string;
 }
 
+export interface MissionProgress {
+    attempts: number;
+    lastScore: number;
+    passedEver: boolean;
+    completedAt?: number;
+    lastAttemptAt?: number;
+}
+
+export interface PracticeAssignmentConfig {
+    templateId: "math-multiplication-1-12";
+    subject: "math";
+    gradeLevel: 3 | 4;
+    questionCount: number;
+    tableMin: number;
+    tableMax: number;
+    multiplicandMin: number;
+    multiplicandMax: number;
+    attemptPolicy: "once" | "unlimited";
+}
+
 export interface AvatarConfig {
     hue?: number;
     skinHue?: number;
@@ -93,6 +113,7 @@ export interface UserData {
     planetXP?: Record<string, number>; // XP earned per planet (for unlocks)
     unlockedHats?: string[];
     completedMissions?: string[];
+    missionProgress?: Record<string, MissionProgress>;
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)

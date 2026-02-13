@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, getDocs, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
-import { Plus, BookOpen, Video, Trash2, Edit2, Loader2, ArrowLeft } from "lucide-react";
+import { Plus, BookOpen, Video, Trash2, Loader2, ArrowLeft, Brain, CheckCircle2, Clock3, CircleDashed } from "lucide-react";
 
 export interface Question {
     id: string;
@@ -19,7 +19,7 @@ export interface Mission {
     id: string;
     title: string;
     description: string;
-    type: 'read' | 'watch';
+    type: 'read' | 'watch' | 'practice';
     contentUrl?: string; // For Youtube
     contentText?: string; // For reading
     questions: Question[];
@@ -27,9 +27,15 @@ export interface Mission {
     createdAt: any;
 }
 
+interface StudentProgress {
+    completedMissions?: string[];
+    missionProgress?: Record<string, { attempts: number; lastScore: number; passedEver: boolean }>;
+}
+
 export default function MissionsPage() {
     const { user } = useAuth();
     const [missions, setMissions] = useState<Mission[]>([]);
+    const [students, setStudents] = useState<StudentProgress[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -37,13 +43,26 @@ export default function MissionsPage() {
             if (!user) return;
             try {
                 // Fetch from teacher's subcollection
-                const q = query(
+                const missionQuery = query(
                     collection(db, `users/${user.uid}/missions`), 
                     orderBy("createdAt", "desc")
                 );
-                const snapshot = await getDocs(q);
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
-                setMissions(data);
+                const studentQuery = query(
+                    collection(db, "users"),
+                    where("role", "==", "student"),
+                    where("teacherId", "==", user.uid)
+                );
+
+                const [missionSnapshot, studentSnapshot] = await Promise.all([
+                    getDocs(missionQuery),
+                    getDocs(studentQuery)
+                ]);
+
+                const missionData = missionSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
+                const studentData = studentSnapshot.docs.map(doc => doc.data() as StudentProgress);
+
+                setMissions(missionData);
+                setStudents(studentData);
             } catch (error) {
                 console.error("Error fetching missions:", error);
             } finally {
@@ -53,6 +72,43 @@ export default function MissionsPage() {
 
         fetchMissions();
     }, [user]);
+
+    const missionStatsById = useMemo(() => {
+        const totalStudents = students.length;
+        const map: Record<string, { completed: number; attempted: number; notStarted: number; averageScore: number }> = {};
+
+        missions.forEach((mission) => {
+            let completed = 0;
+            let attempted = 0;
+            let scoreSum = 0;
+            let scoreCount = 0;
+
+            students.forEach((student) => {
+                const progress = student.missionProgress?.[mission.id];
+                const completedViaLegacy = student.completedMissions?.includes(mission.id) || false;
+
+                if ((progress?.attempts || 0) > 0 || completedViaLegacy) attempted += 1;
+                if (progress?.passedEver || completedViaLegacy) completed += 1;
+                if (typeof progress?.lastScore === 'number') {
+                    scoreSum += progress.lastScore;
+                    scoreCount += 1;
+                }
+            });
+
+            map[mission.id] = {
+                completed,
+                attempted,
+                notStarted: Math.max(totalStudents - attempted, 0),
+                averageScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+            };
+        });
+
+        return { totalStudents, map };
+    }, [missions, students]);
+
+    const totalCompleted = missions.reduce((sum, mission) => sum + (missionStatsById.map[mission.id]?.completed || 0), 0);
+    const totalAttempted = missions.reduce((sum, mission) => sum + (missionStatsById.map[mission.id]?.attempted || 0), 0);
+    const totalNotStarted = missions.reduce((sum, mission) => sum + (missionStatsById.map[mission.id]?.notStarted || 0), 0);
 
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">
@@ -64,8 +120,8 @@ export default function MissionsPage() {
                             <ArrowLeft size={20} />
                         </Link>
                         <div>
-                            <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Mission Control</h1>
-                            <p className="text-cyan-600 text-sm mt-1">Manage Cadet Assignments & Training Modules</p>
+                            <h1 className="text-3xl font-bold uppercase tracking-widest text-white">Assignments</h1>
+                            <p className="text-cyan-600 text-sm mt-1">Track completion, attempts, and scores.</p>
                         </div>
                     </div>
                     <Link 
@@ -76,6 +132,27 @@ export default function MissionsPage() {
                         CREATE MISSION
                     </Link>
                 </div>
+
+                {!loading && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div className="rounded-xl border border-cyan-900/50 bg-black/30 p-4">
+                            <div className="text-xs uppercase text-cyan-600 tracking-wider">Students</div>
+                            <div className="text-2xl font-bold text-white mt-1">{missionStatsById.totalStudents}</div>
+                        </div>
+                        <div className="rounded-xl border border-green-900/50 bg-black/30 p-4">
+                            <div className="text-xs uppercase text-green-500 tracking-wider">Completed</div>
+                            <div className="text-2xl font-bold text-white mt-1">{totalCompleted}</div>
+                        </div>
+                        <div className="rounded-xl border border-yellow-900/50 bg-black/30 p-4">
+                            <div className="text-xs uppercase text-yellow-500 tracking-wider">Attempted</div>
+                            <div className="text-2xl font-bold text-white mt-1">{totalAttempted}</div>
+                        </div>
+                        <div className="rounded-xl border border-red-900/50 bg-black/30 p-4">
+                            <div className="text-xs uppercase text-red-500 tracking-wider">Not Started</div>
+                            <div className="text-2xl font-bold text-white mt-1">{totalNotStarted}</div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Content */}
                 {loading ? (
@@ -93,14 +170,28 @@ export default function MissionsPage() {
                             missions.map((mission) => (
                                 <div key={mission.id} className="group bg-black/40 border border-cyan-900/50 hover:border-cyan-500/50 rounded-xl p-6 transition-all backdrop-blur-sm flex flex-col">
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : 'bg-blue-900/20 text-blue-400'}`}>
-                                            {mission.type === 'watch' ? <Video size={24} /> : <BookOpen size={24} />}
+                                        <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : mission.type === 'practice' ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
+                                            {mission.type === 'watch' ? <Video size={24} /> : mission.type === 'practice' ? <Brain size={24} /> : <BookOpen size={24} />}
                                         </div>
                                         <span className="text-xs font-bold bg-cyan-950/50 text-cyan-300 px-2 py-1 rounded border border-cyan-900">{mission.xpReward} XP</span>
                                     </div>
                                     
                                     <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{mission.title}</h3>
                                     <p className="text-cyan-600 text-sm mb-6 line-clamp-3 flex-grow">{mission.description}</p>
+
+                                    {(() => {
+                                        const stats = missionStatsById.map[mission.id] || { completed: 0, attempted: 0, notStarted: 0, averageScore: 0 };
+                                        return (
+                                            <div className="mb-4 rounded-lg border border-cyan-900/40 bg-black/30 p-3 text-xs">
+                                                <div className="grid grid-cols-2 gap-2 text-gray-300">
+                                                    <div className="flex items-center gap-1"><CheckCircle2 size={12} className="text-green-400" /> Completed: <span className="text-white font-bold">{stats.completed}</span></div>
+                                                    <div className="flex items-center gap-1"><Clock3 size={12} className="text-yellow-400" /> Attempted: <span className="text-white font-bold">{stats.attempted}</span></div>
+                                                    <div className="flex items-center gap-1"><CircleDashed size={12} className="text-red-400" /> Not Started: <span className="text-white font-bold">{stats.notStarted}</span></div>
+                                                    <div>Avg Score: <span className="text-white font-bold">{stats.averageScore}%</span></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                     
                                     <div className="flex gap-2 mt-auto pt-4 border-t border-cyan-900/30">
                                         <Link href={`/teacher/missions/create?edit=${mission.id}`} className="flex-1">

@@ -22,7 +22,7 @@ service cloud.firestore {
     // Public, non-sensitive aggregated stats for the marketing homepage.
     match /public-stats/{docId} {
       allow read: if docId == "landing";
-      allow write: if docId == "landing" && (isAdmin() || isTeacher());
+      allow write: if docId == "landing" && request.auth != null;
     }
 
     match /users/{userId} {

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
 import Link from "next/link";
 import confetti from 'canvas-confetti';
+import { createPracticeQuestions, PracticeAssignmentConfig, PracticeQuestion } from "@/lib/practice";
 
 interface Question {
     id: string;
@@ -20,11 +21,20 @@ interface Mission {
     id: string;
     title: string;
     description: string;
-    type: 'read' | 'watch';
+    type: 'read' | 'watch' | 'practice';
     contentUrl?: string; 
     contentText?: string;
     questions: Question[];
+    practiceConfig?: PracticeAssignmentConfig;
     xpReward: number;
+}
+
+interface MissionProgress {
+    attempts: number;
+    lastScore: number;
+    passedEver: boolean;
+    completedAt?: number;
+    lastAttemptAt?: number;
 }
 
 export default function StudentMissions() {
@@ -34,8 +44,11 @@ export default function StudentMissions() {
     const [activeMission, setActiveMission] = useState<Mission | null>(null);
     const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
     const [completedMissions, setCompletedMissions] = useState<string[]>([]);
+    const [missionProgress, setMissionProgress] = useState<Record<string, MissionProgress>>({});
     const [submitting, setSubmitting] = useState(false);
     const [feedback, setFeedback] = useState<{correct: boolean, score: number, newRank?: string} | null>(null);
+    const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[]>([]);
+    const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
 
     const normalizeText = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
@@ -83,10 +96,13 @@ export default function StudentMissions() {
                 const missionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
                 setMissions(missionData);
 
-                // Get User Completions (if stored on user doc)
-                // Casting userData as any to access custom fields not yet in strict types
-                const userCompletions: string[] = (userData as any)?.completedMissions || [];
+                // Get fresh user progress (context can be stale)
+                const userSnap = await getDoc(doc(db, "users", user.uid));
+                const userRecord = userSnap.exists() ? userSnap.data() as any : (userData as any);
+                const userCompletions: string[] = userRecord?.completedMissions || [];
+                const progressMap: Record<string, MissionProgress> = userRecord?.missionProgress || {};
                 setCompletedMissions(userCompletions);
+                setMissionProgress(progressMap);
             } catch (e) {
                 console.error("Error loading missions:", e);
             }
@@ -96,6 +112,12 @@ export default function StudentMissions() {
     }, [user, userData]);
 
     const handleStartMission = (mission: Mission) => {
+        const missionState = missionProgress[mission.id];
+        if (mission.type === 'practice' && mission.practiceConfig?.attemptPolicy === 'once' && (missionState?.attempts || 0) > 0) {
+            alert("This assignment is set to one attempt.");
+            return;
+        }
+
         setActiveMission(mission);
         const initialAnswers: Record<string, string | string[]> = {};
         mission.questions.forEach((q) => {
@@ -105,12 +127,25 @@ export default function StudentMissions() {
             }
         });
         setAnswers(initialAnswers);
+        if (mission.type === 'practice' && mission.practiceConfig) {
+            const seed = `${user?.uid || 'cadet'}:${mission.id}:${Date.now()}`;
+            const generated = createPracticeQuestions(mission.practiceConfig, seed);
+            setPracticeQuestions(generated);
+            setPracticeAnswers({});
+        } else {
+            setPracticeQuestions([]);
+            setPracticeAnswers({});
+        }
         setFeedback(null);
         window.scrollTo(0,0);
     };
 
     const handleAnswerChange = (questionId: string, value: string) => {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
+    };
+
+    const handlePracticeAnswerChange = (questionId: string, value: string) => {
+        setPracticeAnswers((prev) => ({ ...prev, [questionId]: value }));
     };
 
     const moveSortItem = (questionId: string, fromIndex: number, delta: number) => {
@@ -132,40 +167,61 @@ export default function StudentMissions() {
         try {
             // Grading
             let correctCount = 0;
-            const totalQuestions = activeMission.questions.length;
+            let totalQuestions = 0;
 
-            activeMission.questions.forEach(q => {
-                const answer = answers[q.id];
-                if (q.type === 'sort') {
-                    const submittedOrder = Array.isArray(answer)
-                        ? answer.map(normalizeText)
-                        : [];
-                    const expectedOrder = Array.isArray(q.correctAnswer)
-                        ? q.correctAnswer.map(normalizeText)
-                        : (q.options || []).map(normalizeText);
-                    const isCorrectSort = submittedOrder.length === expectedOrder.length
-                        && submittedOrder.every((item, index) => item === expectedOrder[index]);
-                    if (isCorrectSort) {
+            if (activeMission.type === 'practice') {
+                totalQuestions = practiceQuestions.length;
+                practiceQuestions.forEach((question) => {
+                    const raw = practiceAnswers[question.id];
+                    const numeric = Number(String(raw || '').trim());
+                    if (!Number.isNaN(numeric) && numeric === question.answer) {
+                        correctCount += 1;
+                    }
+                });
+            } else {
+                totalQuestions = activeMission.questions.length;
+                activeMission.questions.forEach(q => {
+                    const answer = answers[q.id];
+                    if (q.type === 'sort') {
+                        const submittedOrder = Array.isArray(answer)
+                            ? answer.map(normalizeText)
+                            : [];
+                        const expectedOrder = Array.isArray(q.correctAnswer)
+                            ? q.correctAnswer.map(normalizeText)
+                            : (q.options || []).map(normalizeText);
+                        const isCorrectSort = submittedOrder.length === expectedOrder.length
+                            && submittedOrder.every((item, index) => item === expectedOrder[index]);
+                        if (isCorrectSort) {
+                            correctCount++;
+                        }
+                        return;
+                    }
+
+                    const submitted = normalizeText(answer);
+                    const expected = normalizeText(q.correctAnswer);
+                    if (submitted && submitted === expected) {
                         correctCount++;
                     }
-                    return;
-                }
+                });
+            }
 
-                const submitted = normalizeText(answer);
-                const expected = normalizeText(q.correctAnswer);
-                if (submitted && submitted === expected) {
-                    correctCount++;
-                }
-            });
-
-            const score = Math.round((correctCount / totalQuestions) * 100);
+            const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
             const passed = score >= 70; // 70% passing grade
 
             let newRankName: string | undefined;
+            const userRef = doc(db, "users", user.uid);
+            const currentProgress = missionProgress[activeMission.id] || { attempts: 0, lastScore: 0, passedEver: false };
+            const nextAttempts = (currentProgress.attempts || 0) + 1;
+            const now = Date.now();
+            const progressPayload: Record<string, any> = {
+                [`missionProgress.${activeMission.id}.attempts`]: nextAttempts,
+                [`missionProgress.${activeMission.id}.lastScore`]: score,
+                [`missionProgress.${activeMission.id}.lastAttemptAt`]: now,
+                [`missionProgress.${activeMission.id}.passedEver`]: currentProgress.passedEver || passed,
+            };
 
             if (passed) {
-                // Update User
-                const userRef = doc(db, "users", user.uid);
+                progressPayload[`missionProgress.${activeMission.id}.completedAt`] = now;
                 
                 // Only award XP if not already completed
                 if (!completedMissions.includes(activeMission.id)) {
@@ -185,20 +241,25 @@ export default function StudentMissions() {
                         completedMissions: arrayUnion(activeMission.id),
                         xp: increment(activeMission.xpReward),
                         ...(planetXpKey ? { [planetXpKey]: increment(activeMission.xpReward) } : {}),
-                        lastXpReason: `Mission completed: ${activeMission.title}`
+                        lastXpReason: `Mission completed: ${activeMission.title}`,
+                        ...progressPayload,
                     });
 
                     if (activeMission.xpReward > 0) {
-                        await setDoc(
-                            doc(db, "public-stats", "landing"),
-                            {
-                                focusPointsAwarded: increment(activeMission.xpReward),
-                                awardEvents: increment(1),
-                                studentsAwarded: increment(1),
-                                updatedAt: serverTimestamp(),
-                            },
-                            { merge: true }
-                        );
+                        try {
+                            await setDoc(
+                                doc(db, "public-stats", "landing"),
+                                {
+                                    focusPointsAwarded: increment(activeMission.xpReward),
+                                    awardEvents: increment(1),
+                                    studentsAwarded: increment(1),
+                                    updatedAt: serverTimestamp(),
+                                },
+                                { merge: true }
+                            );
+                        } catch (statsError) {
+                            console.warn("Public stats update skipped:", statsError);
+                        }
                     }
                     
                     // Trigger confetti
@@ -209,7 +270,41 @@ export default function StudentMissions() {
                     });
 
                     setCompletedMissions(prev => [...prev, activeMission.id]);
+                    setMissionProgress((prev) => ({
+                        ...prev,
+                        [activeMission.id]: {
+                            attempts: nextAttempts,
+                            lastScore: score,
+                            passedEver: true,
+                            completedAt: now,
+                            lastAttemptAt: now,
+                        }
+                    }));
+                } else {
+                    await updateDoc(userRef, progressPayload);
+                    setMissionProgress((prev) => ({
+                        ...prev,
+                        [activeMission.id]: {
+                            attempts: nextAttempts,
+                            lastScore: score,
+                            passedEver: currentProgress.passedEver || passed,
+                            completedAt: currentProgress.completedAt || now,
+                            lastAttemptAt: now,
+                        }
+                    }));
                 }
+            } else {
+                await updateDoc(userRef, progressPayload);
+                setMissionProgress((prev) => ({
+                    ...prev,
+                    [activeMission.id]: {
+                        attempts: nextAttempts,
+                        lastScore: score,
+                        passedEver: currentProgress.passedEver,
+                        completedAt: currentProgress.completedAt,
+                        lastAttemptAt: now,
+                    }
+                }));
             }
 
             setFeedback({ correct: passed, score, newRank: newRankName });
@@ -249,8 +344,8 @@ export default function StudentMissions() {
                         <div className="p-8 border-b border-cyan-900/50 bg-gradient-to-r from-cyan-950/50 to-transparent">
                             <div className="flex justify-between items-start mb-4">
                                 <span className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 text-cyan-300 rounded text-xs font-bold uppercase tracking-wider border border-cyan-500/20">
-                                    {activeMission.type === 'watch' ? <Video size={14} /> : <BookOpen size={14} />}
-                                    {activeMission.type === 'watch' ? 'Video Log' : 'Intel Report'}
+                                    {activeMission.type === 'watch' ? <Video size={14} /> : activeMission.type === 'practice' ? <Brain size={14} /> : <BookOpen size={14} />}
+                                    {activeMission.type === 'watch' ? 'Video Log' : activeMission.type === 'practice' ? 'Math Practice' : 'Intel Report'}
                                 </span>
                                 <div className="flex items-center gap-2 text-yellow-400 font-bold">
                                     <Trophy size={18} />
@@ -282,15 +377,38 @@ export default function StudentMissions() {
                                 </div>
                             )}
 
+                            {activeMission.type === 'practice' && (
+                                <div className="mb-8 p-5 rounded-xl border border-cyan-900/30 bg-cyan-950/20">
+                                    <p className="text-cyan-200/90 text-sm md:text-base">
+                                        Solve each multiplication problem. You need 70% or higher to pass.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Quiz Section */}
                             <div className="mt-12">
                                 <h3 className="flex items-center gap-2 text-xl font-bold text-white mb-6 pb-2 border-b border-cyan-900">
                                     <Brain className="text-purple-400" />
-                                    Knowledge Check
+                                    {activeMission.type === 'practice' ? 'Practice Drill' : 'Knowledge Check'}
                                 </h3>
 
                                 <div className="space-y-8">
-                                    {activeMission.questions.map((q, idx) => (
+                                    {activeMission.type === 'practice' ? practiceQuestions.map((question, idx) => (
+                                        <div key={question.id} className="p-6 bg-black/40 rounded-xl border border-cyan-900/30">
+                                            <p className="font-bold text-white mb-4 text-lg">
+                                                <span className="text-cyan-600 mr-2">{idx + 1}.</span>
+                                                {question.prompt}
+                                            </p>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                value={practiceAnswers[question.id] || ''}
+                                                onChange={(e) => handlePracticeAnswerChange(question.id, e.target.value)}
+                                                className="w-full max-w-xs rounded-lg bg-black/30 border border-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                placeholder="Enter answer"
+                                            />
+                                        </div>
+                                    )) : activeMission.questions.map((q, idx) => (
                                         <div key={q.id} className="p-6 bg-black/40 rounded-xl border border-cyan-900/30">
                                             <p className="font-bold text-white mb-4 text-lg">
                                                 <span className="text-cyan-600 mr-2">{idx + 1}.</span>
@@ -405,22 +523,26 @@ export default function StudentMissions() {
                             {!feedback && (
                                 <button 
                                     onClick={submitMission}
-                                    disabled={submitting || activeMission.questions.some((q) => {
-                                        const value = answers[q.id];
-                                        if (q.type === 'sort') {
-                                            return !Array.isArray(value) || value.length === 0;
-                                        }
-                                        return typeof value !== 'string' || !value.trim();
-                                    })}
-                                    className={`
-                                        w-full mt-8 py-4 rounded-xl font-bold text-xl uppercase tracking-widest transition-all
-                                        ${activeMission.questions.some((q) => {
+                                    disabled={submitting || (activeMission.type === 'practice'
+                                        ? practiceQuestions.length === 0 || practiceQuestions.some((question) => !String(practiceAnswers[question.id] || '').trim())
+                                        : activeMission.questions.some((q) => {
                                             const value = answers[q.id];
                                             if (q.type === 'sort') {
                                                 return !Array.isArray(value) || value.length === 0;
                                             }
                                             return typeof value !== 'string' || !value.trim();
-                                        })
+                                        }))}
+                                    className={`
+                                        w-full mt-8 py-4 rounded-xl font-bold text-xl uppercase tracking-widest transition-all
+                                        ${(activeMission.type === 'practice'
+                                            ? practiceQuestions.length === 0 || practiceQuestions.some((question) => !String(practiceAnswers[question.id] || '').trim())
+                                            : activeMission.questions.some((q) => {
+                                                const value = answers[q.id];
+                                                if (q.type === 'sort') {
+                                                    return !Array.isArray(value) || value.length === 0;
+                                                }
+                                                return typeof value !== 'string' || !value.trim();
+                                            }))
                                             ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                                             : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-900/50'}
                                     `}
@@ -452,6 +574,8 @@ export default function StudentMissions() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {missions.map(mission => {
                         const isCompleted = completedMissions.includes(mission.id);
+                        const progress = missionProgress[mission.id];
+                        const isPracticeOnceLocked = mission.type === 'practice' && mission.practiceConfig?.attemptPolicy === 'once' && (progress?.attempts || 0) > 0;
                         return (
                             <div 
                                 key={mission.id} 
@@ -464,8 +588,8 @@ export default function StudentMissions() {
                                 `}
                             >
                                 <div className="flex justify-between items-start mb-4">
-                                     <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : 'bg-blue-900/20 text-blue-400'}`}>
-                                        {mission.type === 'watch' ? <Video size={24} /> : <BookOpen size={24} />}
+                                     <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : mission.type === 'practice' ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
+                                        {mission.type === 'watch' ? <Video size={24} /> : mission.type === 'practice' ? <Brain size={24} /> : <BookOpen size={24} />}
                                      </div>
                                      {isCompleted ? (
                                          <span className="flex items-center gap-1 text-green-400 font-bold bg-green-900/20 px-3 py-1 rounded-full border border-green-500/30 text-xs uppercase">
@@ -482,6 +606,14 @@ export default function StudentMissions() {
                                     {mission.title}
                                 </h3>
                                 <p className="text-sm text-gray-400 line-clamp-2 mb-4">{mission.description}</p>
+
+                                {(progress || isPracticeOnceLocked) && (
+                                    <div className="text-xs text-cyan-500 mb-3">
+                                        Attempts: {progress?.attempts || 0}
+                                        {typeof progress?.lastScore === 'number' ? ` • Last score: ${progress.lastScore}%` : ''}
+                                        {isPracticeOnceLocked ? ' • One-attempt assignment already used' : ''}
+                                    </div>
+                                )}
                                 
                                 <div className="text-xs text-cyan-700 font-bold uppercase tracking-wider flex items-center gap-2">
                                     {isCompleted ? 'Review Data' : 'Click to Initiate'}
