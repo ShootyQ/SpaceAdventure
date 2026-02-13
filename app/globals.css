@@ -37,3 +37,22 @@ body {
 .font-heading {
   font-family: var(--font-heading);
 }
+
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #020617;
+  color: #e2e8f0;
+}
+
+.no-number-spinner {
+  -moz-appearance: textfield;
+}
+
+.no-number-spinner::-webkit-outer-spin-button,
+.no-number-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

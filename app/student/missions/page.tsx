@@ -415,15 +415,6 @@ export default function StudentMissions() {
         setSubmitting(false);
     };
 
-    if (loading) {
-        return (
-             <div className="min-h-screen bg-black flex items-center justify-center text-cyan-500">
-                <Loader2 size={40} className="animate-spin" />
-             </div>
-        );
-    }
-
-    // Active Mission View
     const missionCards = useMemo(() => {
         return missions.map((mission) => {
             const isPracticeMission = inferPracticeFromLegacy(mission);
@@ -520,6 +511,16 @@ export default function StudentMissions() {
             )}
         </section>
     );
+
+    if (loading) {
+        return (
+             <div className="min-h-screen bg-black flex items-center justify-center text-cyan-500">
+                <Loader2 size={40} className="animate-spin" />
+             </div>
+        );
+    }
+
+    // Active Mission View
 
     if (activeMission) {
         const isPracticeMission = inferPracticeFromLegacy(activeMission);

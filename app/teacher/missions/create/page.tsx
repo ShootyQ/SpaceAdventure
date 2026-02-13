@@ -100,6 +100,20 @@ export default function CreateMissionPage() {
         return next;
     };
 
+    const getEffectivePracticeGradeLevel = (): GradeLevel => {
+        if (gradeFilter !== 'all') return gradeFilter;
+
+        const numericTargetGrades = targetGrades
+            .map((grade) => Number(grade))
+            .filter((grade) => Number.isInteger(grade) && grade >= 1 && grade <= 8) as GradeLevel[];
+
+        if (numericTargetGrades.length > 0) {
+            return numericTargetGrades[0];
+        }
+
+        return practiceConfig.gradeLevel;
+    };
+
     const addQuestion = () => {
         setQuestions([...questions, {
             id: Date.now().toString(),
@@ -313,7 +327,11 @@ export default function CreateMissionPage() {
                     targetGrades,
                     contentUrl: type === 'watch' ? contentUrl : null,
                     contentText: type === 'read' ? contentText : null,
-                    practiceConfig: type === 'practice' ? practiceConfig : null,
+                    practiceConfig: type === 'practice' ? {
+                        ...practiceConfig,
+                        gradeLevel: getEffectivePracticeGradeLevel(),
+                        questionCount: Math.min(Math.max(Number(practiceConfig.questionCount || 24), 1), 50),
+                    } : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
                     updatedAt: serverTimestamp()
@@ -326,7 +344,11 @@ export default function CreateMissionPage() {
                     targetGrades,
                     contentUrl: type === 'watch' ? contentUrl : null,
                     contentText: type === 'read' ? contentText : null,
-                    practiceConfig: type === 'practice' ? practiceConfig : null,
+                    practiceConfig: type === 'practice' ? {
+                        ...practiceConfig,
+                        gradeLevel: getEffectivePracticeGradeLevel(),
+                        questionCount: Math.min(Math.max(Number(practiceConfig.questionCount || 24), 1), 50),
+                    } : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
                     teacherId: user.uid,
@@ -486,6 +508,9 @@ export default function CreateMissionPage() {
                                                 onChange={(e) => {
                                                     const next = e.target.value === 'all' ? 'all' : Number(e.target.value) as GradeLevel;
                                                     setGradeFilter(next);
+                                                    if (next !== 'all') {
+                                                        setPracticeConfig((prev) => ({ ...prev, gradeLevel: next }));
+                                                    }
                                                 }}
                                                 className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                             >
@@ -519,35 +544,23 @@ export default function CreateMissionPage() {
                                         <p className="text-xs text-cyan-600 mt-1">{selectedTemplate?.description || ''}</p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Assignment Grade</label>
-                                            <select
-                                                value={practiceConfig.gradeLevel}
-                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, gradeLevel: Number(e.target.value) as GradeLevel })}
-                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
-                                            >
-                                                <option value={1}>1st Grade</option>
-                                                <option value={2}>2nd Grade</option>
-                                                <option value={3}>3rd Grade</option>
-                                                <option value={4}>4th Grade</option>
-                                                <option value={5}>5th Grade</option>
-                                                <option value={6}>6th Grade</option>
-                                                <option value={7}>7th Grade</option>
-                                                <option value={8}>8th Grade</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Problems per Attempt</label>
-                                            <input
-                                                type="number"
-                                                min={5}
-                                                max={60}
-                                                value={practiceConfig.questionCount}
-                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, questionCount: Number(e.target.value) || 24 })}
-                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
-                                            />
-                                        </div>
+                                    <div>
+                                        <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">How Many Problems for This Lesson</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={50}
+                                            value={practiceConfig.questionCount}
+                                            onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                if (Number.isNaN(next)) {
+                                                    setPracticeConfig({ ...practiceConfig, questionCount: 1 });
+                                                    return;
+                                                }
+                                                setPracticeConfig({ ...practiceConfig, questionCount: Math.min(Math.max(next, 1), 50) });
+                                            }}
+                                            className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                        />
                                     </div>
 
                                     {(practiceConfig.templateId === 'math-addition-1-3-digit'
