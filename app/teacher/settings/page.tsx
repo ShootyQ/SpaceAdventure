@@ -1500,7 +1500,7 @@ function SettingsContent() {
                     <div className="flex items-center gap-4">
                         {/* Direct Link to Dashboard for Top-Level Modes */}
                         {["asteroids", "billing", "team", "cockpit"].includes(view) ? (
-                            <Link href="/teacher" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                            <Link href="/teacher/space" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                                 <ArrowLeft size={20} />
                                 <span className="sr-only">Return to Dashboard</span>
                             </Link>

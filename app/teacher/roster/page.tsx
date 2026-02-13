@@ -223,7 +223,7 @@ export default function RosterPage() {
         <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between gap-4 mb-8">
                  <div className="flex items-center gap-4">
-                     <Link href="/teacher" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                     <Link href="/teacher/space" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                         <ArrowLeft size={20} />
                      </Link>
                      <div>

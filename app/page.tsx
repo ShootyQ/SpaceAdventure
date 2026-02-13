@@ -8,36 +8,55 @@ import { ArrowRight, CheckCircle2, GraduationCap, ShieldCheck, UserCircle2, Game
 import { motion } from "framer-motion";
 
 export default function Home() {
-  const [educatorCount, setEducatorCount] = useState(1);
+  const [educatorCount, setEducatorCount] = useState(2);
   const [educatorInitialsList, setEducatorInitialsList] = useState<string[]>(["CD", "SK"]);
   const [activeStudents, setActiveStudents] = useState(24);
   const [weeklyMissions, setWeeklyMissions] = useState(5);
   const [focusPointsAwarded, setFocusPointsAwarded] = useState(320);
   const [awardEvents, setAwardEvents] = useState(12);
   const [studentsAwarded, setStudentsAwarded] = useState(6);
+  const [isLandingStatsLoading, setIsLandingStatsLoading] = useState(true);
+  const [statsUpdatedAt, setStatsUpdatedAt] = useState<string | null>(null);
+  const [statsSource, setStatsSource] = useState<"live" | "fallback" | "unknown">("unknown");
+
+  const statsFreshness = (() => {
+    if (!statsUpdatedAt) return "just now";
+    const diffMs = Date.now() - new Date(statsUpdatedAt).getTime();
+    if (diffMs < 60_000) return "just now";
+    const minutes = Math.floor(diffMs / 60_000);
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  })();
 
   useEffect(() => {
     const fetchEducators = async () => {
       try {
-        // Fetch from server-side API to bypass Firestore client-side permission issues
-        const res = await fetch('/api/educators/stats');
+        const res = await fetch('/api/educators/stats', { cache: 'no-store' });
         if (res.ok) {
             const data = await res.json();
-            setEducatorCount(data.count);
+            if (typeof data.count === 'number') setEducatorCount(data.count);
             if (Array.isArray(data.initialsList) && data.initialsList.length) {
               setEducatorInitialsList(data.initialsList);
             } else if (typeof data.initials === 'string' && data.initials) {
               setEducatorInitialsList([data.initials]);
             }
-            if (data.activeStudents) setActiveStudents(data.activeStudents);
-            if (data.weeklyMissions) setWeeklyMissions(data.weeklyMissions);
+            if (typeof data.activeStudents === 'number') setActiveStudents(data.activeStudents);
+            if (typeof data.weeklyMissions === 'number') setWeeklyMissions(data.weeklyMissions);
+            if (typeof data.updatedAt === 'string') setStatsUpdatedAt(data.updatedAt);
+            if (data.source === 'live' || data.source === 'fallback') setStatsSource(data.source);
         }
       } catch (error) {
         console.error("Error fetching educator stats:", error);
+      } finally {
+        setIsLandingStatsLoading(false);
       }
     };
     
     fetchEducators();
+
+    const pollId = setInterval(fetchEducators, 60_000);
+    return () => clearInterval(pollId);
   }, []);
 
   useEffect(() => {
@@ -162,7 +181,11 @@ export default function Home() {
                     Used by {educatorCount} educator{educatorCount !== 1 ? "s" : ""}
                     {educatorInitialsList.length ? ` (${educatorInitialsList.slice(0, 2).join(", ")})` : ""} building consistent routines.
                   </p>
-                  <p className="text-xs text-slate-500">Early access enrollment for 2026 launches.</p>
+                  <p className="text-xs text-slate-500">
+                    {isLandingStatsLoading
+                      ? "Refreshing live stats..."
+                      : `Updated ${statsFreshness}${statsSource === "fallback" ? " (seed data)" : ""}.`}
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -179,6 +202,9 @@ export default function Home() {
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Demo</p>
                       <h2 className="font-heading text-2xl font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">Classroom Snapshot</h2>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {isLandingStatsLoading ? "Syncing..." : `Data updated ${statsFreshness}`}
+                      </p>
                     </div>
                     <div className="text-xs text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 group-hover:bg-emerald-200 transition-colors">
                         <span className="relative flex h-2 w-2">

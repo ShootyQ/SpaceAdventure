@@ -256,7 +256,7 @@ export default function RewardsPage() {
                 {/* Header */}
                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 shrink-0 gap-4">
                     <div className="flex items-center gap-4">
-                        <Link href="/teacher" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                        <Link href="/teacher/space" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                              <X size={20} />
                         </Link>
                         <h1 className="text-xl md:text-2xl font-bold uppercase tracking-widest text-white">Rewards Command</h1>

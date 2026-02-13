@@ -98,7 +98,7 @@ export default function PrintablesPage() {
             <div className="print:hidden bg-space-950 text-white p-6 border-b border-cyan-900 sticky top-0 z-50 shadow-xl">
                  <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-4">
-                        <Link href="/teacher" className="p-2 rounded-lg border border-white/10 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                        <Link href="/teacher/space" className="p-2 rounded-lg border border-white/10 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
                             <ArrowLeft size={20} />
                         </Link>
                         <div>

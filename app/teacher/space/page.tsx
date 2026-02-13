@@ -95,6 +95,12 @@ export default function TeacherConsole() {
              </div>
           </div>
           <div className="flex gap-4 text-xs tracking-wider items-center">
+                 <Link
+                     href="/teacher"
+                     className="bg-black/40 hover:bg-cyan-900/20 border border-white/10 hover:border-cyan-500/50 text-white/60 hover:text-cyan-300 px-3 py-2 rounded-lg transition-all"
+                 >
+                     ALL GAMES
+                 </Link>
              <div className="flex flex-col items-end mr-4">
                  <span className="text-cyan-600">STATUS</span>
                  <span className="text-green-400">ONLINE</span>
@@ -173,36 +179,42 @@ export default function TeacherConsole() {
                         <div className="space-y-4">
                              <div className="grid grid-cols-2 gap-2">
                                  <div>
-                                     <label className="text-[10px] uppercase text-cyan-600">Current</label>
+                                     <label htmlFor="bonus-current" className="text-[10px] uppercase text-cyan-600">Current</label>
                                      <input 
+                                         id="bonus-current"
                                          type="number" 
                                          value={editBonusForm.current} 
                                          onChange={e => setEditBonusForm({...editBonusForm, current: Number(e.target.value)})}
                                          className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                         title="Current class bonus progress"
                                      />
                                  </div>
                                  <div>
-                                     <label className="text-[10px] uppercase text-cyan-600">Target</label>
+                                     <label htmlFor="bonus-target" className="text-[10px] uppercase text-cyan-600">Target</label>
                                      <input 
+                                         id="bonus-target"
                                          type="number" 
                                          value={editBonusForm.target} 
                                          onChange={e => setEditBonusForm({...editBonusForm, target: Number(e.target.value)})}
                                          className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                         title="Target class bonus goal"
                                      />
                                  </div>
                              </div>
                              <div>
-                                 <label className="text-[10px] uppercase text-cyan-600">Reward</label>
+                                 <label htmlFor="bonus-reward" className="text-[10px] uppercase text-cyan-600">Reward</label>
                                  <input 
+                                     id="bonus-reward"
                                      type="text" 
                                      value={editBonusForm.reward} 
                                      onChange={e => setEditBonusForm({...editBonusForm, reward: e.target.value})}
                                      className="w-full bg-black border border-cyan-800 rounded p-1 text-sm outline-none focus:border-cyan-400 text-white"
+                                     title="Class bonus reward description"
                                  />
                              </div>
                              <div className="flex justify-end gap-2">
-                                 <button onClick={() => setIsEditingBonus(false)} className="p-1 text-red-500 hover:bg-white/10 rounded"><X size={16} /></button>
-                                 <button onClick={handleSaveBonus} className="p-1 text-green-500 hover:bg-white/10 rounded"><Save size={16} /></button>
+                                 <button onClick={() => setIsEditingBonus(false)} title="Cancel bonus edits" className="p-1 text-red-500 hover:bg-white/10 rounded"><X size={16} /></button>
+                                 <button onClick={handleSaveBonus} title="Save bonus settings" className="p-1 text-green-500 hover:bg-white/10 rounded"><Save size={16} /></button>
                              </div>
                         </div>
                     ) : (

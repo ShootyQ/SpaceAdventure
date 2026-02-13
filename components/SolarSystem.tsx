@@ -876,6 +876,8 @@ export default function SolarSystem() {
       };
   };
 
+    const shipNameScale = Math.min(Math.max(0.85 / zoom, 1), 6);
+
   return (
     <div 
         className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
@@ -889,7 +891,7 @@ export default function SolarSystem() {
        <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
 
        {/* Class Name HUD */}
-       <div className="absolute top-6 left-6 z-40 pointer-events-none">
+       <div className={`absolute ${userData?.role === 'teacher' ? 'top-6 left-44' : 'top-6 left-6'} z-40 pointer-events-none`}>
            <div className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-bold mb-1">Sector Control</div>
            <div className="text-xl md:text-3xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
                {className || "Deep Space Network"}
@@ -899,7 +901,7 @@ export default function SolarSystem() {
        {/* Sound Toggle */}
        <button 
            onClick={(e) => { e.stopPropagation(); toggleSound(); }}
-           className={`absolute top-6 right-6 z-50 p-3 rounded-full border backdrop-blur-md transition-all ${isSoundOn ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-black/20 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
+           className={`absolute top-32 right-6 z-50 p-3 rounded-full border backdrop-blur-md transition-all ${isSoundOn ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-black/20 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
        >
            {isSoundOn ? <Volume2 size={24} /> : <VolumeX size={24} />}
        </button>
@@ -975,7 +977,7 @@ export default function SolarSystem() {
                               />
                           ) : (
                                                             <div 
-                                                                                                                                className="relative w-12 h-12 flex items-center justify-center"
+                                                                                                                                className="relative w-8 h-8 flex items-center justify-center"
                                                                 style={{ transform: `rotate(${rotationData + 45}deg)` }}
                               >
                                   <div className="relative w-full h-full">
@@ -991,7 +993,10 @@ export default function SolarSystem() {
                                   </div>
                               </div>
                           )}
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 text-[8px] bg-black/50 text-white px-1 rounded whitespace-nowrap mt-1">
+                          <span
+                              className="absolute top-full left-1/2 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded whitespace-nowrap mt-1 border border-cyan-500/30"
+                              style={{ transform: `translateX(-50%) scale(${shipNameScale})`, transformOrigin: 'top center' }}
+                          >
                               {ship.cadetName} ({Math.round(progress * 100)}%)
                           </span>
                       </div>
@@ -1129,7 +1134,10 @@ export default function SolarSystem() {
                                     }} 
                                 >
                                     {arr.length <= 8 && (
-                                        <span className="text-[10px] font-bold text-white bg-black/70 px-2 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm">
+                                        <span
+                                            className="text-[10px] font-bold text-white bg-black/70 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm"
+                                            style={{ transform: `scale(${shipNameScale})`, transformOrigin: 'bottom center' }}
+                                        >
                                             {ship.cadetName}
                                         </span>
                                     )}
@@ -1141,7 +1149,7 @@ export default function SolarSystem() {
                                         />
                                     ) : (
                                         <div 
-                                            className="relative w-12 h-12 flex items-center justify-center"
+                                            className="relative w-8 h-8 flex items-center justify-center"
                                             style={{ transform: 'rotate(-45deg)' }}
                                         >
                                             <div className="relative w-full h-full">
@@ -1172,7 +1180,7 @@ export default function SolarSystem() {
                    <h1 className="text-white font-mono text-xs tracking-widest uppercase">Classroom Sensor Feed // Live</h1>
                </div>
 
-                <Link href="/teacher" className="absolute top-6 left-6 z-40 bg-black/20 hover:bg-black/80 border border-white/10 hover:border-cyan-500 text-white/50 hover:text-cyan-400 px-6 py-3 rounded-full backdrop-blur-sm flex items-center gap-3 transition-all group">
+                <Link href="/teacher/space" className="absolute top-6 left-6 z-40 bg-black/20 hover:bg-black/80 border border-white/10 hover:border-cyan-500 text-white/50 hover:text-cyan-400 px-6 py-3 rounded-full backdrop-blur-sm flex items-center gap-3 transition-all group">
                     <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
                     <span className="font-bold tracking-widest uppercase text-sm">Cockpit</span>
                 </Link>
@@ -1472,7 +1480,7 @@ export default function SolarSystem() {
        </AnimatePresence>
 
        {/* Legend / Overlay Controls */}
-       <div className="absolute bottom-6 left-6 p-4 bg-black/60 rounded-xl border border-white/10 backdrop-blur text-xs text-gray-400 pointer-events-none select-none">
+         <div className="absolute bottom-24 left-6 p-4 bg-black/60 rounded-xl border border-white/10 backdrop-blur text-xs text-gray-400 pointer-events-none select-none">
           <h3 className="text-white font-bold mb-2 uppercase tracking-wider">System Command</h3>
           <p>Zoom Level: {Math.round(zoom * 100)}%</p>
           <p>Orbit Status: {isOrbiting ? "ACTIVE" : "LOCKED"}</p>

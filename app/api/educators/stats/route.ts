@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-// Revalidate every hour to keep stats reasonably fresh but cached
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function toInitials(displayName: string | undefined) {
   const safe = (displayName || "").trim();
@@ -15,6 +15,7 @@ function toInitials(displayName: string | undefined) {
 }
 
 export async function GET() {
+  const updatedAt = new Date().toISOString();
   try {
     // If Admin SDK is not initialized (mock mode), return fallback
     // We can detect mock by checking if 'listCollections' exists or just try/catch
@@ -32,6 +33,8 @@ export async function GET() {
         initialsList: ["CD", "SK"],
         activeStudents: 24,
         weeklyMissions: 5,
+        updatedAt,
+        source: "fallback",
       });
     }
 
@@ -94,6 +97,8 @@ export async function GET() {
       initialsList: initialsList.length ? initialsList : [initials],
       activeStudents,
       weeklyMissions,
+      updatedAt,
+      source: "live",
     });
 
   } catch (error) {
@@ -105,6 +110,8 @@ export async function GET() {
       initialsList: ["CD", "SK"],
       activeStudents: 24,
       weeklyMissions: 5,
+      updatedAt,
+      source: "fallback",
     }, { status: 200 });
   }
 }

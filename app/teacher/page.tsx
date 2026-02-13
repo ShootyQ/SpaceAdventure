@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Compass, Lock, Rocket, Power } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Compass, Lock, Rocket, Power } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function TeacherAdventurePortal() {
@@ -33,27 +33,36 @@ export default function TeacherAdventurePortal() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 px-6 py-10">
+    <div className="min-h-screen bg-[#f7f4ef] text-slate-900 px-6 py-10">
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute -top-32 -right-20 w-[560px] h-[560px] bg-emerald-200/40 blur-[140px] rounded-full" />
+        <div className="absolute bottom-0 -left-24 w-[560px] h-[560px] bg-amber-200/40 blur-[150px] rounded-full" />
+      </div>
+
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
           <div>
+            <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-3 transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Teacher Portal</p>
-            <h1 className="text-4xl font-bold tracking-tight">Choose your adventure</h1>
+            <h1 className="text-4xl font-bold tracking-tight">Choose your game</h1>
             <p className="text-slate-600 mt-2">One class roster, one XP system, multiple game worlds.</p>
           </div>
           <button
             onClick={logout}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 bg-white/90 hover:bg-white transition-colors"
           >
             <Power className="w-4 h-4" />
             Logout
           </button>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="relative z-10 grid md:grid-cols-3 gap-6">
           <Link
             href="/teacher/space"
-            className="group rounded-2xl border border-emerald-300 bg-white p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+            className="group rounded-2xl border border-emerald-300 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] hover:shadow-[0_30px_70px_rgba(15,23,42,0.14)] hover:-translate-y-0.5 transition-all"
           >
             <div className="flex items-center justify-between mb-6">
               <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
@@ -65,6 +74,7 @@ export default function TeacherAdventurePortal() {
             </div>
             <h2 className="text-2xl font-semibold mb-2">Space Adventure</h2>
             <p className="text-slate-600">Launch classroom control, missions, rewards, and the live map.</p>
+            <p className="mt-5 text-sm font-semibold text-emerald-700">Enter game →</p>
           </Link>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 opacity-75">
