@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase";
 import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy, Printer } from "lucide-react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { UserData, PLANETS, SpaceshipConfig } from "@/types";
+import { UserData, PLANETS, SpaceshipConfig, STUDENT_GRADES, StudentGrade } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
@@ -29,6 +29,7 @@ export default function RosterPage() {
   // Student Creation State
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
+    const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
   const [selectedAvatarId, setSelectedAvatarId] = useState(AVATAR_OPTIONS[0].id);
   const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
   const [creationError, setCreationError] = useState("");
@@ -105,6 +106,7 @@ export default function RosterPage() {
               photoURL: null,
               role: 'student',
               teacherId: user!.uid,
+              gradeLevel: newStudentGrade,
               classCode: classCode,
               status: 'active',
               xp: 0,
@@ -138,6 +140,7 @@ export default function RosterPage() {
           
           setStudents(prev => [...prev, newStudent]);
           setNewStudentData({ name: "", username: "", password: "" });
+          setNewStudentGrade("3");
           setSelectedAvatarId(AVATAR_OPTIONS[0].id);
           setSelectedShipId(SHIP_OPTIONS[0].id);
           setIsAddingStudent(false);
@@ -160,6 +163,7 @@ export default function RosterPage() {
           xp: student.xp || 0,
           fuel: student.fuel || 500,
           location: student.location || 'earth',
+          gradeLevel: student.gradeLevel || '3',
           status: student.status,
           avatar: student.avatar,
           spaceship: student.spaceship // Include spaceship
@@ -317,6 +321,18 @@ export default function RosterPage() {
                                     className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
                                     placeholder="Set Password"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-1 uppercase tracking-wider">Grade Level</label>
+                                <select
+                                    value={newStudentGrade}
+                                    onChange={(e) => setNewStudentGrade(e.target.value as StudentGrade)}
+                                    className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
+                                >
+                                    {STUDENT_GRADES.map((grade) => (
+                                        <option key={grade} value={grade}>{grade}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Avatar Selection */}
@@ -528,16 +544,27 @@ export default function RosterPage() {
                                                 </div>
                                             </div>
                                             <div className="col-span-12 md:col-span-2">
-                                                <select
-                                                    value={editForm.location}
-                                                    onChange={e => setEditForm({...editForm, location: e.target.value})}
-                                                    className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs uppercase"
-                                                >
-                                                    <option value="earth">Earth</option>
-                                                    {PLANETS.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                                    ))}
-                                                </select>
+                                                <div className="space-y-1">
+                                                    <select
+                                                        value={editForm.location}
+                                                        onChange={e => setEditForm({...editForm, location: e.target.value})}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs uppercase"
+                                                    >
+                                                        <option value="earth">Earth</option>
+                                                        {PLANETS.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        value={String(editForm.gradeLevel || '3')}
+                                                        onChange={e => setEditForm({ ...editForm, gradeLevel: e.target.value as StudentGrade })}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs"
+                                                    >
+                                                        {STUDENT_GRADES.map((grade) => (
+                                                            <option key={grade} value={grade}>Grade {grade}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
                                             </div>
                                         </>
                                     )}
@@ -560,6 +587,9 @@ export default function RosterPage() {
                                             <div className="text-xs text-gray-500 flex items-center gap-2">
                                                 {student.email || <span className="text-gray-600 italic">Offline Account</span>}
                                             </div>
+                                            {student.gradeLevel && (
+                                                <div className="text-[10px] text-cyan-500 uppercase tracking-wider mt-1">Grade {student.gradeLevel}</div>
+                                            )}
                                         </div>
                                     </div>
 

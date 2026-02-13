@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, Video, BookOpen, GripVertical, Loader2 } from "lucide-react";
 import { GradeLevel, PracticeAssignmentConfig, PracticeTemplateId, getPracticeTemplatesForGrade } from "@/lib/practice";
+import { STUDENT_GRADES, StudentGrade } from "@/types";
 
 type QuestionType = 'mc' | 'tf' | 'sort';
 type MissionContentType = 'read' | 'watch' | 'practice';
@@ -34,6 +35,7 @@ export default function CreateMissionPage() {
     const [type, setType] = useState<MissionContentType>('read');
     const [contentUrl, setContentUrl] = useState("");
     const [contentText, setContentText] = useState("");
+    const [targetGrades, setTargetGrades] = useState<Array<StudentGrade | 'all'>>(['all']);
     const [practiceConfig, setPracticeConfig] = useState<PracticeAssignmentConfig>({
         templateId: 'math-multiplication-facts',
         subject: 'math',
@@ -73,6 +75,18 @@ export default function CreateMissionPage() {
 
     const [editMissionId, setEditMissionId] = useState<string | null>(null);
     const isEditMode = !!editMissionId;
+
+    const toggleTargetGrade = (grade: StudentGrade | 'all') => {
+        setTargetGrades((prev) => {
+            if (grade === 'all') return ['all'];
+            const withoutAll = prev.filter((item) => item !== 'all') as StudentGrade[];
+            if (withoutAll.includes(grade)) {
+                const next = withoutAll.filter((item) => item !== grade);
+                return next.length > 0 ? next : ['all'];
+            }
+            return [...withoutAll, grade];
+        });
+    };
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -193,6 +207,11 @@ export default function CreateMissionPage() {
                 setType(data.type === 'watch' ? 'watch' : data.type === 'practice' ? 'practice' : 'read');
                 setContentUrl(data.contentUrl || '');
                 setContentText(data.contentText || '');
+                if (Array.isArray(data.targetGrades) && data.targetGrades.length > 0) {
+                    setTargetGrades(data.targetGrades);
+                } else {
+                    setTargetGrades(['all']);
+                }
                 if (data.practiceConfig) {
                     const legacyTemplate = data.practiceConfig.templateId === 'math-multiplication-1-12'
                         ? 'math-multiplication-facts'
@@ -291,6 +310,7 @@ export default function CreateMissionPage() {
                     title,
                     description,
                     type,
+                    targetGrades,
                     contentUrl: type === 'watch' ? contentUrl : null,
                     contentText: type === 'read' ? contentText : null,
                     practiceConfig: type === 'practice' ? practiceConfig : null,
@@ -303,6 +323,7 @@ export default function CreateMissionPage() {
                     title,
                     description,
                     type,
+                    targetGrades,
                     contentUrl: type === 'watch' ? contentUrl : null,
                     contentText: type === 'read' ? contentText : null,
                     practiceConfig: type === 'practice' ? practiceConfig : null,
@@ -401,6 +422,33 @@ export default function CreateMissionPage() {
                                         </button>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Assign to Grades</label>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleTargetGrade('all')}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${targetGrades.includes('all') ? 'bg-cyan-600 text-black border-cyan-400' : 'bg-black/40 text-cyan-300 border-cyan-900 hover:border-cyan-500'}`}
+                                    >
+                                        All Grades
+                                    </button>
+                                    {STUDENT_GRADES.map((grade) => {
+                                        const selected = targetGrades.includes(grade);
+                                        return (
+                                            <button
+                                                key={grade}
+                                                type="button"
+                                                onClick={() => toggleTargetGrade(grade)}
+                                                className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${selected ? 'bg-cyan-600 text-black border-cyan-400' : 'bg-black/40 text-cyan-300 border-cyan-900 hover:border-cyan-500'}`}
+                                            >
+                                                {grade}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-[10px] text-cyan-700 mt-2 uppercase tracking-wider">Click one or more grades. If none are selected, it defaults to All Grades.</p>
                             </div>
 
                             {type === 'watch' ? (

@@ -49,6 +49,10 @@ export interface Rank {
     image: string;
 }
 
+export type StudentGrade = "PreK" | "K" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
+
+export const STUDENT_GRADES: StudentGrade[] = ["PreK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
 export interface MissionProgress {
     attempts: number;
     lastScore: number;
@@ -104,6 +108,7 @@ export interface UserData {
     photoURL: string | null;
     role: "teacher" | "student" | "pending" | "admin";
     teacherId?: string; // Links student to a teacher
+    gradeLevel?: StudentGrade;
     classCode?: string; // For teachers, unique code for students to join
     classId?: string;   // Optional grouping
     status: "active" | "pending_approval" | "rejected";

@@ -7,7 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
 import Link from "next/link";
 import confetti from 'canvas-confetti';
-import { createPracticeQuestions, PracticeAssignmentConfig, PracticeQuestion } from "@/lib/practice";
+import { createPracticeQuestions, PracticeAssignmentConfig, PracticeQuestion, getPracticeTemplatesForGrade } from "@/lib/practice";
+import { StudentGrade } from "@/types";
 
 interface Question {
     id: string;
@@ -25,6 +26,7 @@ interface Mission {
     contentUrl?: string; 
     contentText?: string;
     questions: Question[];
+    targetGrades?: Array<StudentGrade | 'all'>;
     practiceConfig?: PracticeAssignmentConfig;
     xpReward: number;
 }
@@ -100,6 +102,29 @@ export default function StudentMissions() {
 
     const normalizeText = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
+    const normalizePracticeConfig = (config?: PracticeAssignmentConfig): PracticeAssignmentConfig => {
+        const templates = getPracticeTemplatesForGrade('all');
+        const defaultTemplateId = DEFAULT_PRACTICE_CONFIG.templateId;
+        const requestedTemplate = String(config?.templateId || defaultTemplateId);
+        const templateExists = templates.some((template) => template.id === requestedTemplate);
+
+        return {
+            ...DEFAULT_PRACTICE_CONFIG,
+            ...(config || {}),
+            templateId: (templateExists ? requestedTemplate : defaultTemplateId) as PracticeAssignmentConfig['templateId'],
+            questionCount: Math.min(Math.max(Number(config?.questionCount ?? DEFAULT_PRACTICE_CONFIG.questionCount), 5), 60),
+        };
+    };
+
+    const isMissionAssignedToStudentGrade = (mission: Mission, studentGrade?: StudentGrade) => {
+        const targets = Array.isArray(mission.targetGrades) && mission.targetGrades.length > 0
+            ? mission.targetGrades.map((grade) => String(grade))
+            : ['all'];
+        if (targets.includes('all')) return true;
+        if (!studentGrade) return true;
+        return targets.includes(String(studentGrade));
+    };
+
     const shuffleOptions = (values: string[]) => {
         const arr = [...values];
         for (let i = arr.length - 1; i > 0; i--) {
@@ -146,10 +171,10 @@ export default function StudentMissions() {
                     const inferredPractice = inferPracticeFromLegacy(raw);
                     const normalizedPracticeConfig = raw.practiceConfig
                         ? {
-                            ...raw.practiceConfig,
+                            ...normalizePracticeConfig(raw.practiceConfig),
                             templateId: String(raw.practiceConfig.templateId || '') === 'math-multiplication-1-12'
                                 ? 'math-multiplication-facts'
-                                : raw.practiceConfig.templateId,
+                                : normalizePracticeConfig(raw.practiceConfig).templateId,
                         }
                         : undefined;
                     return {
@@ -159,13 +184,15 @@ export default function StudentMissions() {
                         questions: Array.isArray(raw.questions) ? raw.questions : [],
                     } as Mission;
                 });
-                setMissions(missionData);
 
                 // Get fresh user progress (context can be stale)
                 const userSnap = await getDoc(doc(db, "users", user.uid));
                 const userRecord = userSnap.exists() ? userSnap.data() as any : (userData as any);
                 const userCompletions: string[] = userRecord?.completedMissions || [];
                 const progressMap: Record<string, MissionProgress> = userRecord?.missionProgress || {};
+                const studentGrade = userRecord?.gradeLevel as StudentGrade | undefined;
+                const filteredMissions = missionData.filter((mission) => isMissionAssignedToStudentGrade(mission, studentGrade));
+                setMissions(filteredMissions);
                 setCompletedMissions(userCompletions);
                 setMissionProgress(progressMap);
             } catch (e) {
@@ -178,7 +205,7 @@ export default function StudentMissions() {
 
     const handleStartMission = (mission: Mission) => {
         const isPracticeMission = inferPracticeFromLegacy(mission);
-        const practiceConfig = mission.practiceConfig || DEFAULT_PRACTICE_CONFIG;
+        const practiceConfig = normalizePracticeConfig(mission.practiceConfig || DEFAULT_PRACTICE_CONFIG);
         const missionState = missionProgress[mission.id];
         if (isPracticeMission && practiceConfig.attemptPolicy === 'once' && (missionState?.attempts || 0) > 0) {
             alert("This assignment is set to one attempt.");
@@ -197,7 +224,12 @@ export default function StudentMissions() {
         if (isPracticeMission) {
             const seed = `${user?.uid || 'cadet'}:${mission.id}:${Date.now()}`;
             const generated = createPracticeQuestions(practiceConfig, seed);
-            setPracticeQuestions(generated);
+            if (generated.length > 0) {
+                setPracticeQuestions(generated);
+            } else {
+                const fallbackGenerated = createPracticeQuestions(DEFAULT_PRACTICE_CONFIG, `${seed}:fallback`);
+                setPracticeQuestions(fallbackGenerated);
+            }
             setPracticeAnswers({});
         } else {
             setPracticeQuestions([]);
