@@ -41,6 +41,26 @@ const numericQuestion = (id: number, prompt: string, answer: number, decimalPlac
     };
 };
 
+const formatCoefficient = (value: number, variable: 'x' | 'y', isFirstTerm: boolean) => {
+    const abs = Math.abs(value);
+    const coefPart = abs === 1 ? variable : `${abs}${variable}`;
+    if (isFirstTerm) {
+        return value < 0 ? `-${coefPart}` : coefPart;
+    }
+    return value < 0 ? ` - ${coefPart}` : ` + ${coefPart}`;
+};
+
+const formatLinearEquation = (a: number, b: number, c: number) => {
+    const left = `${formatCoefficient(a, 'x', true)}${formatCoefficient(b, 'y', false)}`;
+    return `${left} = ${c}`;
+};
+
+const formatSlopeIntercept = (slope: number, intercept: number) => {
+    const slopePart = slope === 1 ? 'x' : slope === -1 ? '-x' : `${slope}x`;
+    if (intercept === 0) return `y = ${slopePart}`;
+    return intercept > 0 ? `y = ${slopePart} + ${intercept}` : `y = ${slopePart} - ${Math.abs(intercept)}`;
+};
+
 export const generateMathTemplateQuestions = ({ config, seed }: PracticeGeneratorInput): PracticeQuestion[] => {
     const normalized = normalizeConfig(config);
     const range = buildRange(normalized.numberRangeMin, normalized.numberRangeMax);
@@ -133,8 +153,95 @@ export const generateMathTemplateQuestions = ({ config, seed }: PracticeGenerato
             return numericQuestion(index, `Solve for x: x + ${add} = ${result + add}`, result);
         }
 
-        const solutionX = makeInt('e2-x', 15, 1, idx);
-        const solutionY = makeInt('e2-y', 15, 1, idx);
-        return numericQuestion(index, `If x = ${solutionX} and y = ${solutionY}, what is x + y?`, solutionX + solutionY);
+        if (config.templateId === 'math-slope-graph-points') {
+            const slopeChoices = [-4, -3, -2, -1, 1, 2, 3, 4];
+            const slope = slopeChoices[makeInt('g1-slope', slopeChoices.length, 0, idx)];
+            const intercept = makeInt('g1-intercept', 13, -6, idx);
+            return {
+                id: String(index),
+                prompt: `Plot any two points on the graph that satisfy ${formatSlopeIntercept(slope, intercept)}.`,
+                answer: `${slope},${intercept}`,
+                inputMode: 'graph-two-points',
+                graph: {
+                    type: 'plot-two-points',
+                    minX: -10,
+                    maxX: 10,
+                    minY: -10,
+                    maxY: 10,
+                    line: {
+                        slope,
+                        intercept,
+                    },
+                },
+            };
+        }
+
+        if (config.templateId === 'math-slope-intercept-from-graph') {
+            const slopeChoices = [-4, -3, -2, -1, 1, 2, 3, 4];
+            const slope = slopeChoices[makeInt('g2-slope', slopeChoices.length, 0, idx)];
+            const intercept = makeInt('g2-intercept', 13, -6, idx);
+            return {
+                id: String(index),
+                prompt: 'Write the equation of the graphed line in slope-intercept form.',
+                answer: `y=${slope}x${intercept >= 0 ? `+${intercept}` : `${intercept}`}`,
+                inputMode: 'equation',
+                graph: {
+                    type: 'read-line-equation',
+                    minX: -10,
+                    maxX: 10,
+                    minY: -10,
+                    maxY: 10,
+                    line: {
+                        slope,
+                        intercept,
+                    },
+                },
+            };
+        }
+
+        let solutionX = 2;
+        let solutionY = 3;
+        let a1 = 2;
+        let b1 = 3;
+        let a2 = 4;
+        let b2 = -5;
+
+        for (let attempt = 0; attempt < 12; attempt++) {
+            const salt = `${idx}:${attempt}`;
+            const candidateX = makeInt(`e2-x:${salt}`, 19, -9, idx);
+            const candidateY = makeInt(`e2-y:${salt}`, 19, -9, idx);
+            const candidateA1 = makeInt(`e2-a1:${salt}`, 15, -7, idx);
+            const candidateB1 = makeInt(`e2-b1:${salt}`, 15, -7, idx);
+            const candidateA2 = makeInt(`e2-a2:${salt}`, 15, -7, idx);
+            const candidateB2 = makeInt(`e2-b2:${salt}`, 15, -7, idx);
+
+            if (!candidateA1 || !candidateB1 || !candidateA2 || !candidateB2) continue;
+            const determinant = (candidateA1 * candidateB2) - (candidateA2 * candidateB1);
+            if (Math.abs(determinant) <= 1) continue;
+
+            const c1 = (candidateA1 * candidateX) + (candidateB1 * candidateY);
+            const c2 = (candidateA2 * candidateX) + (candidateB2 * candidateY);
+            if (Math.abs(c1) > 120 || Math.abs(c2) > 120) continue;
+
+            solutionX = candidateX;
+            solutionY = candidateY;
+            a1 = candidateA1;
+            b1 = candidateB1;
+            a2 = candidateA2;
+            b2 = candidateB2;
+            break;
+        }
+
+        const c1 = (a1 * solutionX) + (b1 * solutionY);
+        const c2 = (a2 * solutionX) + (b2 * solutionY);
+        const askForX = seededNumber(`${seed || 'session'}:${idx}:e2-ask`, 2) === 0;
+        const targetVariable = askForX ? 'x' : 'y';
+        const targetAnswer = askForX ? solutionX : solutionY;
+
+        return numericQuestion(
+            index,
+            `Solve the system:\n${formatLinearEquation(a1, b1, c1)}\n${formatLinearEquation(a2, b2, c2)}\nWhat is ${targetVariable}?`,
+            targetAnswer
+        );
     });
 };

@@ -39,6 +39,11 @@ interface MissionProgress {
     lastAttemptAt?: number;
 }
 
+interface GraphPoint {
+    x: number;
+    y: number;
+}
+
 export default function StudentMissions() {
     const { user, userData } = useAuth();
     const [missions, setMissions] = useState<Mission[]>([]);
@@ -51,6 +56,7 @@ export default function StudentMissions() {
     const [feedback, setFeedback] = useState<{correct: boolean, score: number, newRank?: string} | null>(null);
     const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[]>([]);
     const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
+    const [practiceGraphPoints, setPracticeGraphPoints] = useState<Record<string, GraphPoint[]>>({});
     const [showFinished, setShowFinished] = useState(false);
 
     const DEFAULT_PRACTICE_CONFIG: PracticeAssignmentConfig = {
@@ -83,7 +89,63 @@ export default function StudentMissions() {
 
     const normalizePracticeAnswer = (value: string) => String(value || '').trim().toLowerCase();
 
+    const parseSlopeInterceptEquation = (value: string): { slope: number; intercept: number } | null => {
+        const compact = String(value || '').toLowerCase().replace(/\s+/g, '');
+        if (!compact.startsWith('y=')) return null;
+
+        const rhs = compact.slice(2);
+        const xIndex = rhs.indexOf('x');
+        if (xIndex < 0) return null;
+
+        const slopeRaw = rhs.slice(0, xIndex);
+        const interceptRaw = rhs.slice(xIndex + 1);
+
+        let slope = 0;
+        if (slopeRaw === '' || slopeRaw === '+') slope = 1;
+        else if (slopeRaw === '-') slope = -1;
+        else slope = Number(slopeRaw);
+        if (!Number.isFinite(slope)) return null;
+
+        let intercept = 0;
+        if (interceptRaw) {
+            intercept = Number(interceptRaw);
+            if (!Number.isFinite(intercept)) return null;
+        }
+
+        return { slope, intercept };
+    };
+
+    const parseGraphPointsAnswer = (value: string): GraphPoint[] => {
+        try {
+            const parsed = JSON.parse(value || '[]');
+            if (!Array.isArray(parsed)) return [];
+            return parsed
+                .map((point) => ({ x: Number(point?.x), y: Number(point?.y) }))
+                .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+        } catch {
+            return [];
+        }
+    };
+
     const isPracticeAnswerCorrect = (question: PracticeQuestion, submittedRaw: string) => {
+        if (question.inputMode === 'equation' && question.graph) {
+            const parsed = parseSlopeInterceptEquation(submittedRaw);
+            if (!parsed) return false;
+            return parsed.slope === question.graph.line.slope && parsed.intercept === question.graph.line.intercept;
+        }
+
+        if (question.inputMode === 'graph-two-points' && question.graph) {
+            const points = parseGraphPointsAnswer(submittedRaw);
+            if (points.length !== 2) return false;
+
+            const [first, second] = points;
+            if (first.x === second.x && first.y === second.y) return false;
+
+            const expectedYFirst = (question.graph.line.slope * first.x) + question.graph.line.intercept;
+            const expectedYSecond = (question.graph.line.slope * second.x) + question.graph.line.intercept;
+            return Math.abs(first.y - expectedYFirst) < 0.0001 && Math.abs(second.y - expectedYSecond) < 0.0001;
+        }
+
         const submitted = normalizePracticeAnswer(submittedRaw);
         if (!submitted) return false;
 
@@ -231,9 +293,11 @@ export default function StudentMissions() {
                 setPracticeQuestions(fallbackGenerated);
             }
             setPracticeAnswers({});
+            setPracticeGraphPoints({});
         } else {
             setPracticeQuestions([]);
             setPracticeAnswers({});
+            setPracticeGraphPoints({});
         }
         setFeedback(null);
         window.scrollTo(0,0);
@@ -245,6 +309,33 @@ export default function StudentMissions() {
 
     const handlePracticeAnswerChange = (questionId: string, value: string) => {
         setPracticeAnswers((prev) => ({ ...prev, [questionId]: value }));
+    };
+
+    const handlePracticeGraphToggle = (questionId: string, point: GraphPoint) => {
+        setPracticeGraphPoints((prev) => {
+            const current = prev[questionId] || [];
+            const exists = current.some((item) => item.x === point.x && item.y === point.y);
+            const nextPoints = exists
+                ? current.filter((item) => !(item.x === point.x && item.y === point.y))
+                : [...current.slice(-1), point];
+
+            setPracticeAnswers((prevAnswers) => ({
+                ...prevAnswers,
+                [questionId]: JSON.stringify(nextPoints),
+            }));
+
+            return {
+                ...prev,
+                [questionId]: nextPoints,
+            };
+        });
+    };
+
+    const isPracticeQuestionIncomplete = (question: PracticeQuestion) => {
+        if (question.inputMode === 'graph-two-points') {
+            return (practiceGraphPoints[question.id] || []).length !== 2;
+        }
+        return !String(practiceAnswers[question.id] || '').trim();
     };
 
     const moveSortItem = (questionId: string, fromIndex: number, delta: number) => {
@@ -578,7 +669,7 @@ export default function StudentMissions() {
                             {isPracticeMission && (
                                 <div className="mb-8 p-5 rounded-xl border border-cyan-900/30 bg-cyan-950/20">
                                     <p className="text-cyan-200/90 text-sm md:text-base">
-                                        Solve each multiplication problem. You need 70% or higher to pass.
+                                        Complete each practice prompt. You need 70% or higher to pass.
                                     </p>
                                 </div>
                             )}
@@ -597,14 +688,101 @@ export default function StudentMissions() {
                                                 <span className="text-cyan-600 mr-2">{idx + 1}.</span>
                                                 {question.prompt}
                                             </p>
-                                            <input
-                                                type={question.inputMode === 'text' ? 'text' : 'number'}
-                                                inputMode={question.inputMode === 'text' ? 'text' : 'numeric'}
-                                                value={practiceAnswers[question.id] || ''}
-                                                onChange={(e) => handlePracticeAnswerChange(question.id, e.target.value)}
-                                                className="w-full max-w-xs rounded-lg bg-black/30 border border-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                                placeholder="Enter answer"
-                                            />
+
+                                            {question.graph && (
+                                                <div className="mb-4">
+                                                    <svg
+                                                        viewBox="0 0 280 280"
+                                                        className="w-full max-w-[280px] rounded-lg border border-cyan-800/70 bg-black/40"
+                                                        onClick={(event) => {
+                                                            if (question.inputMode !== 'graph-two-points' || !question.graph) return;
+                                                            const rect = event.currentTarget.getBoundingClientRect();
+                                                            const localX = event.clientX - rect.left;
+                                                            const localY = event.clientY - rect.top;
+                                                            const width = rect.width || 280;
+                                                            const height = rect.height || 280;
+                                                            const x = Math.round((localX / width) * (question.graph.maxX - question.graph.minX) + question.graph.minX);
+                                                            const y = Math.round((((height - localY) / height) * (question.graph.maxY - question.graph.minY)) + question.graph.minY);
+
+                                                            if (x < question.graph.minX || x > question.graph.maxX || y < question.graph.minY || y > question.graph.maxY) return;
+                                                            handlePracticeGraphToggle(question.id, { x, y });
+                                                        }}
+                                                    >
+                                                        {Array.from({ length: question.graph.maxX - question.graph.minX + 1 }, (_, index) => {
+                                                            const xValue = question.graph!.minX + index;
+                                                            const xPixel = ((xValue - question.graph!.minX) / (question.graph!.maxX - question.graph!.minX)) * 280;
+                                                            const isAxis = xValue === 0;
+                                                            return (
+                                                                <line
+                                                                    key={`gx-${question.id}-${xValue}`}
+                                                                    x1={xPixel}
+                                                                    y1={0}
+                                                                    x2={xPixel}
+                                                                    y2={280}
+                                                                    stroke={isAxis ? 'rgba(34,211,238,0.65)' : 'rgba(34,211,238,0.12)'}
+                                                                    strokeWidth={isAxis ? 2 : 1}
+                                                                />
+                                                            );
+                                                        })}
+
+                                                        {Array.from({ length: question.graph.maxY - question.graph.minY + 1 }, (_, index) => {
+                                                            const yValue = question.graph!.minY + index;
+                                                            const yPixel = 280 - ((yValue - question.graph!.minY) / (question.graph!.maxY - question.graph!.minY)) * 280;
+                                                            const isAxis = yValue === 0;
+                                                            return (
+                                                                <line
+                                                                    key={`gy-${question.id}-${yValue}`}
+                                                                    x1={0}
+                                                                    y1={yPixel}
+                                                                    x2={280}
+                                                                    y2={yPixel}
+                                                                    stroke={isAxis ? 'rgba(34,211,238,0.65)' : 'rgba(34,211,238,0.12)'}
+                                                                    strokeWidth={isAxis ? 2 : 1}
+                                                                />
+                                                            );
+                                                        })}
+
+                                                        {question.graph.type === 'read-line-equation' && (
+                                                            <line
+                                                                x1={0}
+                                                                y1={280 - (((question.graph.line.slope * question.graph.minX) + question.graph.line.intercept - question.graph.minY) / (question.graph.maxY - question.graph.minY)) * 280}
+                                                                x2={280}
+                                                                y2={280 - (((question.graph.line.slope * question.graph.maxX) + question.graph.line.intercept - question.graph.minY) / (question.graph.maxY - question.graph.minY)) * 280}
+                                                                stroke="rgba(244,114,182,0.9)"
+                                                                strokeWidth={3}
+                                                            />
+                                                        )}
+
+                                                        {(practiceGraphPoints[question.id] || []).map((point, pointIndex) => {
+                                                            const xPixel = ((point.x - question.graph!.minX) / (question.graph!.maxX - question.graph!.minX)) * 280;
+                                                            const yPixel = 280 - ((point.y - question.graph!.minY) / (question.graph!.maxY - question.graph!.minY)) * 280;
+                                                            return (
+                                                                <g key={`gp-${question.id}-${pointIndex}-${point.x}-${point.y}`}>
+                                                                    <circle cx={xPixel} cy={yPixel} r={5} fill="rgba(34,197,94,1)" />
+                                                                    <text x={xPixel + 8} y={yPixel - 8} fill="rgba(134,239,172,1)" fontSize="11">({point.x}, {point.y})</text>
+                                                                </g>
+                                                            );
+                                                        })}
+                                                    </svg>
+
+                                                    {question.inputMode === 'graph-two-points' && (
+                                                        <p className="text-xs text-cyan-500 mt-2">
+                                                            Click the graph to select two points on the line. Click a selected point again to remove it.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {question.inputMode !== 'graph-two-points' && (
+                                                <input
+                                                    type="text"
+                                                    inputMode={question.inputMode === 'text' || question.inputMode === 'equation' ? 'text' : 'numeric'}
+                                                    value={practiceAnswers[question.id] || ''}
+                                                    onChange={(e) => handlePracticeAnswerChange(question.id, e.target.value)}
+                                                    className="w-full max-w-xs rounded-lg bg-black/30 border border-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                    placeholder={question.inputMode === 'equation' ? 'y = mx + b' : 'Enter answer'}
+                                                />
+                                            )}
                                         </div>
                                     )) : activeMission.questions.map((q, idx) => (
                                         <div key={q.id} className="p-6 bg-black/40 rounded-xl border border-cyan-900/30">
@@ -722,7 +900,7 @@ export default function StudentMissions() {
                                 <button 
                                     onClick={submitMission}
                                     disabled={submitting || (isPracticeMission
-                                        ? practiceQuestions.length === 0 || practiceQuestions.some((question) => !String(practiceAnswers[question.id] || '').trim())
+                                        ? practiceQuestions.length === 0 || practiceQuestions.some((question) => isPracticeQuestionIncomplete(question))
                                         : activeMission.questions.some((q) => {
                                             const value = answers[q.id];
                                             if (q.type === 'sort') {
@@ -733,7 +911,7 @@ export default function StudentMissions() {
                                     className={`
                                         w-full mt-8 py-4 rounded-xl font-bold text-xl uppercase tracking-widest transition-all
                                         ${(isPracticeMission
-                                            ? practiceQuestions.length === 0 || practiceQuestions.some((question) => !String(practiceAnswers[question.id] || '').trim())
+                                            ? practiceQuestions.length === 0 || practiceQuestions.some((question) => isPracticeQuestionIncomplete(question))
                                             : activeMission.questions.some((q) => {
                                                 const value = answers[q.id];
                                                 if (q.type === 'sort') {

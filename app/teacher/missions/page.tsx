@@ -28,6 +28,9 @@ export interface Mission {
 }
 
 interface StudentProgress {
+    uid: string;
+    displayName?: string | null;
+    username?: string;
     completedMissions?: string[];
     missionProgress?: Record<string, { attempts: number; lastScore: number; passedEver: boolean }>;
 }
@@ -59,7 +62,10 @@ export default function MissionsPage() {
                 ]);
 
                 const missionData = missionSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Mission));
-                const studentData = studentSnapshot.docs.map(doc => doc.data() as StudentProgress);
+                const studentData = studentSnapshot.docs.map((studentDoc) => ({
+                    uid: studentDoc.id,
+                    ...(studentDoc.data() as Omit<StudentProgress, 'uid'>),
+                } as StudentProgress));
 
                 setMissions(missionData);
                 setStudents(studentData);
@@ -106,9 +112,41 @@ export default function MissionsPage() {
         return { totalStudents, map };
     }, [missions, students]);
 
+    const missionTrackerById = useMemo(() => {
+        const map: Record<string, { completed: string[]; notCompleted: string[] }> = {};
+
+        missions.forEach((mission) => {
+            const completed: string[] = [];
+            const notCompleted: string[] = [];
+
+            students.forEach((student, index) => {
+                const progress = student.missionProgress?.[mission.id];
+                const completedViaLegacy = student.completedMissions?.includes(mission.id) || false;
+                const isCompleted = Boolean(progress?.passedEver || completedViaLegacy);
+                const fallbackName = `Cadet ${index + 1}`;
+                const studentName = (student.displayName || student.username || fallbackName).trim();
+
+                if (isCompleted) {
+                    completed.push(studentName);
+                } else {
+                    notCompleted.push(studentName);
+                }
+            });
+
+            completed.sort((a, b) => a.localeCompare(b));
+            notCompleted.sort((a, b) => a.localeCompare(b));
+
+            map[mission.id] = { completed, notCompleted };
+        });
+
+        return map;
+    }, [missions, students]);
+
     const totalCompleted = missions.reduce((sum, mission) => sum + (missionStatsById.map[mission.id]?.completed || 0), 0);
-    const totalAttempted = missions.reduce((sum, mission) => sum + (missionStatsById.map[mission.id]?.attempted || 0), 0);
-    const totalNotStarted = missions.reduce((sum, mission) => sum + (missionStatsById.map[mission.id]?.notStarted || 0), 0);
+    const totalPossibleCompletions = missionStatsById.totalStudents * missions.length;
+    const classCompletionPct = totalPossibleCompletions > 0
+        ? Math.round((totalCompleted / totalPossibleCompletions) * 100)
+        : 0;
 
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">
@@ -134,23 +172,10 @@ export default function MissionsPage() {
                 </div>
 
                 {!loading && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                        <div className="rounded-xl border border-cyan-900/50 bg-black/30 p-4">
-                            <div className="text-xs uppercase text-cyan-600 tracking-wider">Students</div>
-                            <div className="text-2xl font-bold text-white mt-1">{missionStatsById.totalStudents}</div>
-                        </div>
-                        <div className="rounded-xl border border-green-900/50 bg-black/30 p-4">
-                            <div className="text-xs uppercase text-green-500 tracking-wider">Completed</div>
-                            <div className="text-2xl font-bold text-white mt-1">{totalCompleted}</div>
-                        </div>
-                        <div className="rounded-xl border border-yellow-900/50 bg-black/30 p-4">
-                            <div className="text-xs uppercase text-yellow-500 tracking-wider">Attempted</div>
-                            <div className="text-2xl font-bold text-white mt-1">{totalAttempted}</div>
-                        </div>
-                        <div className="rounded-xl border border-red-900/50 bg-black/30 p-4">
-                            <div className="text-xs uppercase text-red-500 tracking-wider">Not Started</div>
-                            <div className="text-2xl font-bold text-white mt-1">{totalNotStarted}</div>
-                        </div>
+                    <div className="rounded-xl border border-green-900/50 bg-black/30 p-4 mb-8">
+                        <div className="text-xs uppercase text-green-500 tracking-wider">Class Completion</div>
+                        <div className="text-2xl font-bold text-white mt-1">{totalCompleted}/{totalPossibleCompletions} ({classCompletionPct}%)</div>
+                        <div className="text-xs text-cyan-600 mt-1">Across {missions.length} assignments and {missionStatsById.totalStudents} students.</div>
                     </div>
                 )}
 
@@ -181,15 +206,35 @@ export default function MissionsPage() {
 
                                     {(() => {
                                         const stats = missionStatsById.map[mission.id] || { completed: 0, attempted: 0, notStarted: 0, averageScore: 0 };
+                                        const tracker = missionTrackerById[mission.id] || { completed: [], notCompleted: [] };
                                         return (
-                                            <div className="mb-4 rounded-lg border border-cyan-900/40 bg-black/30 p-3 text-xs">
-                                                <div className="grid grid-cols-2 gap-2 text-gray-300">
-                                                    <div className="flex items-center gap-1"><CheckCircle2 size={12} className="text-green-400" /> Completed: <span className="text-white font-bold">{stats.completed}</span></div>
-                                                    <div className="flex items-center gap-1"><Clock3 size={12} className="text-yellow-400" /> Attempted: <span className="text-white font-bold">{stats.attempted}</span></div>
-                                                    <div className="flex items-center gap-1"><CircleDashed size={12} className="text-red-400" /> Not Started: <span className="text-white font-bold">{stats.notStarted}</span></div>
-                                                    <div>Avg Score: <span className="text-white font-bold">{stats.averageScore}%</span></div>
+                                            <>
+                                                <div className="mb-4 rounded-lg border border-cyan-900/40 bg-black/30 p-3 text-xs">
+                                                    <div className="grid grid-cols-2 gap-2 text-gray-300">
+                                                        <div className="flex items-center gap-1"><CheckCircle2 size={12} className="text-green-400" /> Completed: <span className="text-white font-bold">{stats.completed}</span></div>
+                                                        <div className="flex items-center gap-1"><Clock3 size={12} className="text-yellow-400" /> Attempted: <span className="text-white font-bold">{stats.attempted}</span></div>
+                                                        <div className="flex items-center gap-1"><CircleDashed size={12} className="text-red-400" /> Not Started: <span className="text-white font-bold">{stats.notStarted}</span></div>
+                                                        <div>Avg Score: <span className="text-white font-bold">{stats.averageScore}%</span></div>
+                                                    </div>
                                                 </div>
-                                            </div>
+
+                                                <div className="mb-4 rounded-lg border border-cyan-900/40 bg-black/30 p-3 text-xs">
+                                                    <div className="grid grid-cols-1 gap-3">
+                                                        <div>
+                                                            <div className="text-green-400 uppercase tracking-wider mb-1">Completed ({tracker.completed.length})</div>
+                                                            <div className="max-h-20 overflow-y-auto pr-1 text-gray-300 leading-relaxed">
+                                                                {tracker.completed.length ? tracker.completed.join(', ') : 'None yet'}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-red-400 uppercase tracking-wider mb-1">Not Completed ({tracker.notCompleted.length})</div>
+                                                            <div className="max-h-20 overflow-y-auto pr-1 text-gray-300 leading-relaxed">
+                                                                {tracker.notCompleted.length ? tracker.notCompleted.join(', ') : 'Everyone completed this mission'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </>
                                         );
                                     })()}
                                     
@@ -199,7 +244,11 @@ export default function MissionsPage() {
                                                 EDIT
                                             </span>
                                         </Link>
-                                        <button className="p-2 rounded bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors">
+                                        <button
+                                            className="p-2 rounded bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors"
+                                            aria-label="Delete mission"
+                                            title="Delete mission"
+                                        >
                                             <Trash2 size={18} />
                                         </button>
                                     </div>

@@ -415,7 +415,8 @@ export default function CreateMissionPage() {
                                         type="number" 
                                         value={xpReward}
                                         onChange={(e) => setXpReward(Number(e.target.value))}
-                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -498,7 +499,7 @@ export default function CreateMissionPage() {
                                 <div className="grid gap-6">
                                     <div className="rounded-lg border border-cyan-800/50 bg-cyan-950/20 p-4">
                                         <h3 className="text-white font-bold mb-1">Practice Drill Setup</h3>
-                                        <p className="text-sm text-cyan-500">Auto-generated math problems by grade and skill.</p>
+                                        <p className="text-sm text-cyan-500">Auto-generated math problems by grade and skill. Each time students start this lesson, they get a fresh set of problems.</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-6">
                                         <div>
@@ -559,6 +560,7 @@ export default function CreateMissionPage() {
                                                 }
                                                 setPracticeConfig({ ...practiceConfig, questionCount: Math.min(Math.max(next, 1), 50) });
                                             }}
+                                            onWheel={(e) => e.currentTarget.blur()}
                                             className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                         />
                                     </div>
@@ -574,13 +576,15 @@ export default function CreateMissionPage() {
                                                     type="number"
                                                     value={practiceConfig.numberRangeMin ?? 1}
                                                     onChange={(e) => setPracticeConfig({ ...practiceConfig, numberRangeMin: Number(e.target.value) || 1 })}
-                                                    className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                 />
                                                 <input
                                                     type="number"
                                                     value={practiceConfig.numberRangeMax ?? 100}
                                                     onChange={(e) => setPracticeConfig({ ...practiceConfig, numberRangeMax: Number(e.target.value) || 100 })}
-                                                    className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                 />
                                             </div>
                                         </div>
@@ -598,7 +602,8 @@ export default function CreateMissionPage() {
                                                         max={20}
                                                         value={practiceConfig.tableMin ?? 1}
                                                         onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMin: Number(e.target.value) || 1 })}
-                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                     />
                                                     <input
                                                         type="number"
@@ -606,7 +611,8 @@ export default function CreateMissionPage() {
                                                         max={20}
                                                         value={practiceConfig.tableMax ?? 12}
                                                         onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMax: Number(e.target.value) || 12 })}
-                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                     />
                                                 </div>
                                             </div>
@@ -619,7 +625,8 @@ export default function CreateMissionPage() {
                                                         max={99}
                                                         value={practiceConfig.multiplicandMin ?? 1}
                                                         onChange={(e) => setPracticeConfig({ ...practiceConfig, multiplicandMin: Number(e.target.value) || 1 })}
-                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                     />
                                                     <input
                                                         type="number"
@@ -627,7 +634,8 @@ export default function CreateMissionPage() {
                                                         max={99}
                                                         value={practiceConfig.multiplicandMax ?? 12}
                                                         onChange={(e) => setPracticeConfig({ ...practiceConfig, multiplicandMax: Number(e.target.value) || 12 })}
-                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                     />
                                                 </div>
                                             </div>
@@ -645,7 +653,8 @@ export default function CreateMissionPage() {
                                                         max={20}
                                                         value={practiceConfig.denominatorMin ?? 2}
                                                         onChange={(e) => setPracticeConfig({ ...practiceConfig, denominatorMin: Number(e.target.value) || 2 })}
-                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                     />
                                                     <input
                                                         type="number"
@@ -653,7 +662,8 @@ export default function CreateMissionPage() {
                                                         max={20}
                                                         value={practiceConfig.denominatorMax ?? 12}
                                                         onChange={(e) => setPracticeConfig({ ...practiceConfig, denominatorMax: Number(e.target.value) || 12 })}
-                                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                                     />
                                                 </div>
                                             </div>
@@ -683,6 +693,7 @@ export default function CreateMissionPage() {
                                             <option value="once">One Attempt</option>
                                             <option value="unlimited">Unlimited Attempts</option>
                                         </select>
+                                        <p className="text-xs text-cyan-600 mt-2">If you reassign this same lesson later, students will still get different problem versions.</p>
                                     </div>
                                 </div>
                             )}

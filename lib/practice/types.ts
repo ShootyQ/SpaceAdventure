@@ -12,6 +12,8 @@ export type PracticeTemplateId =
     | 'math-decimal-operations'
     | 'math-ratios-and-rates'
     | 'math-one-step-equations'
+    | 'math-slope-graph-points'
+    | 'math-slope-intercept-from-graph'
     | 'math-systems-intro';
 
 export interface PracticeTemplate {
@@ -44,7 +46,18 @@ export interface PracticeQuestion {
     prompt: string;
     answer: string;
     acceptedAnswers?: string[];
-    inputMode?: 'numeric' | 'text';
+    inputMode?: 'numeric' | 'text' | 'equation' | 'graph-two-points';
+    graph?: {
+        type: 'plot-two-points' | 'read-line-equation';
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+        line: {
+            slope: number;
+            intercept: number;
+        };
+    };
 }
 
 export interface PracticeGeneratorInput {
