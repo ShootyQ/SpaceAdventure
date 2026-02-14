@@ -6,12 +6,12 @@ import { db } from "@/lib/firebase";
 import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy, Printer } from "lucide-react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { UserData, PLANETS, SpaceshipConfig } from "@/types";
+import { UserData, PLANETS, SpaceshipConfig, STUDENT_GRADES, StudentGrade } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
-import { getAssetPath } from "@/lib/utils";
+import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
@@ -29,6 +29,7 @@ export default function RosterPage() {
   // Student Creation State
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
+    const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
   const [selectedAvatarId, setSelectedAvatarId] = useState(AVATAR_OPTIONS[0].id);
   const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
   const [creationError, setCreationError] = useState("");
@@ -95,13 +96,17 @@ export default function RosterPage() {
           const selectedShip = SHIP_OPTIONS.find(s => s.id === selectedShipId) || SHIP_OPTIONS[0];
           
           // 3. Create Firestore Document
+          const safeDisplayName = sanitizeName(newStudentData.name);
+          const safeFirstName = sanitizeName(safeDisplayName.split(' ')[0] || 'Cadet');
+
           const newStudent: UserData = {
               uid: uid,
               email: email,
-              displayName: newStudentData.name,
+              displayName: safeDisplayName,
               photoURL: null,
               role: 'student',
               teacherId: user!.uid,
+              gradeLevel: newStudentGrade,
               classCode: classCode,
               status: 'active',
               xp: 0,
@@ -110,7 +115,7 @@ export default function RosterPage() {
               fuel: 500,
               travelStatus: 'idle',
               spaceship: {
-                  name: `SS ${newStudentData.name.split(' ')[0]}`,
+                  name: sanitizeName(`SS ${safeFirstName}`),
                   color: 'text-blue-400',
                   type: selectedShip.type,
                   speed: 1,
@@ -135,6 +140,7 @@ export default function RosterPage() {
           
           setStudents(prev => [...prev, newStudent]);
           setNewStudentData({ name: "", username: "", password: "" });
+          setNewStudentGrade("3");
           setSelectedAvatarId(AVATAR_OPTIONS[0].id);
           setSelectedShipId(SHIP_OPTIONS[0].id);
           setIsAddingStudent(false);
@@ -157,6 +163,7 @@ export default function RosterPage() {
           xp: student.xp || 0,
           fuel: student.fuel || 500,
           location: student.location || 'earth',
+          gradeLevel: student.gradeLevel || '3',
           status: student.status,
           avatar: student.avatar,
           spaceship: student.spaceship // Include spaceship
@@ -167,8 +174,19 @@ export default function RosterPage() {
   const saveEdit = async () => {
       if (!editingId) return;
       try {
-          await updateDoc(doc(db, "users", editingId), editForm);
-          setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...editForm } : s));
+          const normalizedEditForm: Partial<UserData> = {
+              ...editForm,
+              displayName: sanitizeName(String(editForm.displayName || '')),
+              spaceship: editForm.spaceship
+                  ? {
+                        ...editForm.spaceship,
+                        name: sanitizeName(String(editForm.spaceship.name || ''))
+                    }
+                  : editForm.spaceship
+          };
+
+          await updateDoc(doc(db, "users", editingId), normalizedEditForm);
+          setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...normalizedEditForm } : s));
           setEditingId(null);
           setShowEditVisuals(false);
       } catch (e) {
@@ -223,7 +241,7 @@ export default function RosterPage() {
         <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between gap-4 mb-8">
                  <div className="flex items-center gap-4">
-                     <Link href="/teacher" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                     <Link href="/teacher/space" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                         <ArrowLeft size={20} />
                      </Link>
                      <div>
@@ -277,7 +295,8 @@ export default function RosterPage() {
                                     autoFocus
                                     type="text" 
                                     value={newStudentData.name}
-                                    onChange={(e) => setNewStudentData({...newStudentData, name: e.target.value})}
+                                    onChange={(e) => setNewStudentData({...newStudentData, name: e.target.value.slice(0, NAME_MAX_LENGTH)})}
+                                    maxLength={NAME_MAX_LENGTH}
                                     className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
                                     placeholder="e.g. Cadet Tom"
                                 />
@@ -302,6 +321,18 @@ export default function RosterPage() {
                                     className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
                                     placeholder="Set Password"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-1 uppercase tracking-wider">Grade Level</label>
+                                <select
+                                    value={newStudentGrade}
+                                    onChange={(e) => setNewStudentGrade(e.target.value as StudentGrade)}
+                                    className="w-full bg-black/50 border border-cyan-800 rounded-lg px-4 py-2 text-white focus:ring-1 focus:ring-cyan-400 outline-none"
+                                >
+                                    {STUDENT_GRADES.map((grade) => (
+                                        <option key={grade} value={grade}>{grade}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Avatar Selection */}
@@ -424,7 +455,8 @@ export default function RosterPage() {
                                             </button>
                                             <input 
                                                 value={editForm.displayName || ""} 
-                                                onChange={e => setEditForm({...editForm, displayName: e.target.value})}
+                                                onChange={e => setEditForm({...editForm, displayName: e.target.value.slice(0, NAME_MAX_LENGTH)})}
+                                                maxLength={NAME_MAX_LENGTH}
                                                 className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white"
                                             />
                                          </div>
@@ -512,16 +544,27 @@ export default function RosterPage() {
                                                 </div>
                                             </div>
                                             <div className="col-span-12 md:col-span-2">
-                                                <select
-                                                    value={editForm.location}
-                                                    onChange={e => setEditForm({...editForm, location: e.target.value})}
-                                                    className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs uppercase"
-                                                >
-                                                    <option value="earth">Earth</option>
-                                                    {PLANETS.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                                    ))}
-                                                </select>
+                                                <div className="space-y-1">
+                                                    <select
+                                                        value={editForm.location}
+                                                        onChange={e => setEditForm({...editForm, location: e.target.value})}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs uppercase"
+                                                    >
+                                                        <option value="earth">Earth</option>
+                                                        {PLANETS.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        value={String(editForm.gradeLevel || '3')}
+                                                        onChange={e => setEditForm({ ...editForm, gradeLevel: e.target.value as StudentGrade })}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs"
+                                                    >
+                                                        {STUDENT_GRADES.map((grade) => (
+                                                            <option key={grade} value={grade}>Grade {grade}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
                                             </div>
                                         </>
                                     )}
@@ -540,10 +583,13 @@ export default function RosterPage() {
                                             <UserAvatar userData={student} className="w-full h-full" />
                                         </div>
                                         <div>
-                                            <div className="font-bold text-white text-lg md:text-base">{student.displayName}</div>
+                                            <div className="font-bold text-white text-lg md:text-base">{truncateName(student.displayName || "Cadet")}</div>
                                             <div className="text-xs text-gray-500 flex items-center gap-2">
                                                 {student.email || <span className="text-gray-600 italic">Offline Account</span>}
                                             </div>
+                                            {student.gradeLevel && (
+                                                <div className="text-[10px] text-cyan-500 uppercase tracking-wider mt-1">Grade {student.gradeLevel}</div>
+                                            )}
                                         </div>
                                     </div>
 

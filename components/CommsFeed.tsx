@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { UserData, AsteroidEvent, PLANETS } from '@/types';
 import { Radio, ShieldAlert, UserPlus, Rocket, Star, CheckCircle } from 'lucide-react';
+import { truncateName } from '@/lib/utils';
 
 interface FeedItem {
     id: string;
@@ -51,7 +52,7 @@ export default function CommsFeed() {
         const unsub = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 const data = change.doc.data() as UserData;
-                const name = data.displayName || data.email || 'Unknown';
+                const name = truncateName(data.displayName || data.email || 'Unknown');
                 const id = change.doc.id;
                 const prev = previousUserData.current[id];
 

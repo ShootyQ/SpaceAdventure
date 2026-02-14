@@ -20,6 +20,7 @@ export const AVATAR_OPTIONS = [
     { id: 'owl', name: 'Omega Owl', src: '/images/avatar/spaceowl.png' },
     { id: 'penguin', name: 'Power Penguin', src: '/images/avatar/spacepenguin.png' },
     { id: 'turtle', name: 'Turbo Turtle', src: '/images/avatar/spaceturtle.png' },
+    { id: 'jovi', name: 'Jovi', src: '/images/avatar/JUPITER/jovi.png' },
 ];
 
 export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[] = [
@@ -81,6 +82,7 @@ interface UserAvatarProps {
     bgLight?: number;
     hat?: string;
     avatarId?: string;
+    transparentBg?: boolean;
     className?: string;
 }
 
@@ -93,6 +95,7 @@ export const UserAvatar = ({
     bgLight, 
     hat, 
     avatarId,
+    transparentBg = false,
     className = "" 
 }: UserAvatarProps) => {
     // Determine values: prefers direct props if provided (overriding userData), 
@@ -117,7 +120,7 @@ export const UserAvatar = ({
     const hatStyle = hatOption?.style || "scale-100";
     
     return (
-       <div className={`relative ${className}`} style={{ backgroundColor: `hsl(${finalBgHue}, ${finalBgSat}%, ${finalBgLight}%)` }}>
+         <div className={`relative ${className}`} style={{ backgroundColor: transparentBg ? 'transparent' : `hsl(${finalBgHue}, ${finalBgSat}%, ${finalBgLight}%)` }}>
             <div className="absolute inset-0 z-0" style={{ backgroundColor: `hsl(${finalSkinHue}, 70%, 50%)`, maskImage: `url(${getAssetPath(avatarSrc)})`, WebkitMaskImage: `url(${getAssetPath(avatarSrc)})`, maskSize: 'cover' }} />
             <img src={getAssetPath(avatarSrc)} alt="Avatar" className="w-full h-full object-cover relative z-10" style={{ filter: `hue-rotate(${finalHue}deg)` }} />
             {hatSrc && (

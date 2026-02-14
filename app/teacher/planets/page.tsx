@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
+import { UserAvatar } from "@/components/UserAvatar";
 
 // Interface for dynamic data stored in DB
 interface PlanetData {
@@ -16,6 +17,10 @@ interface PlanetData {
     currentXP: number;
     rewardName: string;
     rewardDescription: string;
+    unlocks?: {
+        ships?: Record<string, number>;
+        avatars?: Record<string, number>;
+    };
 }
 
 // Merge of Static + Dynamic
@@ -50,7 +55,8 @@ export default function PlanetManagementPage() {
                      xpGoal: 1000,
                      currentXP: 0,
                      rewardName: "",
-                     rewardDescription: ""
+                     rewardDescription: "",
+                     unlocks: { ships: {}, avatars: {} }
                  };
                  return {
                      ...dynamic, // Dynamic overrides defaults
@@ -69,16 +75,36 @@ export default function PlanetManagementPage() {
         setPlanets(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
+    const handleJoviUnlockChange = (planetId: string, value: string) => {
+        const numeric = Number(value);
+        setPlanets(prev => prev.map(p => {
+            if (p.id !== planetId) return p;
+            const unlocks = {
+                ships: { ...(p.unlocks?.ships || {}) },
+                avatars: { ...(p.unlocks?.avatars || {}) },
+            };
+            unlocks.avatars.jovi = Number.isFinite(numeric) ? numeric : 0;
+            return { ...p, unlocks };
+        }));
+    };
+
     const handleSave = async (planet: PlanetState) => {
         if (!user) return;
         setSaving(planet.id);
         try {
+            const isJupiter = planet.id === "jupiter";
+            const joviXP = Number(planet.unlocks?.avatars?.jovi || 0);
+            const unlocksToSave = isJupiter && joviXP > 0
+                ? { ships: {}, avatars: { jovi: joviXP } }
+                : { ships: {}, avatars: {} };
+
             // Save to subcollection
             await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
                 id: planet.id,
                 xpGoal: Number(planet.xpGoal),
                 rewardName: planet.rewardName,
                 rewardDescription: planet.rewardDescription,
+                unlocks: unlocksToSave,
                 teacherId: user.uid
             }, { merge: true });
             setSaving(null);
@@ -94,7 +120,7 @@ export default function PlanetManagementPage() {
                 {/* Header */}
                  <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
-                        <Link href="/teacher" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                        <Link href="/teacher/space" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                             <ArrowLeft size={20} />
                         </Link>
                         <div>
@@ -173,6 +199,34 @@ export default function PlanetManagementPage() {
                                             onChange={(e) => handleChange(planet.id, 'rewardDescription', e.target.value)}
                                             className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-xs h-20 resize-none focus:border-yellow-500/50 outline-none transition-colors"
                                          />
+                                     </div>
+
+                                     <div className="border-t border-cyan-900/30 pt-4">
+                                         <label className="block text-xs uppercase tracking-wider text-purple-400 mb-2 flex items-center gap-2">
+                                             <Star size={14} /> Cosmetic Unlocks
+                                         </label>
+                                         {planet.id === "jupiter" ? (
+                                            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
+                                                        <UserAvatar avatarId="jovi" hat="none" className="w-full h-full" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-xs text-white font-bold">Jovi Avatar</div>
+                                                        <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Jupiter</div>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        value={planet.unlocks?.avatars?.jovi ?? ""}
+                                                        onChange={(e) => handleJoviUnlockChange(planet.id, e.target.value)}
+                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                         ) : (
+                                            <p className="text-[10px] text-gray-500">No cosmetic unlock configured for this planet yet.</p>
+                                         )}
                                      </div>
 
                                      <button 

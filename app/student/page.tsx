@@ -47,7 +47,19 @@ export default function StudentConsole() {
   }, []);
 
   const currentXP = userData?.xp || 0;
-  const currentRank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => currentXP >= r.minXP) || ranks[0];
+    const sortedRanksAsc = [...ranks].sort((a, b) => a.minXP - b.minXP);
+    const sortedRanksDesc = [...ranks].sort((a, b) => b.minXP - a.minXP);
+    const currentRank = sortedRanksDesc.find(r => currentXP >= r.minXP) || sortedRanksAsc[0];
+    const currentRankIndex = sortedRanksAsc.findIndex((rank) => rank.id === currentRank?.id);
+    const nextRank = currentRankIndex >= 0 ? (sortedRanksAsc[currentRankIndex + 1] || null) : null;
+
+    const currentRankFloor = currentRank?.minXP || 0;
+    const xpEarnedInRank = Math.max(currentXP - currentRankFloor, 0);
+    const xpNeededForNext = nextRank ? Math.max(nextRank.minXP - currentXP, 0) : 0;
+    const rankSpan = nextRank ? Math.max(nextRank.minXP - currentRankFloor, 1) : 1;
+    const xpProgressPercent = nextRank
+            ? Math.min(100, Math.max(0, (xpEarnedInRank / rankSpan) * 100))
+            : 100;
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono bg-black">
@@ -85,9 +97,11 @@ export default function StudentConsole() {
        </header>
 
        {/* Main Viewport */}
-       <main className="flex-1 relative z-0">
-          {/* We show the map directly as the main view for students */}
-          <SolarSystem />
+         <main className="flex-1 relative z-0 min-h-0">
+             {/* We show the map directly as the main view for students */}
+             <div className="absolute inset-0">
+                <SolarSystem studentView />
+             </div>
           
           {/* Overlay Controls for Student */}
           <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
@@ -107,8 +121,13 @@ export default function StudentConsole() {
            <div className="flex flex-col">
                <span className="text-xs text-gray-500 uppercase">XP Progress</span>
                <div className="w-full bg-gray-800 h-2 rounded-full mt-1">
-                   <div className="bg-yellow-500 h-2 rounded-full w-[15%]"></div>
+                   <div className="bg-yellow-500 h-2 rounded-full transition-all" style={{ width: `${xpProgressPercent}%` }}></div>
                </div>
+               <span className="text-xs text-cyan-500 mt-1">
+                   {nextRank
+                       ? `Earned: ${xpEarnedInRank} XP • Left: ${xpNeededForNext} XP to ${nextRank.name}`
+                       : `Earned: ${currentXP} XP • Max Rank Reached`}
+               </span>
            </div>
        </div>
     </div>

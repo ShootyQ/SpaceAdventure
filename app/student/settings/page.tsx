@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot, increment } from "firebase/firestore";
+import { Rank, FlagConfig, SpaceshipConfig } from "@/types";
+import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity
 } from "lucide-react";
 
-import { getAssetPath } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS } from "@/components/UserAvatar";
+import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -32,6 +32,14 @@ const SHIP_COLORS = [
     { name: "Starlight Gold", class: "text-yellow-400", bg: "bg-yellow-400" },
     { name: "Void Purple", class: "text-purple-400", bg: "bg-purple-400" },
     { name: "Ice Cyan", class: "text-cyan-400", bg: "bg-cyan-400" },
+];
+
+const SHIP_OPTIONS: { id: string; name: string; type: SpaceshipConfig['type'] }[] = [
+    { id: 'finalship', name: 'Standard Interceptor', type: 'fighter' },
+    { id: 'alienship', name: 'Alien Scout', type: 'scout' },
+    { id: 'jellyalienship', name: 'Bio-Cruiser', type: 'cruiser' },
+    { id: 'coconutship', name: 'Tropical Drifter', type: 'cruiser' },
+    { id: 'dragoneggship', name: 'Dragon Scale Pod', type: 'scout' },
 ];
 
 const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
@@ -210,7 +218,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                  {/* ID Card Header */}
                  <div className="border-b border-white/10 pb-4 text-center pb-6">
                      <h2 className="text-white/70 uppercase tracking-[0.3em] text-xs font-bold mb-1">Active Personnel</h2>
-                     <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{userData?.displayName || "Unknown Pilot"}</div>
+                     <div className="text-2xl font-bold text-white tracking-widest truncate mb-2">{truncateName(userData?.displayName || "Unknown Pilot")}</div>
                      <div className="flex justify-center gap-4 text-[10px] uppercase font-bold tracking-widest text-cyan-400/80">
                         <span>{currentRank.name}</span>
                         <span className="text-white/30"> | </span>
@@ -289,11 +297,13 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [loading, setLoading] = useState(false);
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
+    const [selectedShipId, setSelectedShipId] = useState("finalship");
     // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
 
     useEffect(() => {
         if (userData?.spaceship) {
-            setShipName(userData.spaceship.name);
+            setShipName(sanitizeName(userData.spaceship.name));
+            setSelectedShipId(userData.spaceship.id || userData.spaceship.modelId || "finalship");
             const col = SHIP_COLORS.find(c => c.class === userData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
             // setSelectedType(userData.spaceship.type);
@@ -305,11 +315,15 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
         setLoading(true);
         try {
             const userRef = doc(db, "users", user.uid);
+            const safeShipName = sanitizeName(shipName);
             await updateDoc(userRef, {
-                "spaceship.name": shipName,
+                "spaceship.name": safeShipName,
                 "spaceship.color": selectedColor.class,
+                "spaceship.id": selectedShipId,
+                "spaceship.modelId": selectedShipId,
                 // "spaceship.type": selectedType
             });
+            setShipName(safeShipName);
             alert("Ship specifications updated, Commander.");
         } catch (e) {
             console.error(e);
@@ -336,14 +350,14 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src={getAssetPath("/images/ships/finalship.png")}
+                        src={getAssetPath(`/images/ships/${selectedShipId}.png`)}
                         alt="Ship"
                         className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />
                 </motion.div>
 
                 <div className="mt-12 text-center z-10 w-full max-w-md">
-                    <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-6">{shipName || "Unknown Vessel"}</h2>
+                    <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-6">{truncateName(shipName || "Unknown Vessel")}</h2>
                     
                     {/* Fuel Gauge */}
                     <div className="bg-black/60 border border-cyan-900/50 rounded-xl p-4 w-full">
@@ -377,11 +391,31 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
             {/* Right Column: Controls */}
             <div className="space-y-6">
                 <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
+                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
+                        <Shield size={16} /> Ship Models
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        {SHIP_OPTIONS.map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setSelectedShipId(opt.id)}
+                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                            >
+                                <img src={getAssetPath(`/images/ships/${opt.id}.png`)} alt={opt.name} className="w-10 h-10 object-contain" />
+                                <span className={`text-xs uppercase font-bold ${selectedShipId === opt.id ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
                     <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-2">Vessel Identification</label>
                     <input
                         type="text"
                         value={shipName}
-                        onChange={(e) => setShipName(e.target.value)}
+                        onChange={(e) => setShipName(e.target.value.slice(0, NAME_MAX_LENGTH))}
+                        maxLength={NAME_MAX_LENGTH}
                         className="w-full bg-black/50 border border-cyan-700 rounded p-3 text-white focus:outline-none focus:border-cyan-400 placeholder-cyan-800 transition-colors font-mono"
                         placeholder="Enter Ship Name"
                     />
@@ -468,6 +502,42 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
     const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
 
+    const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
+    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(["bunny"]));
+
+    useEffect(() => {
+        const teacherId = userData?.teacherId;
+        if (!teacherId) return;
+
+        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
+            const map: Record<string, Record<string, number>> = {};
+            snap.forEach((d) => {
+                const data = d.data() as any;
+                if (d.id === "jupiter") {
+                    const joviThreshold = Number(data?.unlocks?.avatars?.jovi || 0);
+                    map[d.id] = joviThreshold > 0 ? { jovi: joviThreshold } : {};
+                }
+            });
+            setPlanetAvatarUnlocks(map);
+        });
+
+        return () => unsub();
+    }, [userData?.teacherId]);
+
+    useEffect(() => {
+        const currentAvatar = userData?.avatar?.avatarId || "bunny";
+        const unlocked = new Set<string>(["bunny", currentAvatar]);
+
+        const jupiterXP = Number((userData?.planetXP || {})?.jupiter || 0);
+        const joviThreshold = Number(planetAvatarUnlocks?.jupiter?.jovi || 0);
+        if (joviThreshold > 0 && jupiterXP >= joviThreshold) {
+            unlocked.add("jovi");
+        }
+
+        setUnlockedAvatarIds(unlocked);
+        if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
+    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, avatarId]);
+
     const handleSelectPreset = (presetId: string) => {
         const preset = AVATAR_PRESETS.find(p => p.id === presetId);
         if (preset) {
@@ -480,6 +550,8 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             setAvatarId(preset.config.avatarId);
         }
     };
+
+    const visiblePresets = AVATAR_PRESETS.filter(p => unlockedAvatarIds.has(p.config.avatarId));
 
     const handleSave = async () => {
         if (!user) return;
@@ -535,7 +607,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     </h3>
 
                     <div className="grid grid-cols-2 gap-4">
-                        {AVATAR_PRESETS.map(preset => (
+                        {visiblePresets.map(preset => (
                             <button
                                 key={preset.id}
                                 onClick={() => handleSelectPreset(preset.id)}
@@ -554,6 +626,29 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                     />
                                 </div>
                                 <span className="text-xs font-bold uppercase tracking-wider text-purple-300 group-hover:text-white">{preset.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <User size={20} className="text-purple-400" />
+                        <span className="uppercase tracking-wider">Unlocked Avatars</span>
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                        {AVATAR_OPTIONS.filter(opt => unlockedAvatarIds.has(opt.id)).map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setAvatarId(opt.id)}
+                                className={`group relative p-3 rounded-xl border transition-all flex flex-col items-center gap-2 ${avatarId === opt.id ? 'bg-purple-900/40 border-purple-400' : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'}`}
+                                title={opt.name}
+                            >
+                                <div className="w-14 h-14 rounded-full border-2 border-white/20 overflow-hidden">
+                                    <UserAvatar avatarId={opt.id} hat={activeHat} className="w-full h-full" />
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${avatarId === opt.id ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>{opt.name}</span>
                             </button>
                         ))}
                     </div>
@@ -599,14 +694,16 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
     const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || { name: 'Recruit', minXP: 0 };
 
     useEffect(() => {
-        if (userData?.displayName) setNewName(userData.displayName);
+        if (userData?.displayName) setNewName(sanitizeName(userData.displayName));
     }, [userData]);
 
     const handleSaveName = async () => {
-        if (!user || !newName.trim()) return;
+        const safeName = sanitizeName(newName);
+        if (!user || !safeName) return;
         try {
             const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, { displayName: newName });
+            await updateDoc(userRef, { displayName: safeName });
+            setNewName(safeName);
             setIsEditingName(false);
         } catch (e) {
             console.error(e);
@@ -647,7 +744,8 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                         <input 
                             type="text" 
                             value={newName} 
-                            onChange={(e) => setNewName(e.target.value)}
+                            onChange={(e) => setNewName(e.target.value.slice(0, NAME_MAX_LENGTH))}
+                            maxLength={NAME_MAX_LENGTH}
                             className="bg-black/50 border border-purple-500 text-white font-bold text-2xl px-2 py-1 rounded w-64 text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
                             autoFocus
                         />
@@ -657,7 +755,7 @@ function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void,
                 ) : (
                     <div className="flex items-center gap-3 group/edit">
                         <h2 className="text-2xl font-bold text-white cursor-pointer" onClick={() => setIsEditingName(true)}>
-                            {userData?.displayName || "Cadet Pilot"}
+                            {truncateName(userData?.displayName || "Cadet Pilot")}
                         </h2>
                         <button 
                             onClick={() => setIsEditingName(true)} 

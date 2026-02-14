@@ -2,14 +2,16 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap } from "lucide-react";
+import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft } from "lucide-react";
+import Link from 'next/link';
+import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getAssetPath } from "@/lib/utils";
+import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
-import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -35,6 +37,9 @@ const DEFAULT_RANKS: Rank[] = [
 */
 
 const DUMMY_SHIPS: Ship[] = [];
+
+const MIN_MAP_ZOOM = 0.05;
+const MAX_MAP_ZOOM = 10;
 
 // Revamped SmallFlag to handle shapes without clipPath IDs collision risk (by just not using clipPath or generated IDs)
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
@@ -79,12 +84,18 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
     );
 }
 
-export default function SolarSystem() {
+interface SolarSystemProps {
+        studentView?: boolean;
+}
+
+export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
+    const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
-  const [zoom, setZoom] = useState(0.25); // Start zoomed out to see more
-  const [isAutoFit, setIsAutoFit] = useState(true); // Auto-scale to screen
+    const [planetVisitors, setPlanetVisitors] = useState<Ship[]>([]);
+    const [zoom, setZoom] = useState(studentView ? 0.16 : 0.25); // Keep student view readable by default
+    const [isAutoFit, setIsAutoFit] = useState(!studentView); // Personal map starts at manual zoom
   const [isLanded, setIsLanded] = useState(false); // New Landing State
   const [isOrbiting, setIsOrbiting] = useState(true); // Default active
   const [mounted, setMounted] = useState(false);
@@ -97,6 +108,8 @@ export default function SolarSystem() {
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
   const [currentAward, setCurrentAward] = useState<AwardEvent | null>(null);
+
+    const previousPlanetXPRef = useRef<Map<string, Record<string, number>>>(new Map());
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
@@ -263,7 +276,7 @@ export default function SolarSystem() {
         let newZoom = Math.min(scaleX, scaleY);
         
         // Clamp bounds
-        newZoom = Math.min(Math.max(newZoom, 0.05), 1.5);
+        newZoom = Math.min(Math.max(newZoom, MIN_MAP_ZOOM), 1.5);
         
         setZoom(newZoom);
     };
@@ -316,7 +329,7 @@ export default function SolarSystem() {
           if (awardTimer.current) clearTimeout(awardTimer.current);
           awardTimer.current = setTimeout(() => {
               setAwardQueue([]);
-          }, 15000); 
+          }, awardQueue.length >= 10 ? 30000 : 20000);
       }
       prevQueueLength.current = awardQueue.length;
       return () => {
@@ -327,6 +340,101 @@ export default function SolarSystem() {
   // Real-time subscription to all star travelers
   useEffect(() => {
     if (!userData) return;
+
+    const mapUserToShip = (id: string, data: any): Ship => {
+        const loc = data.location || 'earth';
+        return {
+            id,
+            shipId: data.spaceship?.id || 'finalship',
+            cadetName: truncateName(data.spaceship?.name || data.displayName || 'Unknown Traveler'),
+            locationId: loc,
+            status: data.travelStatus || 'idle',
+            destinationId: data.destinationId,
+            travelStart: data.travelStart,
+            travelEnd: data.travelEnd,
+            avatarColor: data.spaceship?.color || 'text-cyan-400',
+            avatar: data.avatar,
+            role: data.role,
+            xp: data.xp || 0,
+            lastXpReason: data.lastXpReason,
+            flag: data.flag,
+            visitedPlanets: data.visitedPlanets || [],
+            planetXP: data.planetXP || {}
+        };
+    };
+
+    const processFleet = (fleet: Ship[]) => {
+        setShips(fleet);
+
+        fleet.forEach(shipData => {
+             if (!isFirstLoad.current && !isStudentPersonalView) {
+                const oldXP = previousXPRef.current.get(shipData.id);
+                if (oldXP !== undefined && shipData.xp > oldXP) {
+                    const oldRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => oldXP >= r.minXP);
+                    const newRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => shipData.xp >= r.minXP);
+                    const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
+
+                    const planetId = (shipData.locationId || '').toLowerCase();
+                    const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
+                    const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
+                    const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
+
+                    let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
+                    if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
+                        const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
+                        const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
+
+                        if (joviUnlockedNow) {
+                            unlocks = {
+                                avatars: ['jovi'],
+                            };
+                        }
+                    }
+
+                    const event: AwardEvent = {
+                        id: Math.random().toString(),
+                        ship: shipData,
+                        xpGained: shipData.xp - oldXP,
+                        newRank: isPromotion ? newRank.name : undefined,
+                        startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                        reason: shipData.lastXpReason,
+                        unlocks
+                    };
+
+                    const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
+                    if (audioElement && isSoundOnRef.current) {
+                        audioElement.currentTime = 0;
+                        audioElement.volume = 0.5;
+                        audioElement.play().catch(() => {});
+                    }
+
+                    setAwardQueue(prev => [...prev, event]);
+                }
+             }
+
+             previousXPRef.current.set(shipData.id, shipData.xp);
+             previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
+        });
+
+        isFirstLoad.current = false;
+    };
+
+    if (isStudentPersonalView) {
+        const userRef = doc(db, "users", userData.uid);
+        const unsubscribeOwn = onSnapshot(userRef, {
+            next: (snap) => {
+                if (!snap.exists()) {
+                    setShips([]);
+                    return;
+                }
+                processFleet([mapUserToShip(snap.id, snap.data())]);
+            },
+            error: (e) => console.log("Silent Permission Error", e)
+        });
+
+        return () => unsubscribeOwn();
+    }
+
     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
     if (!teacherId && userData.role !== 'admin') return;
 
@@ -363,97 +471,68 @@ export default function SolarSystem() {
         next: (snapshot) => {
             const fleet: Ship[] = [];
             snapshot.forEach((doc) => {
-                const data = doc.data();
-                const loc = data.location || 'earth';
+                fleet.push(mapUserToShip(doc.id, doc.data()));
+            });
+            processFleet(fleet);
+        },
+        error: (e) => console.log("Silent Permission Error", e)
+    });
+    
+        return () => unsubscribe();
+    }, [userData, isStudentPersonalView]);
 
-                const shipData: Ship = {
-                    id: doc.id,
-                    cadetName: data.spaceship?.name || data.displayName || 'Unknown Traveler',
+  // On-demand visitors feed for selected planet in student personal view (lightweight class read)
+  useEffect(() => {
+    if (!isStudentPersonalView || !userData?.teacherId || !selectedPlanet) {
+        setPlanetVisitors([]);
+        return;
+    }
+
+    const q = query(
+        collection(db, "users"),
+        where("teacherId", "==", userData.teacherId),
+        where("visitedPlanets", "array-contains", selectedPlanet.id)
+    );
+
+    const unsub = onSnapshot(q, {
+        next: (snapshot) => {
+            const visitors: Ship[] = snapshot.docs.map((snap) => {
+                const data: any = snap.data();
+                const loc = data.location || 'earth';
+                return {
+                    id: snap.id,
+                    shipId: data.spaceship?.id || 'finalship',
+                    cadetName: truncateName(data.spaceship?.name || data.displayName || 'Unknown Traveler'),
                     locationId: loc,
                     status: data.travelStatus || 'idle',
                     destinationId: data.destinationId,
                     travelStart: data.travelStart,
                     travelEnd: data.travelEnd,
                     avatarColor: data.spaceship?.color || 'text-cyan-400',
-                    avatar: data.avatar, // Including Avatar Config
-                    role: data.role, 
+                    avatar: data.avatar,
+                    role: data.role,
                     xp: data.xp || 0,
                     lastXpReason: data.lastXpReason,
                     flag: data.flag,
-                    visitedPlanets: data.visitedPlanets || []
-                };
-                fleet.push(shipData);
+                    visitedPlanets: data.visitedPlanets || [],
+                    planetXP: data.planetXP || {}
+                } as Ship;
             });
-            setShips(fleet);
-
-            // Award & Rank Logic
-            fleet.forEach(shipData => {
-                 if (!isFirstLoad.current) {
-                    const oldXP = previousXPRef.current.get(shipData.id);
-                    // Trigger if XP gained (and not just initialized from undefined)
-                    if (oldXP !== undefined && shipData.xp > oldXP) {
-                        
-                        // 1. Calculate Start Pos
-                        let startX = 0, startY = 0;
-                        
-                        // Find planet position
-                        const planet = PLANETS.find(p => p.id === shipData.locationId);
-                        if (planet) {
-                            const period = planet.orbitDuration * 1000;
-                            let angleDeg = planet.startAngle;
-                            if (period > 0) {
-                                 const tSeconds = Date.now() / 1000;
-                                 const progress = (tSeconds % planet.orbitDuration) / planet.orbitDuration;
-                                 angleDeg += progress * 360; 
-                            }
-                            const angleRad = angleDeg * (Math.PI / 180);
-                            const r = planet.orbitSize / 2; // Using orbitSize from constants
-                             // Map Pan offset? We can't easily get it here without Ref. 
-                             // Let's just default to center for the animation start or a random edge.
-                             // Actually, 0,0 is fine, it will fly in from center.
-                        }
-
-                        // 2. Check Rank Up
-                        const oldRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => oldXP >= r.minXP);
-                        const newRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => shipData.xp >= r.minXP);
-                        
-                        const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
-
-                        const event: AwardEvent = {
-                            id: Math.random().toString(),
-                            ship: shipData,
-                            xpGained: shipData.xp - oldXP,
-                            newRank: isPromotion ? newRank.name : undefined,
-                            startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-                            reason: shipData.lastXpReason
-                        };
-                        
-                        // Play notification sound safely if enabled
-                        const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
-                        if (audioElement && isSoundOnRef.current) {
-                            console.log("Map: Playing Award Sound");
-                            audioElement.currentTime = 0;
-                            audioElement.volume = 0.5;
-                            audioElement.play().catch(e => console.error("Map audio playback failed (Autoplay blocked? Click map to enable):", e));
-                        }
-                        
-                        // Add to queue
-                        setAwardQueue(prev => [...prev, event]);
-                    }
-                 }
-                 // Always update ref
-                 previousXPRef.current.set(shipData.id, shipData.xp);
-            });
-            isFirstLoad.current = false;
+            setPlanetVisitors(visitors);
         },
-        error: (e) => console.log("Silent Permission Error", e)
+        error: () => setPlanetVisitors([])
     });
-    
-    return () => unsubscribe();
-  }, [userData]);
+
+    return () => unsub();
+  }, [isStudentPersonalView, selectedPlanet, userData]);
 
 
-  const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+    const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+    const dynamicPlanetsRef = useRef<Map<string, any>>(new Map());
+
+    useEffect(() => {
+            dynamicPlanetsRef.current = dynamicPlanets as any;
+    }, [dynamicPlanets]);
 
   // Load Dynamic Planet Stats
   useEffect(() => {
@@ -467,11 +546,9 @@ export default function SolarSystem() {
      const unsub = onSnapshot(q, (snapshot) => {
          const d = new Map();
          snapshot.forEach(doc => {
-             // We use the internal ID stored in the doc, not the document key (which is composite)
              const data = doc.data();
-             if (data.id) {
-                 d.set(data.id, data);
-             }
+             const planetKey = data.id || doc.id;
+             d.set(planetKey, data);
          });
          setDynamicPlanets(d);
      });
@@ -748,11 +825,35 @@ export default function SolarSystem() {
   }, [isAsteroidDestroyed, asteroidEvent?.active, userData]);
 
   // Handle mouse wheel zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    setIsAutoFit(false);
-    const newZoom = zoom - e.deltaY * 0.001;
-    setZoom(Math.min(Math.max(0.05, newZoom), 2));
-  };
+    const handleWheel = (e: React.WheelEvent) => {
+        e.preventDefault();
+        setIsAutoFit(false);
+
+        const viewport = containerRef.current;
+        if (!viewport) {
+                const fallbackZoom = zoom - e.deltaY * 0.001;
+                setZoom(Math.min(Math.max(MIN_MAP_ZOOM, fallbackZoom), MAX_MAP_ZOOM));
+                return;
+        }
+
+        const rect = viewport.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const clampedNewZoom = Math.min(Math.max(MIN_MAP_ZOOM, zoom - e.deltaY * 0.001), MAX_MAP_ZOOM);
+        if (clampedNewZoom === zoom) return;
+
+        const worldX = (pointerX - centerX - pan.x) / zoom;
+        const worldY = (pointerY - centerY - pan.y) / zoom;
+
+        const nextPanX = pointerX - centerX - worldX * clampedNewZoom;
+        const nextPanY = pointerY - centerY - worldY * clampedNewZoom;
+
+        setPan({ x: nextPanX, y: nextPanY });
+        setZoom(clampedNewZoom);
+    };
 
   // Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -788,8 +889,70 @@ export default function SolarSystem() {
     })));
   }, []);
 
+  const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+    const visitorsForSelectedPlanet = selectedPlanet
+        ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
+        : [];
+
+  const getSubjectLocationId = (subject: unknown): string | undefined => {
+      if (!subject || typeof subject !== 'object') return undefined;
+
+      if ('locationId' in subject) {
+          const value = (subject as { locationId?: unknown }).locationId;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      if ('location' in subject) {
+          const value = (subject as { location?: unknown }).location;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      return undefined;
+  };
+
+  const getSubjectUserId = (subject: unknown): string | undefined => {
+      if (!subject || typeof subject !== 'object') return undefined;
+
+      if ('id' in subject) {
+          const value = (subject as { id?: unknown }).id;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      if ('uid' in subject) {
+          const value = (subject as { uid?: unknown }).uid;
+          return typeof value === 'string' ? value : undefined;
+      }
+
+      return undefined;
+  };
+
+  const buildFallbackFlag = (subject: unknown): FlagConfig => {
+      const avatarColor =
+          subject && typeof subject === 'object' && 'avatarColor' in subject
+              ? String((subject as { avatarColor?: unknown }).avatarColor || '')
+              : '';
+
+      let primaryColor = 'blue';
+      if (avatarColor.includes('red')) primaryColor = 'red';
+      else if (avatarColor.includes('green')) primaryColor = 'green';
+      else if (avatarColor.includes('yellow')) primaryColor = 'yellow';
+      else if (avatarColor.includes('purple')) primaryColor = 'purple';
+      else if (avatarColor.includes('cyan')) primaryColor = 'blue';
+
+      return {
+          pole: 'silver',
+          shape: 'pennant',
+          primaryColor,
+          secondaryColor: 'white',
+          pattern: 'solid'
+      };
+  };
+
+    const shipNameScale = Math.min(Math.max(0.85 / zoom, 1), 6);
+
   return (
     <div 
+        ref={containerRef}
         className={`relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#00091d] to-black flex items-center justify-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -801,7 +964,7 @@ export default function SolarSystem() {
        <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
 
        {/* Class Name HUD */}
-       <div className="absolute top-6 left-6 z-40 pointer-events-none">
+    <div className={`absolute ${userData?.role === 'teacher' ? 'top-6 left-44' : (isStudentPersonalView ? 'top-20 left-6' : 'top-6 left-6')} z-40 pointer-events-none`}>
            <div className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-bold mb-1">Sector Control</div>
            <div className="text-xl md:text-3xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
                {className || "Deep Space Network"}
@@ -811,7 +974,7 @@ export default function SolarSystem() {
        {/* Sound Toggle */}
        <button 
            onClick={(e) => { e.stopPropagation(); toggleSound(); }}
-           className={`absolute top-6 right-6 z-50 p-3 rounded-full border backdrop-blur-md transition-all ${isSoundOn ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-black/20 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
+           className={`absolute top-32 right-6 z-50 p-3 rounded-full border backdrop-blur-md transition-all ${isSoundOn ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-black/20 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
        >
            {isSoundOn ? <Volume2 size={24} /> : <VolumeX size={24} />}
        </button>
@@ -834,7 +997,7 @@ export default function SolarSystem() {
        
        {/* Solar System Container with Pan & Zoom */}
        <div 
-            className="relative flex items-center justify-center transition-transform duration-75 ease-linear will-change-transform"
+          className="relative flex items-center justify-center transition-transform duration-75 ease-linear"
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         >
           
@@ -886,15 +1049,15 @@ export default function SolarSystem() {
                                     style={{ transform: `rotate(${rotationData}deg)` }}
                               />
                           ) : (
-                              <div 
-                                className="relative w-12 h-12 flex items-center justify-center"
-                                style={{ transform: `rotate(${rotationData + 45}deg)` }}
+                                                            <div 
+                                                                                                                                className="relative w-8 h-8 flex items-center justify-center"
+                                                                style={{ transform: `rotate(${rotationData + 45}deg)` }}
                               >
                                   <div className="relative w-full h-full">
                                       <img 
-                                            src={getAssetPath("/images/ships/finalship.png")}
+                                            src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                             alt="Traveling Ship"
-                                            className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
+                                                                                    className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
@@ -903,7 +1066,10 @@ export default function SolarSystem() {
                                   </div>
                               </div>
                           )}
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 text-[8px] bg-black/50 text-white px-1 rounded whitespace-nowrap mt-1">
+                          <span
+                              className="absolute top-full left-1/2 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded whitespace-nowrap mt-1 border border-cyan-500/30"
+                              style={{ transform: `translateX(-50%) scale(${shipNameScale})`, transformOrigin: 'top center' }}
+                          >
                               {ship.cadetName} ({Math.round(progress * 100)}%)
                           </span>
                       </div>
@@ -1001,15 +1167,23 @@ export default function SolarSystem() {
                        {/* Docked Ships Indicators */}
                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
                           {/* Parking Orbit Ring */}
-                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length > 0 && (
-                                <div 
-                                    className="absolute rounded-full border border-cyan-500/30 border-dashed animate-[spin_60s_linear_infinite]"
-                                    style={{
-                                        width: planet.pixelSize + 80, // radius + 40
-                                        height: planet.pixelSize + 80,
-                                    }}
-                                />
-                          )}
+                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length > 0 && (() => {
+                              const dockedCount = ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length;
+                              const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
+                              const crowdPadding = dockedCount > 10 ? 20 : dockedCount > 6 ? 12 : 0;
+                              const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
+                              const diameter = radius * 2;
+
+                              return (
+                                  <div
+                                      className="absolute rounded-full border border-cyan-500/30 border-dashed animate-[spin_60s_linear_infinite]"
+                                      style={{
+                                          width: diameter,
+                                          height: diameter,
+                                      }}
+                                  />
+                              );
+                          })()}
 
                           {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').map((ship, idx, arr) => {
                               // Distribute ships evenly around the planet + Animation
@@ -1018,20 +1192,28 @@ export default function SolarSystem() {
                               const startAngle = (idx * (360 / Math.max(arr.length, 1))) - 90; 
                               
                               const currentAngle = startAngle + timeOffset;
-                              const radius = (planet.pixelSize / 2) + 40; // Increased distance
+                              const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
+                              const crowdPadding = arr.length > 10 ? 20 : arr.length > 6 ? 12 : 0;
+                              const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
                               
                               return (
                                 <div 
                                     key={ship.id} 
                                     className="absolute flex flex-col items-center justify-center" 
+                                    title={ship.cadetName}
                                     style={{ 
                                         transform: `rotate(${currentAngle}deg) translate(${radius}px) rotate(${-currentAngle}deg)`,
                                         zIndex: 30
                                     }} 
                                 >
-                                    <span className="text-[10px] font-bold text-white bg-black/70 px-2 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm">
-                                        {ship.cadetName}
-                                    </span>
+                                    {arr.length <= 8 && (
+                                        <span
+                                            className="text-[10px] font-bold text-white bg-black/70 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm"
+                                            style={{ transform: `scale(${shipNameScale})`, transformOrigin: 'bottom center' }}
+                                        >
+                                            {ship.cadetName}
+                                        </span>
+                                    )}
                                     {ship.role === 'teacher' ? (
                                         <Crown 
                                             size={24} 
@@ -1040,12 +1222,12 @@ export default function SolarSystem() {
                                         />
                                     ) : (
                                         <div 
-                                            className="relative w-12 h-12 flex items-center justify-center -mb-2"
+                                            className="relative w-8 h-8 flex items-center justify-center"
                                             style={{ transform: 'rotate(-45deg)' }}
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
-                                                    src={getAssetPath("/images/ships/finalship.png")}
+                                                    src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
@@ -1064,6 +1246,19 @@ export default function SolarSystem() {
              </React.Fragment>
           ))}
        </div>
+
+       {userData?.role === 'teacher' && (
+           <>
+               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none opacity-30">
+                   <h1 className="text-white font-mono text-xs tracking-widest uppercase">Classroom Sensor Feed // Live</h1>
+               </div>
+
+                <Link href="/teacher/space" className="absolute top-6 left-6 z-40 bg-black/20 hover:bg-black/80 border border-white/10 hover:border-cyan-500 text-white/50 hover:text-cyan-400 px-6 py-3 rounded-full backdrop-blur-sm flex items-center gap-3 transition-all group">
+                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="font-bold tracking-widest uppercase text-sm">Cockpit</span>
+                </Link>
+           </>
+       )}
 
        {/* View Controls */}
        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-[60]">
@@ -1094,8 +1289,8 @@ export default function SolarSystem() {
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, 2)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, 0.05)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, MAX_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
+               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, MIN_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
                <div className="w-full h-px bg-white/20 my-1" />
                <button onClick={() => { setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
            </div>
@@ -1110,7 +1305,7 @@ export default function SolarSystem() {
        </div>
 
        {/* Class Bonus HUD */}
-       {bonusConfig && (
+       {!isStudentPersonalView && bonusConfig && (
            <div className="absolute top-6 right-6 z-40 bg-black/60 backdrop-blur border border-cyan-500/30 rounded-xl p-4 w-64 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
                 <div className="flex items-center justify-between mb-2 text-cyan-300">
                     <div className="flex items-center gap-2">
@@ -1231,10 +1426,10 @@ export default function SolarSystem() {
                   <div className="mt-6">
                       <div className="text-xs uppercase tracking-widest text-gray-500 mb-2">Colony Flags Planted</div>
                       <div className="flex flex-wrap gap-2">
-                          {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id)).length === 0 ? (
+                          {visitorsForSelectedPlanet.length === 0 ? (
                              <p className="text-gray-600 italic text-xs">No landings recorded.</p>
                           ) : (
-                             ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id)).map(ship => (
+                             visitorsForSelectedPlanet.map(ship => (
                                  <div key={ship.id} title={`${ship.cadetName} was here`} className="relative group/flag">
                                      {ship.flag ? (
                                          <div className="scale-75"><TinyFlag config={ship.flag} /></div>
@@ -1245,37 +1440,74 @@ export default function SolarSystem() {
                              ))
                           )}
                       </div>
+                      {visitorsForSelectedPlanet.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                            {visitorsForSelectedPlanet.map((visitor) => (
+                                <div key={`visitor-${visitor.id}`} className="flex items-center gap-2 text-xs text-gray-300">
+                                    <div className="w-4 h-4 rounded-full border border-white/20 overflow-hidden">
+                                        <UserAvatar userData={visitor as any} className="w-full h-full" />
+                                    </div>
+                                    <span className="truncate">{visitor.cadetName}</span>
+                                </div>
+                            ))}
+                        </div>
+                      )}
                   </div>
                </div>
                
                {/* Action Buttons */}
-               {isCommandMode && controlledShipId ? (
-                   <button 
-                      onClick={() => handleTravel(controlledShipId)}
-                      className="mt-4 w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] animate-pulse"
-                   >
-                      <Radio size={18} />
-                      EXECUTE REMOTE JUMP
-                   </button>
-               ) : userData?.location === selectedPlanet.id ? (
-                   <button 
-                      onClick={() => {
-                          setIsLanded(true);
-                      }}
-                      className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
-                   >
-                      <Flag size={18} />
-                      LAND ON SURFACE
-                   </button>
-               ) : (
-                   <button 
-                      onClick={() => handleTravel()}
-                      className="mt-4 w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors"
-                   >
-                      <Navigation size={18} />
-                      ENGAGE HYPERDRIVE
-                   </button>
-               )}
+               {(() => {
+                   const isAtLocation = getSubjectLocationId(landingSubject) === selectedPlanet.id;
+
+                   if (isCommandMode && controlledShipId) {
+                        if (isAtLocation) {
+                             return (
+                               <button 
+                                  onClick={() => setIsLanded(true)}
+                                  className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
+                               >
+                                  <Flag size={18} />
+                                  LAND ON SURFACE (REMOTE)
+                               </button>
+                             );
+                        } else {
+                             return (
+                               <button 
+                                  onClick={() => handleTravel(controlledShipId)}
+                                  className="mt-4 w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] animate-pulse"
+                               >
+                                  <Radio size={18} />
+                                  EXECUTE REMOTE JUMP
+                               </button>
+                             );
+                        }
+                   } 
+                   
+                   // Regular User Checks
+                   if (userData?.location === selectedPlanet.id) {
+                       return (
+                           <button 
+                              onClick={() => {
+                                  setIsLanded(true);
+                              }}
+                              className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
+                           >
+                              <Flag size={18} />
+                              LAND ON SURFACE
+                           </button>
+                       );
+                   }
+
+                   return (
+                       <button 
+                          onClick={() => handleTravel()}
+                          className="mt-4 w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors"
+                       >
+                          <Navigation size={18} />
+                          ENGAGE HYPERDRIVE
+                       </button>
+                   );
+               })()}
             </motion.div>
          )}
        </AnimatePresence>
@@ -1287,7 +1519,7 @@ export default function SolarSystem() {
                     initial={{ x: -300, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: -300, opacity: 0 }}
-                    className="absolute top-0 left-0 bottom-0 w-72 bg-black/90 backdrop-blur-xl border-r border-orange-500/30 z-50 flex flex-col pointer-events-auto"
+                    className="absolute top-0 left-0 bottom-0 w-72 bg-black/90 backdrop-blur-xl border-r border-orange-500/30 z-[150] flex flex-col pointer-events-auto"
                >
                    <div className="p-4 border-b border-orange-500/30 bg-orange-900/10">
                        <h2 className="text-orange-500 font-bold uppercase tracking-widest flex items-center gap-2">
@@ -1333,7 +1565,7 @@ export default function SolarSystem() {
        </AnimatePresence>
 
        {/* Legend / Overlay Controls */}
-       <div className="absolute bottom-6 left-6 p-4 bg-black/60 rounded-xl border border-white/10 backdrop-blur text-xs text-gray-400 pointer-events-none select-none">
+         <div className="absolute bottom-24 left-6 p-4 bg-black/60 rounded-xl border border-white/10 backdrop-blur text-xs text-gray-400 pointer-events-none select-none">
           <h3 className="text-white font-bold mb-2 uppercase tracking-wider">System Command</h3>
           <p>Zoom Level: {Math.round(zoom * 100)}%</p>
           <p>Orbit Status: {isOrbiting ? "ACTIVE" : "LOCKED"}</p>
@@ -1341,23 +1573,25 @@ export default function SolarSystem() {
           <p className="mt-2 text-blue-400">Scroll to zoom. Drag to pan.</p>
        </div>
 
-       {/* CLASS GRID OVERLAY */}
-       <ManifestOverlay 
-            isVisible={isGridVisible} 
-            onClose={handleCloseManifest}
-            ships={ships}
-            ranks={ranks}
-            selectedIds={selectedIds}
-            setSelectedIds={setSelectedIds}
-            behaviors={behaviors}
-       />
+      {/* CLASS GRID OVERLAY */}
+      {!isStudentPersonalView && (
+         <ManifestOverlay 
+             isVisible={isGridVisible} 
+             onClose={handleCloseManifest}
+             ships={ships}
+             ranks={ranks}
+             selectedIds={selectedIds}
+             setSelectedIds={setSelectedIds}
+             behaviors={behaviors}
+         />
+      )}
 
        {/* AWARD CEREMONY OVERLAY */}
        <AnimatePresence>
-         {awardQueue.length > 0 && (
+         {!isStudentPersonalView && awardQueue.length > 0 && (
             <div 
                 key="award-overlay"
-                className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-auto cursor-pointer"
+                className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-auto cursor-pointer"
                 onClick={() => setAwardQueue([])}
             >
                 {/* Visual Backdrop (Dim the map slightly) */}
@@ -1369,7 +1603,10 @@ export default function SolarSystem() {
                 />
 
                 {/* Multiple Awards Container */}
-                <div className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-screen overflow-y-auto">
+                <div
+                    className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-[calc(100vh-2rem)] overflow-y-auto cursor-default"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     {awardQueue.map((award, index) => (
                         <motion.div
                             key={award.id}
@@ -1412,17 +1649,17 @@ export default function SolarSystem() {
                             >
                                 <div className={`relative ${awardQueue.length > 1 ? 'w-24 h-24' : 'w-40 h-40'}`}>
                                     <img 
-                                        src={getAssetPath("/images/ships/finalship.png")} 
+                                        src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
                                         alt="Award Ship"
                                         className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] relative z-20"
                                     />
                                     {/* Avatar Window - Using simple color fallback because getting full user avatar data here might be complex without looking up ship again, 
                                         but we have 'ship' object in award.
                                      */}
-                                    <div className={`absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden ${award.ship.avatarColor?.replace('text','bg').replace('400','900')}/40`}>
-                                         {/* If we have avatar data, we could show it, but 'ship' object in award might be minimal.
-                                             Let's check if we can show generic avatar or if we have color.
-                                         */}
+                                    <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
+                                        {award.ship.avatar && (
+                                            <UserAvatar userData={award.ship as any} className="w-full h-full scale-[1.35] translate-y-1" />
+                                        )}
                                     </div>
                                 </div>
                             </motion.div>
@@ -1433,7 +1670,7 @@ export default function SolarSystem() {
                             
                             {award.reason && (
                                 <div className={`text-cyan-400/80 ${awardQueue.length > 1 ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
-                                    // {award.reason}
+                                    {award.reason}
                                 </div>
                             )}
 
@@ -1470,6 +1707,37 @@ export default function SolarSystem() {
                                 </motion.div>
                                 )}
                             </div>
+
+                            {(award.unlocks?.ships?.length || award.unlocks?.avatars?.length) && (
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="mt-6 w-full bg-purple-500/10 border border-purple-400/40 rounded-2xl p-4 relative overflow-hidden"
+                                >
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-700/30 via-transparent to-transparent" />
+                                    <div className="relative z-10">
+                                        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-purple-200 text-center mb-3">
+                                            NEW UNLOCK!
+                                        </div>
+                                        <div className="flex flex-wrap gap-3 items-center justify-center">
+                                            {(award.unlocks.ships || []).map((id) => (
+                                                <div key={`ship-${id}`} className="flex flex-col items-center gap-1">
+                                                    <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-12 h-12 object-contain drop-shadow-md" />
+                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Ship</div>
+                                                </div>
+                                            ))}
+                                            {(award.unlocks.avatars || []).map((id) => (
+                                                <div key={`avatar-${id}`} className="flex flex-col items-center gap-1">
+                                                    <div className="w-12 h-12 rounded-full border border-purple-400/40 overflow-hidden">
+                                                        <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
+                                                    </div>
+                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Avatar</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
                         </motion.div>
                     ))}
                 </div>
@@ -1479,7 +1747,7 @@ export default function SolarSystem() {
 
        {/* LANDING VIEW OVERLAY */}
        <AnimatePresence>
-         {isLanded && selectedPlanet && userData && (
+         {isLanded && selectedPlanet && landingSubject && (
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1531,7 +1799,7 @@ export default function SolarSystem() {
                         className="origin-bottom-left"
                      >
                          <div className="transform scale-[3] drop-shadow-2xl">
-                              {userData.flag ? <TinyFlag config={userData.flag} /> : <div className="w-4 h-8 bg-gray-400" />}
+                            <TinyFlag config={(landingSubject as any).flag || buildFallbackFlag(landingSubject)} />
                          </div>
                      </motion.div>
 
@@ -1544,8 +1812,8 @@ export default function SolarSystem() {
                      >
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">
-                               <div className="w-full h-full relative overflow-visible">
-                                    <UserAvatar userData={userData} className="w-full h-full" />
+                         <div className="w-full h-full relative overflow-visible">
+                             <UserAvatar userData={landingSubject} transparentBg className="w-full h-full rounded-full" />
                                </div>
                          </div>
                      </motion.div>
@@ -1581,11 +1849,15 @@ export default function SolarSystem() {
                  >
                      <h3 className="text-white/50 uppercase tracking-widest text-xs font-bold mb-4 border-b border-white/10 pb-2">Previous Explorers</h3>
                      <div className="flex flex-wrap gap-2">
-                        {ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== userData.uid).length > 0 ? (
-                            ships.filter(s => s.visitedPlanets?.includes(selectedPlanet.id) && s.id !== userData.uid).map(s => (
+                        {visitorsForSelectedPlanet.filter(s => s.id !== getSubjectUserId(landingSubject)).length > 0 ? (
+                            visitorsForSelectedPlanet.filter(s => s.id !== getSubjectUserId(landingSubject)).map(s => (
                                 <div key={s.id} className="relative group cursor-help">
-                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black">
-                                       <div className={`w-full h-full ${s.avatarColor.replace('text', 'bg').replace('400', '900')}`} />
+                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black flex items-center justify-center">
+                                       {s.flag ? (
+                                           <div className="scale-[0.55]"><TinyFlag config={s.flag} /></div>
+                                       ) : (
+                                           <UserAvatar userData={s as any} className="w-full h-full" />
+                                       )}
                                     </div>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-[10px] rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
                                         {s.cadetName}
@@ -1604,7 +1876,7 @@ export default function SolarSystem() {
 
        {/* ASTEROID OVERLAY */}
        <AnimatePresence>
-            {asteroidStatus && asteroidEvent && asteroidEvent.active && (
+            {!isStudentPersonalView && asteroidStatus && asteroidEvent && asteroidEvent.active && (
                 <div className="absolute inset-0 z-[150] pointer-events-none overflow-hidden">
                     {/* Warning Flash */}
                     <div className="absolute inset-0 bg-red-500/10 animate-pulse" />
@@ -1709,7 +1981,7 @@ export default function SolarSystem() {
 
        {/* CLASS BONUS VICTORY OVERLAY */}
        <AnimatePresence>
-          {showBonusVictory && bonusConfig && (
+          {!isStudentPersonalView && showBonusVictory && bonusConfig && (
               <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -1765,6 +2037,8 @@ export default function SolarSystem() {
               </motion.div>
           )}
        </AnimatePresence>
+
+       {userData?.role === 'teacher' && <MapTutorial />}
 
     </div>
   );

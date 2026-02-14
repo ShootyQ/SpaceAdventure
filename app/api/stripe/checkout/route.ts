@@ -9,9 +9,9 @@ export async function POST(req: Request) {
     console.log("[STRIPE_CHECKOUT] POST request received");
     try {
         const body = await req.json();
-        const { priceId, userId, email } = body;
+        const { priceId, cycle, userId, email } = body;
         
-        console.log("[STRIPE_CHECKOUT] Body:", { priceId, userId, email });
+        console.log("[STRIPE_CHECKOUT] Body:", { priceId, cycle, userId, email });
 
         if (!userId || !email) {
             console.log("[STRIPE_CHECKOUT] Missing fields");
@@ -26,17 +26,21 @@ export async function POST(req: Request) {
                 quantity: 1,
             });
         } else {
-             // Fallback for Sandbox/Demo Mode if no Price ID is configured
-             line_items.push({
+            const normalizedCycle = cycle === 'yearly' ? 'yearly' : 'monthly';
+            const isYearly = normalizedCycle === 'yearly';
+
+            // Fallback for Sandbox/Demo Mode if no Price ID is configured.
+            // NOTE: Production should ideally pass a real Stripe Price ID.
+            line_items.push({
                 price_data: {
                     currency: 'usd',
                     product_data: {
-                        name: 'Class CRAVE Subscription (Monthly)',
-                        description: 'Unlimited access to all teacher tools',
+                        name: `ClassCrave Teacher License (${isYearly ? 'Yearly' : 'Monthly'})`,
+                        description: 'Access to teacher tools and classroom management game worlds',
                     },
-                    unit_amount: 1000, // $10.00
+                    unit_amount: isYearly ? 8000 : 1000, // $80/year or $10/month
                     recurring: {
-                        interval: 'month',
+                        interval: isYearly ? 'year' : 'month',
                     },
                 },
                 quantity: 1,

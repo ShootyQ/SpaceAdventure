@@ -3,12 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 11, 13, 23;
-  --background-end-rgb: 0, 0, 0;
+  --foreground-rgb: 24, 24, 24;
+  --background-start-rgb: 247, 244, 239;
+  --background-end-rgb: 238, 232, 221;
+  --font-body: system-ui;
+  --font-heading: serif;
 }
 
+/* Default to Space Theme (Dark) for the app */
 body {
+  color: white;
+  background: #020617; /* slate-950 */
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Landing Page Theme (Beige/Professional) */
+.landing-theme {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
       to bottom,
@@ -16,6 +27,32 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
-    overflow-x: hidden;
-    min-height: 100vh;
+  min-height: 100vh;
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #020617;
+  color: #e2e8f0;
+}
+
+.no-number-spinner {
+  -moz-appearance: textfield;
+}
+
+.no-number-spinner::-webkit-outer-spin-button,
+.no-number-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

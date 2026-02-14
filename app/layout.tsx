@@ -1,9 +1,18 @@
 import { AuthProvider } from "@/context/AuthContext";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; 
+import { IBM_Plex_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+});
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-heading",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.classcrave.com'),
@@ -11,8 +20,8 @@ export const metadata: Metadata = {
     default: "ClassCrave | Gamified Classroom Learning Adventure",
     template: "%s | ClassCrave"
   },
-  description: "Transform your classroom into an epic space adventure. Track behavior, award XP, and engage students with ClassCrave's immersive gamification platform for educators.",
-  keywords: ["gamified classroom", "classroom management", "student engagement", "educational games", "XP system for schools", "behavior tracking", "ClassCrave", "space adventure", "PBIS tools"],
+  description: "A professional classroom gamification platform with clear routines, rewards, and multiple game experiences for educators.",
+  keywords: ["gamified classroom", "classroom management", "student engagement", "educational games", "XP system for schools", "behavior tracking", "ClassCrave", "PBIS tools", "classroom games"],
   authors: [{ name: "ShootyQ" }],
   creator: "ClassCrave Team",
   publisher: "ClassCrave",
@@ -25,13 +34,13 @@ export const metadata: Metadata = {
     apple: '/images/logos/classcravefavicon.png',
   },
   openGraph: {
-    title: "ClassCrave | The Ultimate Gamified Classroom Adventure",
-    description: "Engage students with immersive missions, real-time behavior tracking, and collaborative space exploration.",
+    title: "ClassCrave | Classroom Games That Make Progress Visible",
+    description: "Engage students with clear routines, real-time behavior tracking, and game-based motivation.",
     url: 'https://www.classcrave.com',
     siteName: 'ClassCrave',
     images: [
       {
-        url: '/images/logos/classcrave logo.png', // Ideally this should be a large 1200x630 og-image
+        url: '/images/logos/croppedclasscravelogo.png', // Ideally this should be a large 1200x630 og-image
         width: 1200,
         height: 630,
         alt: 'ClassCrave Classroom Adventure',
@@ -43,8 +52,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: "ClassCrave | Gamified Classroom Learning",
-    description: "Turn your class into a spaceship crew. Boost engagement with XP, ranks, and missions.",
-    images: ['/images/logos/classcrave logo.png'], // Fallback to logo
+    description: "Boost engagement with XP, ranks, and missions built for educators.",
+    images: ['/images/logos/croppedclasscravelogo.png'], // Fallback to logo
   },
   robots: {
     index: true,
@@ -66,7 +75,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${plexSans.variable} ${fraunces.variable} font-body`}>
         <AuthProvider>
             {children}
         </AuthProvider>

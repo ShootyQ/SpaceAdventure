@@ -1,28 +1,118 @@
 "use client";
 
-import { useState } from "react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, Video, BookOpen, GripVertical, Loader2 } from "lucide-react";
+import { GradeLevel, PracticeAssignmentConfig, PracticeTemplateId, getPracticeTemplatesForGrade } from "@/lib/practice";
+import { STUDENT_GRADES, StudentGrade } from "@/types";
+
+type QuestionType = 'mc' | 'tf' | 'sort';
+type MissionContentType = 'read' | 'watch' | 'practice';
+
+type BuilderQuestion = {
+    id: string;
+    text: string;
+    type: QuestionType;
+    options: string[];
+    correctAnswer: string | string[];
+    correctAnswerIndex?: number | null;
+};
 
 export default function CreateMissionPage() {
     const router = useRouter();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [loadingMission, setLoadingMission] = useState(false);
     
     // Mission State
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [xpReward, setXpReward] = useState(100);
-    const [type, setType] = useState<'read' | 'watch'>('read');
+    const [type, setType] = useState<MissionContentType>('read');
     const [contentUrl, setContentUrl] = useState("");
     const [contentText, setContentText] = useState("");
+    const [targetGrades, setTargetGrades] = useState<Array<StudentGrade | 'all'>>(['all']);
+    const [practiceConfig, setPracticeConfig] = useState<PracticeAssignmentConfig>({
+        templateId: 'math-multiplication-facts',
+        subject: 'math',
+        gradeLevel: 3,
+        questionCount: 24,
+        numberRangeMin: 1,
+        numberRangeMax: 100,
+        tableMin: 1,
+        tableMax: 12,
+        multiplicandMin: 1,
+        multiplicandMax: 12,
+        denominatorMin: 2,
+        denominatorMax: 12,
+        decimalPlaces: 2,
+        attemptPolicy: 'once',
+    });
+    const [gradeFilter, setGradeFilter] = useState<GradeLevel | 'all'>('all');
+    const allPracticeTemplates = useMemo(() => getPracticeTemplatesForGrade('all'), []);
+    const selectedTemplate = useMemo(
+        () => allPracticeTemplates.find((template) => template.id === practiceConfig.templateId),
+        [allPracticeTemplates, practiceConfig.templateId]
+    );
+
+    const filteredTemplates = useMemo(() => getPracticeTemplatesForGrade(gradeFilter), [gradeFilter]);
+
+    useEffect(() => {
+        if (!filteredTemplates.some((tpl) => tpl.id === practiceConfig.templateId)) {
+            const fallbackId = filteredTemplates[0]?.id;
+            if (fallbackId) {
+                setPracticeConfig((prev) => ({ ...prev, templateId: fallbackId }));
+            }
+        }
+    }, [filteredTemplates, practiceConfig.templateId]);
 
     // Questions State
-    const [questions, setQuestions] = useState<any[]>([]);
+    const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
+
+    const [editMissionId, setEditMissionId] = useState<string | null>(null);
+    const isEditMode = !!editMissionId;
+
+    const toggleTargetGrade = (grade: StudentGrade | 'all') => {
+        setTargetGrades((prev) => {
+            if (grade === 'all') return ['all'];
+            const withoutAll = prev.filter((item) => item !== 'all') as StudentGrade[];
+            if (withoutAll.includes(grade)) {
+                const next = withoutAll.filter((item) => item !== grade);
+                return next.length > 0 ? next : ['all'];
+            }
+            return [...withoutAll, grade];
+        });
+    };
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const missionId = new URLSearchParams(window.location.search).get('edit');
+        setEditMissionId(missionId);
+    }, []);
+
+    const ensureMinOptions = (input: string[], min = 4) => {
+        const next = [...input];
+        while (next.length < min) next.push('');
+        return next;
+    };
+
+    const getEffectivePracticeGradeLevel = (): GradeLevel => {
+        if (gradeFilter !== 'all') return gradeFilter;
+
+        const numericTargetGrades = targetGrades
+            .map((grade) => Number(grade))
+            .filter((grade) => Number.isInteger(grade) && grade >= 1 && grade <= 8) as GradeLevel[];
+
+        if (numericTargetGrades.length > 0) {
+            return numericTargetGrades[0];
+        }
+
+        return practiceConfig.gradeLevel;
+    };
 
     const addQuestion = () => {
         setQuestions([...questions, {
@@ -31,11 +121,36 @@ export default function CreateMissionPage() {
             type: "mc",
             options: ["", "", "", ""],
             correctAnswer: "",
+            correctAnswerIndex: null,
         }]);
     };
 
-    const updateQuestion = (id: string, field: string, value: any) => {
+    const updateQuestion = (id: string, field: keyof BuilderQuestion, value: any) => {
         setQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q));
+    };
+
+    const updateQuestionType = (id: string, nextType: QuestionType) => {
+        setQuestions(questions.map(q => {
+            if (q.id !== id) return q;
+            const currentOptions = Array.isArray(q.options) ? q.options : ["", "", "", ""];
+            if (nextType === 'tf') {
+                return { ...q, type: nextType, options: ['True', 'False'], correctAnswer: 'True', correctAnswerIndex: null };
+            }
+            if (nextType === 'mc') {
+                const mcOptions = q.type === 'tf' ? ['', '', '', ''] : ensureMinOptions(currentOptions, 4);
+                const existingCorrect = typeof q.correctAnswer === 'string' ? q.correctAnswer : '';
+                const existingIndex = mcOptions.findIndex(opt => opt === existingCorrect);
+                return {
+                    ...q,
+                    type: nextType,
+                    options: mcOptions,
+                    correctAnswer: existingCorrect,
+                    correctAnswerIndex: existingIndex >= 0 ? existingIndex : null
+                };
+            }
+            const sortOptions = q.type === 'tf' ? ['', '', '', ''] : ensureMinOptions(currentOptions, 4);
+            return { ...q, type: nextType, options: sortOptions, correctAnswer: '', correctAnswerIndex: null };
+        }));
     };
 
     const updateOption = (qId: string, index: number, value: string) => {
@@ -43,7 +158,42 @@ export default function CreateMissionPage() {
             if (q.id !== qId) return q;
             const newOptions = [...(q.options || [])];
             newOptions[index] = value;
-            return { ...q, options: newOptions };
+            const isSelected = q.type === 'mc' && q.correctAnswerIndex === index;
+            return {
+                ...q,
+                options: newOptions,
+                correctAnswer: isSelected ? value : q.correctAnswer
+            };
+        }));
+    };
+
+    const addOption = (qId: string) => {
+        setQuestions(questions.map(q => {
+            if (q.id !== qId) return q;
+            return { ...q, options: [...(q.options || []), ''] };
+        }));
+    };
+
+    const removeOption = (qId: string, optionIndex: number) => {
+        setQuestions(questions.map(q => {
+            if (q.id !== qId) return q;
+            if ((q.options || []).length <= 2) return q;
+
+            const nextOptions = [...q.options];
+            nextOptions.splice(optionIndex, 1);
+
+            let nextIndex = q.correctAnswerIndex ?? null;
+            if (nextIndex !== null) {
+                if (nextIndex === optionIndex) nextIndex = null;
+                else if (nextIndex > optionIndex) nextIndex = nextIndex - 1;
+            }
+
+            return {
+                ...q,
+                options: nextOptions,
+                correctAnswerIndex: nextIndex,
+                correctAnswer: nextIndex !== null ? (nextOptions[nextIndex] || '') : ''
+            };
         }));
     };
 
@@ -51,24 +201,160 @@ export default function CreateMissionPage() {
         setQuestions(questions.filter(q => q.id !== id));
     };
 
+    useEffect(() => {
+        const loadMissionForEdit = async () => {
+            if (!user || !editMissionId) return;
+            setLoadingMission(true);
+            try {
+                const missionRef = doc(db, `users/${user.uid}/missions`, editMissionId);
+                const snap = await getDoc(missionRef);
+                if (!snap.exists()) {
+                    alert('Mission not found.');
+                    router.push('/teacher/missions');
+                    return;
+                }
+
+                const data = snap.data() as any;
+                setTitle(data.title || '');
+                setDescription(data.description || '');
+                setXpReward(Number(data.xpReward || 100));
+                setType(data.type === 'watch' ? 'watch' : data.type === 'practice' ? 'practice' : 'read');
+                setContentUrl(data.contentUrl || '');
+                setContentText(data.contentText || '');
+                if (Array.isArray(data.targetGrades) && data.targetGrades.length > 0) {
+                    setTargetGrades(data.targetGrades);
+                } else {
+                    setTargetGrades(['all']);
+                }
+                if (data.practiceConfig) {
+                    const legacyTemplate = data.practiceConfig.templateId === 'math-multiplication-1-12'
+                        ? 'math-multiplication-facts'
+                        : data.practiceConfig.templateId;
+                    setPracticeConfig((prev) => ({
+                        ...prev,
+                        ...data.practiceConfig,
+                        templateId: legacyTemplate,
+                    }));
+                    const configGrade = Number(data.practiceConfig.gradeLevel || 0);
+                    if (configGrade >= 1 && configGrade <= 8) {
+                        setGradeFilter(configGrade as GradeLevel);
+                    }
+                }
+
+                const loadedQuestions: BuilderQuestion[] = (data.questions || []).map((q: any, idx: number) => {
+                    const qType: QuestionType = q.type === 'tf' || q.type === 'sort' ? q.type : 'mc';
+                    const rawOptions: string[] = Array.isArray(q.options) ? q.options : [];
+                    const safeOptions = qType === 'tf'
+                        ? ['True', 'False']
+                        : (qType === 'mc' ? ensureMinOptions(rawOptions, 4) : rawOptions);
+
+                    const answerString = typeof q.correctAnswer === 'string' ? q.correctAnswer : '';
+                    const answerIndex = qType === 'mc' ? safeOptions.findIndex(opt => opt === answerString) : -1;
+
+                    return {
+                        id: q.id || `${Date.now()}-${idx}`,
+                        text: q.text || '',
+                        type: qType,
+                        options: safeOptions,
+                        correctAnswer: qType === 'sort'
+                            ? (Array.isArray(q.correctAnswer) ? q.correctAnswer : safeOptions.filter(Boolean))
+                            : (qType === 'tf'
+                                ? (String(q.correctAnswer || '').toLowerCase() === 'false' ? 'False' : 'True')
+                                : answerString),
+                        correctAnswerIndex: qType === 'mc' ? (answerIndex >= 0 ? answerIndex : null) : null,
+                    };
+                });
+
+                setQuestions(loadedQuestions);
+            } catch (error) {
+                console.error('Error loading mission:', error);
+                alert('Failed to load mission.');
+            } finally {
+                setLoadingMission(false);
+            }
+        };
+
+        loadMissionForEdit();
+    }, [editMissionId, router, user]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
         try {
             if (!user) throw new Error("Not authenticated");
-            // Add to subcollection
-            await addDoc(collection(db, `users/${user.uid}/missions`), {
-                title,
-                description,
-                type,
-                contentUrl: type === 'watch' ? contentUrl : null,
-                contentText: type === 'read' ? contentText : null,
-                questions,
-                xpReward: Number(xpReward),
-                teacherId: user.uid,
-                createdAt: serverTimestamp()
+            const normalizedQuestions = type === 'practice' ? [] : questions.map((q) => {
+                const normalizedOptions = (q.options || []).map((opt: string) => (opt || '').trim());
+                if (q.type === 'tf') {
+                    const normalizedTf = String(q.correctAnswer || '').trim().toLowerCase();
+                    return {
+                        ...q,
+                        options: ['True', 'False'],
+                        correctAnswer: normalizedTf === 'false' ? 'false' : 'true'
+                    };
+                }
+                if (q.type === 'sort') {
+                    return {
+                        ...q,
+                        options: normalizedOptions,
+                        correctAnswer: normalizedOptions.filter(Boolean)
+                    };
+                }
+                if (q.type === 'mc') {
+                    const selectedFromIndex = (q.correctAnswerIndex ?? -1) >= 0
+                        ? (normalizedOptions[q.correctAnswerIndex as number] || '')
+                        : '';
+                    const normalizedMc = selectedFromIndex || String(q.correctAnswer || '').trim();
+                    return {
+                        ...q,
+                        options: normalizedOptions,
+                        correctAnswer: normalizedMc,
+                        correctAnswerIndex: null
+                    };
+                }
+                return {
+                    ...q,
+                    options: normalizedOptions,
+                    correctAnswer: String(q.correctAnswer || '').trim()
+                };
             });
+
+            if (isEditMode && editMissionId) {
+                await updateDoc(doc(db, `users/${user.uid}/missions`, editMissionId), {
+                    title,
+                    description,
+                    type,
+                    targetGrades,
+                    contentUrl: type === 'watch' ? contentUrl : null,
+                    contentText: type === 'read' ? contentText : null,
+                    practiceConfig: type === 'practice' ? {
+                        ...practiceConfig,
+                        gradeLevel: getEffectivePracticeGradeLevel(),
+                        questionCount: Math.min(Math.max(Number(practiceConfig.questionCount || 24), 1), 50),
+                    } : null,
+                    questions: normalizedQuestions,
+                    xpReward: Number(xpReward),
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                await addDoc(collection(db, `users/${user.uid}/missions`), {
+                    title,
+                    description,
+                    type,
+                    targetGrades,
+                    contentUrl: type === 'watch' ? contentUrl : null,
+                    contentText: type === 'read' ? contentText : null,
+                    practiceConfig: type === 'practice' ? {
+                        ...practiceConfig,
+                        gradeLevel: getEffectivePracticeGradeLevel(),
+                        questionCount: Math.min(Math.max(Number(practiceConfig.questionCount || 24), 1), 50),
+                    } : null,
+                    questions: normalizedQuestions,
+                    xpReward: Number(xpReward),
+                    teacherId: user.uid,
+                    createdAt: serverTimestamp()
+                });
+            }
             router.push("/teacher/missions");
         } catch (error) {
             console.error("Error creating mission:", error);
@@ -85,8 +371,15 @@ export default function CreateMissionPage() {
                     <Link href="/teacher/missions" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                         <ArrowLeft size={20} />
                     </Link>
-                    <h1 className="text-3xl font-bold uppercase tracking-widest text-white">New Mission Protocol</h1>
+                    <h1 className="text-3xl font-bold uppercase tracking-widest text-white">{isEditMode ? 'Edit Mission Protocol' : 'New Mission Protocol'}</h1>
                 </div>
+
+                {loadingMission && (
+                    <div className="flex items-center gap-3 text-cyan-400 mb-6">
+                        <Loader2 className="animate-spin" size={18} />
+                        <span className="text-sm uppercase tracking-wider">Loading Mission Data...</span>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-8">
                     
@@ -122,7 +415,8 @@ export default function CreateMissionPage() {
                                         type="number" 
                                         value={xpReward}
                                         onChange={(e) => setXpReward(Number(e.target.value))}
-                                        className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -142,8 +436,42 @@ export default function CreateMissionPage() {
                                         >
                                             <Video size={16} /> Video
                                         </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => setType('practice')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded transition-all ${type === 'practice' ? 'bg-cyan-600 text-black font-bold' : 'hover:bg-cyan-900/50'}`}
+                                        >
+                                            Basic Math
+                                        </button>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Assign to Grades</label>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleTargetGrade('all')}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${targetGrades.includes('all') ? 'bg-cyan-600 text-black border-cyan-400' : 'bg-black/40 text-cyan-300 border-cyan-900 hover:border-cyan-500'}`}
+                                    >
+                                        All Grades
+                                    </button>
+                                    {STUDENT_GRADES.map((grade) => {
+                                        const selected = targetGrades.includes(grade);
+                                        return (
+                                            <button
+                                                key={grade}
+                                                type="button"
+                                                onClick={() => toggleTargetGrade(grade)}
+                                                className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${selected ? 'bg-cyan-600 text-black border-cyan-400' : 'bg-black/40 text-cyan-300 border-cyan-900 hover:border-cyan-500'}`}
+                                            >
+                                                {grade}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-[10px] text-cyan-700 mt-2 uppercase tracking-wider">Click one or more grades. If none are selected, it defaults to All Grades.</p>
                             </div>
 
                             {type === 'watch' ? (
@@ -157,7 +485,7 @@ export default function CreateMissionPage() {
                                         placeholder="https://youtube.com/watch?v=..."
                                     />
                                 </div>
-                            ) : (
+                            ) : type === 'read' ? (
                                 <div>
                                     <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Reading Material</label>
                                     <textarea 
@@ -167,11 +495,213 @@ export default function CreateMissionPage() {
                                         placeholder="Enter the lesson text here..."
                                     />
                                 </div>
+                            ) : (
+                                <div className="grid gap-6">
+                                    <div className="rounded-lg border border-cyan-800/50 bg-cyan-950/20 p-4">
+                                        <h3 className="text-white font-bold mb-1">Practice Drill Setup</h3>
+                                        <p className="text-sm text-cyan-500">Auto-generated math problems by grade and skill. Each time students start this lesson, they get a fresh set of problems.</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Grade Filter</label>
+                                            <select
+                                                value={gradeFilter}
+                                                onChange={(e) => {
+                                                    const next = e.target.value === 'all' ? 'all' : Number(e.target.value) as GradeLevel;
+                                                    setGradeFilter(next);
+                                                    if (next !== 'all') {
+                                                        setPracticeConfig((prev) => ({ ...prev, gradeLevel: next }));
+                                                    }
+                                                }}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            >
+                                                <option value="all">All Grades</option>
+                                                <option value={1}>1st Grade</option>
+                                                <option value={2}>2nd Grade</option>
+                                                <option value={3}>3rd Grade</option>
+                                                <option value={4}>4th Grade</option>
+                                                <option value={5}>5th Grade</option>
+                                                <option value={6}>6th Grade</option>
+                                                <option value={7}>7th Grade</option>
+                                                <option value={8}>8th Grade</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Skill Template</label>
+                                            <select
+                                                value={practiceConfig.templateId}
+                                                onChange={(e) => setPracticeConfig({ ...practiceConfig, templateId: e.target.value as PracticeTemplateId })}
+                                                className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                            >
+                                                {filteredTemplates.map((template) => (
+                                                    <option key={template.id} value={template.id}>{template.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-cyan-900/60 bg-black/30 p-4">
+                                        <p className="text-sm text-cyan-300 font-semibold">{selectedTemplate?.name || 'Template'}</p>
+                                        <p className="text-xs text-cyan-600 mt-1">{selectedTemplate?.description || ''}</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">How Many Problems for This Lesson</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={50}
+                                            value={practiceConfig.questionCount}
+                                            onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                if (Number.isNaN(next)) {
+                                                    setPracticeConfig({ ...practiceConfig, questionCount: 1 });
+                                                    return;
+                                                }
+                                                setPracticeConfig({ ...practiceConfig, questionCount: Math.min(Math.max(next, 1), 50) });
+                                            }}
+                                            onWheel={(e) => e.currentTarget.blur()}
+                                            className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {(practiceConfig.templateId === 'math-addition-1-3-digit'
+                                        || practiceConfig.templateId === 'math-subtraction-1-3-digit'
+                                        || practiceConfig.templateId === 'math-multi-digit-multiplication'
+                                        || practiceConfig.templateId === 'math-decimal-operations') && (
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Number Range</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input
+                                                    type="number"
+                                                    value={practiceConfig.numberRangeMin ?? 1}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, numberRangeMin: Number(e.target.value) || 1 })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    value={practiceConfig.numberRangeMax ?? 100}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, numberRangeMax: Number(e.target.value) || 100 })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(practiceConfig.templateId === 'math-multiplication-facts'
+                                        || practiceConfig.templateId === 'math-division-facts') && (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Table Range</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={20}
+                                                        value={practiceConfig.tableMin ?? 1}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMin: Number(e.target.value) || 1 })}
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={20}
+                                                        value={practiceConfig.tableMax ?? 12}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, tableMax: Number(e.target.value) || 12 })}
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Second Factor/Quotient Range</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={99}
+                                                        value={practiceConfig.multiplicandMin ?? 1}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, multiplicandMin: Number(e.target.value) || 1 })}
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={99}
+                                                        value={practiceConfig.multiplicandMax ?? 12}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, multiplicandMax: Number(e.target.value) || 12 })}
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {practiceConfig.templateId === 'math-fraction-add-common-denominator' && (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Denominator Range</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="number"
+                                                        min={2}
+                                                        max={20}
+                                                        value={practiceConfig.denominatorMin ?? 2}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, denominatorMin: Number(e.target.value) || 2 })}
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={2}
+                                                        max={20}
+                                                        value={practiceConfig.denominatorMax ?? 12}
+                                                        onChange={(e) => setPracticeConfig({ ...practiceConfig, denominatorMax: Number(e.target.value) || 12 })}
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Decimal Precision</label>
+                                                <select
+                                                    value={practiceConfig.decimalPlaces ?? 2}
+                                                    onChange={(e) => setPracticeConfig({ ...practiceConfig, decimalPlaces: Number(e.target.value) as 0 | 1 | 2 | 3 })}
+                                                    className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                >
+                                                    <option value={0}>0 places</option>
+                                                    <option value={1}>1 place</option>
+                                                    <option value={2}>2 places</option>
+                                                    <option value={3}>3 places</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Attempt Limit</label>
+                                        <select
+                                            value={practiceConfig.attemptPolicy}
+                                            onChange={(e) => setPracticeConfig({ ...practiceConfig, attemptPolicy: e.target.value as 'once' | 'unlimited' })}
+                                            className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                        >
+                                            <option value="once">One Attempt</option>
+                                            <option value="unlimited">Unlimited Attempts</option>
+                                        </select>
+                                        <p className="text-xs text-cyan-600 mt-2">If you reassign this same lesson later, students will still get different problem versions.</p>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
 
                     {/* Questions Section */}
+                    {type !== 'practice' && (
                     <div className="bg-black/40 border border-cyan-900/50 rounded-xl p-6 backdrop-blur-sm">
                         <div className="flex justify-between items-center mb-6 border-b border-cyan-900/50 pb-2">
                             <h2 className="text-white font-bold text-xl">2. Assessment</h2>
@@ -207,7 +737,7 @@ export default function CreateMissionPage() {
                                             />
                                             <select 
                                                 value={q.type}
-                                                onChange={(e) => updateQuestion(q.id, 'type', e.target.value)}
+                                                onChange={(e) => updateQuestionType(q.id, e.target.value as 'mc' | 'tf' | 'sort')}
                                                 className="bg-black/30 border border-cyan-800 rounded p-2 text-cyan-400 outline-none"
                                             >
                                                 <option value="mc">Multiple Choice</option>
@@ -240,8 +770,12 @@ export default function CreateMissionPage() {
                                                         <input 
                                                             type="radio" 
                                                             name={`q-${q.id}-ans`}
-                                                            checked={q.correctAnswer === opt && opt !== ""}
-                                                            onChange={() => updateQuestion(q.id, 'correctAnswer', opt)}
+                                                            checked={q.correctAnswerIndex === i}
+                                                            onChange={() => setQuestions(questions.map(item => item.id === q.id ? {
+                                                                ...item,
+                                                                correctAnswerIndex: i,
+                                                                correctAnswer: item.options[i] || ''
+                                                            } : item))}
                                                             className="accent-cyan-500"
                                                         />
                                                         <input 
@@ -252,8 +786,23 @@ export default function CreateMissionPage() {
                                                             className="flex-grow bg-black/30 border border-cyan-800/50 rounded p-2 text-sm text-gray-300 focus:border-cyan-500 outline-none"
                                                             placeholder={`Option ${i + 1}`}
                                                         />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeOption(q.id, i)}
+                                                            className="text-red-400 hover:text-red-300"
+                                                            title="Remove option"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addOption(q.id)}
+                                                    className="mt-2 text-xs uppercase tracking-wider text-cyan-400 hover:text-white font-bold"
+                                                >
+                                                    + Add Option
+                                                </button>
                                             </div>
                                         )}
 
@@ -271,8 +820,23 @@ export default function CreateMissionPage() {
                                                             className="flex-grow bg-black/30 border border-cyan-800/50 rounded p-2 text-sm text-gray-300 focus:border-cyan-500 outline-none"
                                                             placeholder={`Item ${i + 1}`}
                                                         />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeOption(q.id, i)}
+                                                            className="text-red-400 hover:text-red-300"
+                                                            title="Remove item"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addOption(q.id)}
+                                                    className="mt-2 text-xs uppercase tracking-wider text-cyan-400 hover:text-white font-bold"
+                                                >
+                                                    + Add Item
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -280,14 +844,15 @@ export default function CreateMissionPage() {
                             ))}
                         </div>
                     </div>
+                    )}
 
                     <button 
                         type="submit" 
-                        disabled={loading}
+                        disabled={loading || loadingMission}
                         className="fixed bottom-6 right-6 flex items-center gap-4 bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-8 py-4 rounded-full shadow-lg shadow-cyan-900/50 transition-all z-50 disabled:opacity-50"
                     >
                         {loading ? <Loader2 className="animate-spin" /> : <Save size={24} />}
-                        PUBLISH MISSION
+                        {isEditMode ? 'SAVE MISSION' : 'PUBLISH MISSION'}
                     </button>
                 </form>
             </div>

@@ -49,6 +49,47 @@ export interface Rank {
     image: string;
 }
 
+export type StudentGrade = "PreK" | "K" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
+
+export const STUDENT_GRADES: StudentGrade[] = ["PreK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
+export interface MissionProgress {
+    attempts: number;
+    lastScore: number;
+    passedEver: boolean;
+    completedAt?: number;
+    lastAttemptAt?: number;
+}
+
+export interface PracticeAssignmentConfig {
+    templateId:
+        | "math-addition-within-20"
+        | "math-addition-1-3-digit"
+        | "math-subtraction-1-3-digit"
+        | "math-multiplication-facts"
+        | "math-division-facts"
+        | "math-multi-digit-multiplication"
+        | "math-long-division"
+        | "math-fraction-add-common-denominator"
+        | "math-decimal-operations"
+        | "math-ratios-and-rates"
+        | "math-one-step-equations"
+        | "math-systems-intro";
+    subject: "math";
+    gradeLevel: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    questionCount: number;
+    numberRangeMin?: number;
+    numberRangeMax?: number;
+    tableMin?: number;
+    tableMax?: number;
+    multiplicandMin?: number;
+    multiplicandMax?: number;
+    denominatorMin?: number;
+    denominatorMax?: number;
+    decimalPlaces?: 0 | 1 | 2 | 3;
+    attemptPolicy: "once" | "unlimited";
+}
+
 export interface AvatarConfig {
     hue?: number;
     skinHue?: number;
@@ -67,6 +108,7 @@ export interface UserData {
     photoURL: string | null;
     role: "teacher" | "student" | "pending" | "admin";
     teacherId?: string; // Links student to a teacher
+    gradeLevel?: StudentGrade;
     classCode?: string; // For teachers, unique code for students to join
     classId?: string;   // Optional grouping
     status: "active" | "pending_approval" | "rejected";
@@ -90,8 +132,10 @@ export interface UserData {
     lastAward?: any;
     lastXpReason?: string;
     visitedPlanets?: string[];
+    planetXP?: Record<string, number>; // XP earned per planet (for unlocks)
     unlockedHats?: string[];
     completedMissions?: string[];
+    missionProgress?: Record<string, MissionProgress>;
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)
@@ -104,6 +148,7 @@ export interface UserData {
   
 export interface Ship {
     id: string;
+    shipId?: string; // e.g. "finalship", "fighter-1", etc.
     cadetName: string;
     locationId: string; // Planet ID
     status: "idle" | "traveling";
@@ -117,6 +162,7 @@ export interface Ship {
     lastXpReason?: string;
     flag?: FlagConfig;
     visitedPlanets?: string[];
+    planetXP?: Record<string, number>;
 }
   
 export interface AwardEvent {
@@ -126,6 +172,7 @@ export interface AwardEvent {
       newRank?: string;
       startPos: { x: number, y: number }; // Screen coordinates to fly from
       reason?: string;
+    unlocks?: { ships?: string[]; avatars?: string[] };
 }
   
 export interface Behavior {

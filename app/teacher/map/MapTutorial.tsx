@@ -203,7 +203,7 @@ export default function MapTutorial() {
             {/* Re-open Trigger */}
             <button 
                 onClick={() => { setCurrentStep(0); setIsOpen(true); }}
-                className="fixed bottom-4 left-4 z-[100] bg-white/10 hover:bg-white/20 text-white/50 hover:text-white p-2 px-4 text-xs rounded-full backdrop-blur-sm transition-all border border-white/5 font-bold uppercase tracking-wider"
+                className="absolute bottom-4 left-4 z-[40] bg-white/10 hover:bg-white/20 text-white/50 hover:text-white p-2 px-4 text-xs rounded-full backdrop-blur-sm transition-all border border-white/5 font-bold uppercase tracking-wider"
             >
                 Map Guide
             </button>
