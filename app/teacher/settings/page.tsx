@@ -998,7 +998,18 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                 })
             });
 
-            if (!response.ok) throw new Error("Network response was not ok");
+            if (!response.ok) {
+                let apiError = "Network response was not ok";
+                try {
+                    const errorBody = await response.json();
+                    if (errorBody?.error) {
+                        apiError = errorBody.error;
+                    }
+                } catch {
+                    // keep fallback
+                }
+                throw new Error(apiError);
+            }
             
             const { url } = await response.json();
             if (url) {
@@ -1008,7 +1019,8 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
             }
         } catch (e) {
             console.error(e);
-            alert("Checkout initialization failed. Check console.");
+            const errorMessage = e instanceof Error ? e.message : "Checkout initialization failed.";
+            alert(errorMessage);
         }
         setLoading(false);
     };
