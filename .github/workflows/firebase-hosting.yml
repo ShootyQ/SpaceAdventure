@@ -40,6 +40,8 @@ jobs:
           [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ] || (echo "Missing STRIPE_SECRET_KEY" && exit 1)
           [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY" && exit 1)
           [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY" && exit 1)
+          [ -n "${{ secrets.FIREBASE_CLIENT_EMAIL }}" ] || (echo "Missing FIREBASE_CLIENT_EMAIL" && exit 1)
+          [ -n "${{ secrets.FIREBASE_PRIVATE_KEY }}" ] || (echo "Missing FIREBASE_PRIVATE_KEY" && exit 1)
 
       - name: Create .env.local for framework build (live)
         run: |
@@ -92,6 +94,8 @@ jobs:
           [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ] || (echo "Missing STRIPE_SECRET_KEY" && exit 1)
           [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY" && exit 1)
           [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY" && exit 1)
+          [ -n "${{ secrets.FIREBASE_CLIENT_EMAIL }}" ] || (echo "Missing FIREBASE_CLIENT_EMAIL" && exit 1)
+          [ -n "${{ secrets.FIREBASE_PRIVATE_KEY }}" ] || (echo "Missing FIREBASE_PRIVATE_KEY" && exit 1)
 
       - name: Create .env.local for framework build (dev)
         run: |

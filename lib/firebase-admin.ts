@@ -38,3 +38,4 @@ export const adminDb = admin.apps.length
     } as unknown as admin.firestore.Firestore;
 
 export const adminAuth = admin.apps.length ? admin.auth() : null;
+export const adminInitialized = admin.apps.length > 0;

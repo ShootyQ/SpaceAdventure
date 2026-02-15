@@ -1,7 +1,7 @@
 import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminInitialized } from "@/lib/firebase-admin";
 import Stripe from "stripe";
 
 const ACTIVE_STRIPE_STATUSES = new Set(["active", "trialing"]);
@@ -11,6 +11,11 @@ const toAppSubscriptionStatus = (stripeStatus?: string) => {
 };
 
 export async function POST(req: Request) {
+  if (!adminInitialized) {
+    console.error("[STRIPE_WEBHOOK] Firebase Admin is not initialized. Missing FIREBASE_CLIENT_EMAIL and/or FIREBASE_PRIVATE_KEY.");
+    return new NextResponse("Webhook Error: Firebase Admin not configured", { status: 500 });
+  }
+
   const body = await req.text();
   const signature = headers().get("Stripe-Signature") as string;
 
