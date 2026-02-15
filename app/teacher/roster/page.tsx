@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
+import { getTeacherStudentLimit, isSubscriptionActive } from "@/lib/subscription";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
@@ -41,6 +42,11 @@ export default function RosterPage() {
   const [showEditVisuals, setShowEditVisuals] = useState(false); // Toggle for full editor within row
     const [editPassword, setEditPassword] = useState("");
     const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+
+    const hasActiveSubscription = isSubscriptionActive(userData);
+    const studentLimit = getTeacherStudentLimit(userData);
+    const isOverStudentLimit = students.length > studentLimit;
+    const isAtStudentLimit = students.length >= studentLimit;
 
 
   const fetchRoster = async () => {
@@ -72,10 +78,8 @@ export default function RosterPage() {
   const handleAddStudent = async (e: React.FormEvent) => {
       e.preventDefault();
 
-      // Check Subscription Limit
-      const isTrial = (userData?.subscriptionStatus || 'trial') === 'trial';
-      if (isTrial && students.length >= 5) {
-          alert("TRIAL LIMIT REACHED: Upgrade clearance to recruit more cadets.");
+      if (isAtStudentLimit) {
+          alert(`ROSTER LIMIT REACHED: Your current plan allows up to ${studentLimit} students.`);
           return;
       }
 
@@ -298,12 +302,24 @@ export default function RosterPage() {
 
                      <button 
                         onClick={() => setIsAddingStudent(true)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded-lg transition-colors"
+                        disabled={isAtStudentLimit}
+                                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-cyan-600"
                      >
                         <UserPlus size={18} />
                         <span className="hidden md:inline">Add Student</span>
                      </button>
                  </div>
+            </div>
+
+            <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${isOverStudentLimit ? 'bg-amber-900/20 border-amber-500/50 text-amber-200' : 'bg-cyan-950/30 border-cyan-500/20 text-cyan-300'}`}>
+                {hasActiveSubscription ? (
+                    <span>Active subscription: {students.length}/{studentLimit} students used.</span>
+                ) : (
+                    <span>
+                        Trial/inactive plan: {students.length}/{studentLimit} students used.
+                        {isOverStudentLimit ? ' Existing students stay enrolled, but new students are disabled until billing is active again.' : ''}
+                    </span>
+                )}
             </div>
 
             {/* New Student Modal */}

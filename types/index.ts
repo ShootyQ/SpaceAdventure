@@ -150,6 +150,8 @@ export interface UserData {
     stripeCustomerId?: string;
     stripePriceId?: string;
     stripeSubscriptionInterval?: "month" | "year";
+    stripeCancelAtPeriodEnd?: boolean;
+    subscriptionLifecycleStatus?: string;
     subscriptionActivatedAt?: any;
     stripeCurrentPeriodStart?: any;
     stripeCurrentPeriodEnd?: any;

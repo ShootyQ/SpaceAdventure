@@ -4,6 +4,12 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import Stripe from "stripe";
 
+const ACTIVE_STRIPE_STATUSES = new Set(["active", "trialing"]);
+
+const toAppSubscriptionStatus = (stripeStatus?: string) => {
+  return stripeStatus && ACTIVE_STRIPE_STATUSES.has(stripeStatus) ? "active" : "trial";
+};
+
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = headers().get("Stripe-Signature") as string;
@@ -31,11 +37,13 @@ export async function POST(req: Request) {
     const firstItem = subscription.items.data[0];
 
     await adminDb.collection("users").doc(userId).update({
-      subscriptionStatus: "active",
+      subscriptionStatus: toAppSubscriptionStatus(subscription.status),
+      subscriptionLifecycleStatus: subscription.status,
       stripeSubscriptionId: subscription.id,
       stripeCustomerId: subscription.customer as string,
       stripePriceId: firstItem?.price?.id,
       stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
+      stripeCancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
       subscriptionActivatedAt: new Date((subscription.start_date || subscription.created) * 1000),
       stripeCurrentPeriodStart: new Date((subscription as any).current_period_start * 1000),
       stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
@@ -62,16 +70,83 @@ export async function POST(req: Request) {
     if (!userSnap.empty) {
       const targetDoc = userSnap.docs[0];
       await targetDoc.ref.update({
-        subscriptionStatus: "active",
+        subscriptionStatus: toAppSubscriptionStatus(subscription.status),
+        subscriptionLifecycleStatus: subscription.status,
         stripeCustomerId: customerId,
         stripePriceId: subscription.items.data[0]?.price?.id,
         stripeSubscriptionInterval: subscription.items.data[0]?.price?.recurring?.interval,
+        stripeCancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
         stripeCurrentPeriodStart: new Date((subscription as any).current_period_start * 1000),
         stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
         stripeLastPaymentAt: new Date(),
         stripeLastPaymentAmount: (invoice.amount_paid || 0) / 100,
         stripeCurrency: invoice.currency || "usd",
       });
+    }
+  }
+
+  if (event.type === "customer.subscription.updated") {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    const userSnap = await adminDb
+      .collection("users")
+      .where("stripeSubscriptionId", "==", subscription.id)
+      .get();
+
+    if (!userSnap.empty) {
+      const firstItem = subscription.items.data[0];
+      await userSnap.docs[0].ref.update({
+        subscriptionStatus: toAppSubscriptionStatus(subscription.status),
+        subscriptionLifecycleStatus: subscription.status,
+        stripePriceId: firstItem?.price?.id,
+        stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
+        stripeCancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
+        stripeCurrentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+      });
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    const userSnap = await adminDb
+      .collection("users")
+      .where("stripeSubscriptionId", "==", subscription.id)
+      .get();
+
+    if (!userSnap.empty) {
+      await userSnap.docs[0].ref.update({
+        subscriptionStatus: "trial",
+        subscriptionLifecycleStatus: subscription.status || "canceled",
+        stripeCancelAtPeriodEnd: false,
+        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+      });
+    }
+  }
+
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const invoiceAny = invoice as any;
+    const subscriptionId = (
+      typeof invoiceAny.subscription === "string"
+        ? invoiceAny.subscription
+        : invoiceAny.subscription?.id || invoiceAny.parent?.subscription_details?.subscription
+    ) as string | undefined;
+
+    if (subscriptionId) {
+      const userSnap = await adminDb
+        .collection("users")
+        .where("stripeSubscriptionId", "==", subscriptionId)
+        .get();
+
+      if (!userSnap.empty) {
+        await userSnap.docs[0].ref.update({
+          subscriptionStatus: "trial",
+          subscriptionLifecycleStatus: "past_due",
+          stripeLastPaymentAt: new Date(),
+        });
+      }
     }
   }
 

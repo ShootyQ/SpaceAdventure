@@ -16,6 +16,7 @@ import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { getTeacherStudentLimit, isSubscriptionActive, isTeacherAccessRestricted } from "@/lib/subscription";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
@@ -976,6 +977,19 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
     const [loading, setLoading] = useState(false);
     const [cycle, setCycle] = useState<"monthly" | "yearly">("yearly");
 
+    const formatBillingDate = (value: any) => {
+        if (!value) return "Not available";
+        const asDate = value?.toDate ? value.toDate() : new Date(value);
+        if (!(asDate instanceof Date) || Number.isNaN(asDate.getTime())) return "Not available";
+        return asDate.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    };
+
+    const isActivePlan = isSubscriptionActive(userData);
+    const isRestricted = isTeacherAccessRestricted(userData);
+    const studentCap = getTeacherStudentLimit(userData);
+    const renewalOrEndLabel = userData?.stripeCancelAtPeriodEnd ? "Access ends" : "Auto-renew date";
+    const renewalOrEndValue = formatBillingDate(userData?.stripeCurrentPeriodEnd);
+
     const PRICE_IDS = {
         monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
         yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
@@ -1146,6 +1160,40 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         <p className="text-slate-600 text-sm leading-relaxed">If you don’t see an increase in student engagement within the first 30 days, we’ll refund your subscription in full.</p>
                     </div>
                 </div>
+
+                <div className="p-5 bg-white/80 border border-black/10 rounded-2xl grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Status</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900 uppercase">{userData?.subscriptionStatus || "trial"}</div>
+                        {userData?.subscriptionLifecycleStatus && (
+                            <div className="text-xs text-slate-500 mt-1 uppercase">Stripe: {userData.subscriptionLifecycleStatus}</div>
+                        )}
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">{renewalOrEndLabel}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{renewalOrEndValue}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Auto renew</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{userData?.stripeCancelAtPeriodEnd ? "Off" : "On"}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Student cap</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">Up to {studentCap} students</div>
+                    </div>
+                </div>
+
+                {isRestricted && (
+                    <div className="p-5 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-start gap-4">
+                        <AlertTriangle className="text-amber-700 shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="text-slate-900 font-bold text-sm uppercase tracking-wider mb-1">Account Access Paused</h4>
+                            <p className="text-slate-700 text-sm leading-relaxed">
+                                Your paid subscription ended. Existing class data is preserved, but teacher gameplay tools and student gameplay are paused until billing is reactivated.
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1451,11 +1499,18 @@ function SettingsContent() {
     
     type SettingsView = "cockpit" | "ship" | "inventory" | "avatar" | "avatar-config" | "flag" | "asteroids" | "billing" | "team";
     const [view, setView] = useState<SettingsView>("cockpit");
+    const restricted = isTeacherAccessRestricted(userData);
 
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
     useEffect(() => {
+        if (restricted) {
+            setView("billing");
+            setIsRankEditorOpen(false);
+            return;
+        }
+
         const mode = searchParams.get("mode");
         const success = searchParams.get("success");
         const canceled = searchParams.get("canceled");
@@ -1481,7 +1536,7 @@ function SettingsContent() {
             // Small timeout to allow render if needed, or just set it
              setTimeout(() => setIsRankEditorOpen(true), 100);
         }
-    }, [searchParams]);
+    }, [searchParams, restricted]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "ranks"), (d) => {
@@ -1501,6 +1556,7 @@ function SettingsContent() {
             case "avatar-config": return "DNA Sequencer";
             case "flag": return "Flag Fabricator";
             case "asteroids": return "Defense Systems";
+            case "billing": return "Subscription Control";
             default: return "Main Cockpit";
         }
     };
@@ -1517,7 +1573,12 @@ function SettingsContent() {
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                         {/* Direct Link to Dashboard for Top-Level Modes */}
-                        {["asteroids", "billing", "team", "cockpit"].includes(view) ? (
+                        { restricted ? (
+                            <Link href="/" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                                <ArrowLeft size={20} />
+                                <span className="sr-only">Return to Home</span>
+                            </Link>
+                        ) : ["asteroids", "billing", "team", "cockpit"].includes(view) ? (
                             <Link href="/teacher/space" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                                 <ArrowLeft size={20} />
                                 <span className="sr-only">Return to Dashboard</span>
@@ -1536,7 +1597,7 @@ function SettingsContent() {
                                 {getTitle()}
                             </h1>
                             <div className="text-xs text-cyan-500/50 uppercase tracking-[0.3em]">
-                                System Status: Normal
+                                System Status: {restricted ? "Restricted / Billing Only" : "Normal"}
                             </div>
                         </div>
                     </div>
@@ -1553,25 +1614,31 @@ function SettingsContent() {
                 {/* Main Content Area */}
                 <AnimatePresence mode="wait">
                     <motion.div
-                        key={view}
+                        key={restricted ? "billing" : view}
                         initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
                         animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                         exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
                         transition={{ duration: 0.3 }}
                     >
-                        {view === "cockpit" && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
-                        {view === "ship" && <ShipSettings userData={userData} user={user} />}
-                        {view === "inventory" && <InventoryView />}
-                        {view === "avatar" && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
-                        {view === "avatar-config" && <AvatarConfigView onBack={() => setView("avatar")} />}
-                        {view === "flag" && <FlagDesigner />}
-                        {view === "asteroids" && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
-                        {view === "billing" && <BillingView onNavigate={(v) => setView(v as any)} />}
-                        {view === "team" && <TeamView onNavigate={(v) => setView(v as any)} />}
+                        {restricted ? (
+                            <BillingView onNavigate={() => {}} />
+                        ) : (
+                            <>
+                                {view === "cockpit" && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
+                                {view === "ship" && <ShipSettings userData={userData} user={user} />}
+                                {view === "inventory" && <InventoryView />}
+                                {view === "avatar" && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
+                                {view === "avatar-config" && <AvatarConfigView onBack={() => setView("avatar")} />}
+                                {view === "flag" && <FlagDesigner />}
+                                {view === "asteroids" && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
+                                {view === "billing" && <BillingView onNavigate={(v) => setView(v as any)} />}
+                                {view === "team" && <TeamView onNavigate={(v) => setView(v as any)} />}
+                            </>
+                        )}
                     </motion.div>
                 </AnimatePresence>
                 
-                <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />
+                {!restricted && <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />}
 
             </div>
         </div>
