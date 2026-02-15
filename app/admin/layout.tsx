@@ -21,7 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (loading) {
         return (
-            <div className="h-screen w-screen bg-black flex items-center justify-center text-cyan-500">
+            <div className="h-screen w-screen bg-slate-100 flex items-center justify-center text-slate-600">
                 <Loader2 className="animate-spin" size={48} />
             </div>
         );
@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!user || !ADMIN_EMAILS.includes(user.email || '')) return null;
 
     return (
-        <div className="min-h-screen bg-space-950 text-white font-mono">
+        <div className="min-h-screen bg-slate-100 text-slate-900">
             {children}
         </div>
     );
