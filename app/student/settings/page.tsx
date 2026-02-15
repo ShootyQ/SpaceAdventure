@@ -202,7 +202,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                         </motion.div>
                     </Link>
 
-                    {/* Placeholder for future Solar Map Link */}
+                          {/* Interior Link */}
                     <Link href="/student" className="md:col-span-2">
                         <motion.div
                              whileHover={{ scale: 1.01 }}
@@ -212,8 +212,8 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                                 <Crosshair size={32} className="animate-spin-slow" />
                              </div>
                              <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-cyan-400">Launch Solar Map</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Initiate Flight Sequence</p>
+                                          <h3 className="text-xl font-bold uppercase tracking-wider text-cyan-400">View Spaceship Interior</h3>
+                                          <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Enter Cabin View</p>
                              </div>
                         </motion.div>
                     </Link>
