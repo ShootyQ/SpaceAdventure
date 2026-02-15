@@ -35,6 +35,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate required deploy secrets (live)
+        run: |
+          [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ] || (echo "Missing STRIPE_SECRET_KEY" && exit 1)
+          [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY" && exit 1)
+          [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY" && exit 1)
+
+      - name: Create .env.local for framework build (live)
+        run: |
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}
+          NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID=spaceadventure-7d540
+          EOF
+
       - name: Deploy to Firebase Hosting (live)
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -68,6 +86,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate required deploy secrets (dev)
+        run: |
+          [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ] || (echo "Missing STRIPE_SECRET_KEY" && exit 1)
+          [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY" && exit 1)
+          [ -n "${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}" ] || (echo "Missing NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY" && exit 1)
+
+      - name: Create .env.local for framework build (dev)
+        run: |
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}
+          NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID=spaceadventure-7d540
+          EOF
 
       - name: 'Deploy to Firebase Hosting (preview: dev)'
         uses: FirebaseExtended/action-hosting-deploy@v0
