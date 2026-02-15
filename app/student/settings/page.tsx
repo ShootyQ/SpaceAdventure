@@ -108,6 +108,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
         { id: 'inventory', title: 'Cargo Hold', icon: Box, color: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/30' },
         { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30' },
         { id: 'flag', title: 'Flag Designer', icon: Flag, color: 'text-red-400', border: 'border-red-500', bg: 'bg-red-950/30' },
+        { id: 'interior', title: 'Spaceship Interior', icon: LayoutDashboard, color: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-950/30' },
     ];
 
     // Determine Rank
@@ -145,7 +146,13 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                     {MENU_ITEMS.map((item, index) => (
                         <motion.button
                             key={item.id}
-                            onClick={() => onNavigate(item.id)}
+                            onClick={() => {
+                                if (item.id === 'interior') {
+                                    window.location.href = '/student?interior=true';
+                                } else {
+                                    onNavigate(item.id);
+                                }
+                            }}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}

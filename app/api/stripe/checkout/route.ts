@@ -27,6 +27,30 @@ export async function POST(req: Request) {
             return new NextResponse("Missing required fields", { status: 400 });
         }
 
+        // Check for existing customers/subscriptions by email to prevent double-subscription
+        // This handles cases where our DB might be out of sync (e.g. missed webhooks)
+        const customers = await stripe.customers.list({
+            email: email,
+            limit: 1,
+            expand: ['data.subscriptions']
+        });
+
+        if (customers.data.length > 0) {
+            const customer = customers.data[0];
+            const activeSubscription = customer.subscriptions?.data.find(
+                (sub) => sub.status === 'active' || sub.status === 'trialing'
+            );
+
+            if (activeSubscription) {
+                 // If already subscribed, return the billing portal URL instead of a new checkout session?
+                 // Or just return an error. Returning an error is safer for now.
+                 return NextResponse.json({
+                     error: "You already have an active subscription.",
+                     redirect: "/teacher/settings" // Suggest redirection
+                 }, { status: 409 }); 
+            }
+        }
+
         const line_items: any = [];
 
         if (priceId) {
