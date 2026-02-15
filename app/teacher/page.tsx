@@ -25,11 +25,29 @@ export default function TeacherAdventurePortal() {
 
     if (userData.role === "student") {
       router.push("/student");
+      return;
+    }
+
+    if (userData.role === "admin") {
+      router.push("/admin");
+      return;
     }
   }, [loading, userData, router]);
 
-  if (loading || !userData || userData.role !== "teacher") {
-    return <div className="min-h-screen bg-slate-100" />;
+  if (loading || !userData) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-500">
+        Loading teacher portal...
+      </div>
+    );
+  }
+
+  if (userData.role !== "teacher") {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600 px-6 text-center">
+        Redirecting to your dashboard...
+      </div>
+    );
   }
 
   return (

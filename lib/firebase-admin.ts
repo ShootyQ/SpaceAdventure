@@ -36,3 +36,5 @@ export const adminDb = admin.apps.length
          get: () => Promise.resolve({ exists: false, data: () => ({}) }),
       }),
     } as unknown as admin.firestore.Firestore;
+
+export const adminAuth = admin.apps.length ? admin.auth() : null;

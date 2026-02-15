@@ -39,6 +39,8 @@ export default function RosterPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<UserData>>({});
   const [showEditVisuals, setShowEditVisuals] = useState(false); // Toggle for full editor within row
+    const [editPassword, setEditPassword] = useState("");
+    const [passwordResetLoading, setPasswordResetLoading] = useState(false);
 
 
   const fetchRoster = async () => {
@@ -169,6 +171,26 @@ export default function RosterPage() {
           spaceship: student.spaceship // Include spaceship
       });
       setShowEditVisuals(false); // default to closed
+      setEditPassword("");
+  };
+
+  const resetStudentPassword = async (studentUid: string, newPassword: string) => {
+      if (!user) throw new Error("You must be signed in.");
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/teacher/students/reset-password', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ studentUid, newPassword })
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+          throw new Error(result?.error || 'Failed to reset student password.');
+      }
   };
 
   const saveEdit = async () => {
@@ -185,13 +207,23 @@ export default function RosterPage() {
                   : editForm.spaceship
           };
 
+          if (editPassword.trim()) {
+              setPasswordResetLoading(true);
+              await resetStudentPassword(editingId, editPassword.trim());
+              normalizedEditForm.password = editPassword.trim();
+          }
+
           await updateDoc(doc(db, "users", editingId), normalizedEditForm);
           setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...normalizedEditForm } : s));
           setEditingId(null);
           setShowEditVisuals(false);
+          setEditPassword("");
       } catch (e) {
           console.error("Error saving student:", e);
-          alert("Failed to save changes.");
+          const errorMessage = e instanceof Error ? e.message : "Failed to save changes.";
+          alert(errorMessage);
+      } finally {
+          setPasswordResetLoading(false);
       }
   };
 
@@ -564,14 +596,23 @@ export default function RosterPage() {
                                                             <option key={grade} value={grade}>Grade {grade}</option>
                                                         ))}
                                                     </select>
+                                                    <input
+                                                        type="text"
+                                                        value={editPassword}
+                                                        onChange={(e) => setEditPassword(e.target.value)}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs"
+                                                        placeholder="New password (optional)"
+                                                    />
                                                 </div>
                                             </div>
                                         </>
                                     )}
                                     
                                     <div className="col-span-12 md:col-span-1 flex justify-end gap-2">
-                                        <button onClick={saveEdit} className="p-2 bg-green-600 rounded text-white hover:bg-green-500"><Save size={16} /></button>
-                                        <button onClick={() => setEditingId(null)} className="p-2 bg-red-600 rounded text-white hover:bg-red-500"><X size={16} /></button>
+                                        <button disabled={passwordResetLoading} onClick={saveEdit} className="p-2 bg-green-600 rounded text-white hover:bg-green-500 disabled:opacity-60 disabled:cursor-not-allowed">
+                                            {passwordResetLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                        </button>
+                                        <button onClick={() => { setEditingId(null); setShowEditVisuals(false); setEditPassword(""); }} className="p-2 bg-red-600 rounded text-white hover:bg-red-500"><X size={16} /></button>
                                     </div>
                                 </div>
                             ) : (

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getAssetPath } from '@/lib/utils';
@@ -17,8 +17,9 @@ interface ClassBonusConfig {
 }
 
 export default function TeacherConsole() {
-  const { logout, user, userData } = useAuth();
+    const { logout, user, userData, loading } = useAuth();
   const pathname = usePathname();
+    const router = useRouter();
 
   // Class Bonus State
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig>({ current: 0, target: 10000, reward: "Class Reward" });
@@ -37,6 +38,46 @@ export default function TeacherConsole() {
         });
         return () => unsubBonus();
   }, [user]);
+
+    useEffect(() => {
+        if (loading) return;
+
+        if (!userData) {
+            router.push('/login');
+            return;
+        }
+
+        if (userData.status === 'pending_approval') {
+            router.push('/pending');
+            return;
+        }
+
+        if (userData.role === 'student') {
+            router.push('/student');
+            return;
+        }
+
+        if (userData.role === 'admin') {
+            router.push('/admin');
+            return;
+        }
+    }, [loading, userData, router]);
+
+    if (loading || !userData) {
+        return (
+            <div className="min-h-screen bg-space-950 flex items-center justify-center text-cyan-300 font-mono">
+                Loading command deck...
+            </div>
+        );
+    }
+
+    if (userData.role !== 'teacher') {
+        return (
+            <div className="min-h-screen bg-space-950 flex items-center justify-center text-cyan-300 font-mono">
+                Redirecting...
+            </div>
+        );
+    }
 
   const handleSaveBonus = async () => {
         if (!user) return;
