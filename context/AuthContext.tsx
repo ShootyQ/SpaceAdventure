@@ -8,7 +8,7 @@ import {
     onAuthStateChanged, 
     User 
 } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, getDocs, query, limit } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, query, limit, serverTimestamp } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { generateClassCode, sanitizeName } from "@/lib/utils";
@@ -62,6 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     updates.classCode = newCode;
                 }
 
+                if (!data.createdAt) {
+                  updates.createdAt = serverTimestamp() as any;
+                }
+
                 if (Object.keys(updates).length > 0) {
                      try {
                         await setDoc(userRef, updates, { merge: true });
@@ -88,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     classCode: generateClassCode(),
                     status: 'active', // Auto-activate new teachers
                     subscriptionStatus: 'trial', // Start on Trial
+                    createdAt: serverTimestamp() as any,
                     schoolName: '',
                     location: 'earth',
                     spaceship: {

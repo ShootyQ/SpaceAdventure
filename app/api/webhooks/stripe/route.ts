@@ -20,35 +20,53 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
 
-  const session = event.data.object as Stripe.Checkout.Session;
-
   if (event.type === "checkout.session.completed") {
-    const subscription = await stripe.subscriptions.retrieve(
-      session.subscription as string
-    );
-
-    if (!session?.metadata?.userId) {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session?.metadata?.userId;
+    if (!userId) {
       return new NextResponse("User id is required", { status: 400 });
     }
 
-    await adminDb.collection('users').doc(session.metadata.userId).update({
-        subscriptionStatus: 'active',
-        stripeSubscriptionId: subscription.id,
-        stripeCustomerId: subscription.customer as string,
-        stripePriceId: subscription.items.data[0].price.id,
-        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+    const firstItem = subscription.items.data[0];
+
+    await adminDb.collection("users").doc(userId).update({
+      subscriptionStatus: "active",
+      stripeSubscriptionId: subscription.id,
+      stripeCustomerId: subscription.customer as string,
+      stripePriceId: firstItem?.price?.id,
+      stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
+      subscriptionActivatedAt: new Date((subscription.start_date || subscription.created) * 1000),
+      stripeCurrentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+      stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+      stripeLastPaymentAt: new Date(),
     });
   }
 
   if (event.type === "invoice.payment_succeeded") {
-    const subscription = await stripe.subscriptions.retrieve(
-      session.subscription as string
-    );
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = (typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id) as string | undefined;
+    if (!subscriptionId) {
+      return new NextResponse(null, { status: 200 });
+    }
 
-    if(session.metadata?.userId) {
-        await adminDb.collection('users').doc(session.metadata.userId).update({
-            stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-        }); 
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+
+    const userSnap = await adminDb.collection("users").where("stripeSubscriptionId", "==", subscription.id).get();
+    if (!userSnap.empty) {
+      const targetDoc = userSnap.docs[0];
+      await targetDoc.ref.update({
+        subscriptionStatus: "active",
+        stripeCustomerId: customerId,
+        stripePriceId: subscription.items.data[0]?.price?.id,
+        stripeSubscriptionInterval: subscription.items.data[0]?.price?.recurring?.interval,
+        stripeCurrentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+        stripeLastPaymentAt: new Date(),
+        stripeLastPaymentAmount: (invoice.amount_paid || 0) / 100,
+        stripeCurrency: invoice.currency || "usd",
+      });
     }
   }
 

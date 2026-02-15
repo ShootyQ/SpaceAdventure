@@ -1,5 +1,6 @@
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
 export async function GET() {
     return NextResponse.json({ status: "Stripe Checkout API is online" });
@@ -8,6 +9,14 @@ export async function GET() {
 export async function POST(req: Request) {
     console.log("[STRIPE_CHECKOUT] POST request received");
     try {
+        const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+        if (!stripeKey || !stripeKey.startsWith("sk_")) {
+            console.error("[STRIPE_CHECKOUT] Missing STRIPE_SECRET_KEY in runtime environment");
+            return NextResponse.json({
+                error: "Stripe is not configured on the server (missing STRIPE_SECRET_KEY)."
+            }, { status: 500 });
+        }
+
         const body = await req.json();
         const { priceId, cycle, userId, email } = body;
         
@@ -47,12 +56,14 @@ export async function POST(req: Request) {
             });
         }
 
+        const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.classcrave.com';
+
         const session = await stripe.checkout.sessions.create({
             customer_email: email,
             line_items: line_items,
             mode: 'subscription',
-            success_url: `${req.headers.get('origin')}/teacher/settings?success=true`,
-            cancel_url: `${req.headers.get('origin')}/teacher/settings?canceled=true`,
+            success_url: `${origin}/teacher/settings?success=true`,
+            cancel_url: `${origin}/teacher/settings?canceled=true`,
             metadata: {
                 userId: userId,
             },
@@ -61,6 +72,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ url: session.url });
     } catch (error) {
         console.error("[STRIPE_CHECKOUT]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+
+        if (error instanceof Stripe.errors.StripeError) {
+            return NextResponse.json({
+                error: error.message,
+                code: error.code || null,
+                type: error.type || null,
+            }, { status: 500 });
+        }
+
+        return NextResponse.json({
+            error: "Internal Error",
+        }, { status: 500 });
     }
 }

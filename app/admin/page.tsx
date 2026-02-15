@@ -1,14 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { collection, deleteDoc, doc, getDocs, query, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserData } from "@/types";
 import {
   AlertTriangle,
+  BarChart3,
   Check,
-  ChevronRight,
   Edit3,
+  GraduationCap,
   Loader2,
   RefreshCw,
   Search,
@@ -65,6 +67,7 @@ export default function AdminPage() {
 
       const normalized: AdminUserRow[] = allUsers.map((u) => {
         const studentCount = u.role === "teacher" ? studentList.filter((s) => s.teacherId === u.uid).length : 0;
+
         return {
           ...u,
           status: u.status || "active",
@@ -124,6 +127,42 @@ export default function AdminPage() {
   }, [users, searchTerm, roleFilter, statusFilter, subFilter]);
 
   const selectedUser = users.find((u) => u.uid === selectedId) || null;
+  const selectedTeacher = useMemo(() => {
+    if (!selectedUser) return null;
+    if (selectedUser.role === "teacher") return selectedUser;
+    if (selectedUser.teacherId) return users.find((u) => u.uid === selectedUser.teacherId) || null;
+    return null;
+  }, [selectedUser, users]);
+
+  const teacherStudents = useMemo(() => {
+    if (!selectedTeacher) return [];
+    return users.filter((u) => u.role === "student" && u.teacherId === selectedTeacher.uid);
+  }, [selectedTeacher, users]);
+
+  const teacherDrilldown = useMemo(() => {
+    if (!selectedTeacher) return null;
+
+    const totalXP = teacherStudents.reduce((sum, student) => sum + (student.xp || 0), 0);
+    const avgXP = teacherStudents.length ? Math.round(totalXP / teacherStudents.length) : 0;
+
+    let totalCompletedMissions = 0;
+    let totalPassed = 0;
+
+    for (const student of teacherStudents) {
+      const progress = student.missionProgress || {};
+      const entries = Object.values(progress);
+      totalCompletedMissions += entries.filter((entry) => entry?.completedAt).length;
+      totalPassed += entries.filter((entry) => entry?.passedEver).length;
+    }
+
+    return {
+      studentCount: teacherStudents.length,
+      avgXP,
+      totalXP,
+      totalCompletedMissions,
+      totalPassed,
+    };
+  }, [selectedTeacher, teacherStudents]);
 
   const startEdit = (target: AdminUserRow) => {
     setEditingId(target.uid);
@@ -206,19 +245,28 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 text-slate-900">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Admin Console</h1>
-          <p className="mt-1 text-sm text-slate-600">Manage users, subscriptions, classroom records, and account status.</p>
+          <p className="mt-1 text-sm text-slate-600">User management, teacher drilldowns, and classroom visibility.</p>
         </div>
-        <button
-          onClick={() => fetchAllData(false)}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/payments"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <BarChart3 size={16} />
+            Payments
+          </Link>
+          <button
+            onClick={() => fetchAllData(false)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -242,6 +290,7 @@ export default function AdminPage() {
         </label>
 
         <select
+          aria-label="Filter by role"
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as "all" | UserData["role"])}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
@@ -254,6 +303,7 @@ export default function AdminPage() {
         </select>
 
         <select
+          aria-label="Filter by account status"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as "all" | UserData["status"])}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
@@ -265,6 +315,7 @@ export default function AdminPage() {
         </select>
 
         <select
+          aria-label="Filter by subscription status"
           value={subFilter}
           onChange={(e) => setSubFilter(e.target.value as "all" | "trial" | "active" | "none")}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
@@ -281,7 +332,7 @@ export default function AdminPage() {
           <Loader2 className="animate-spin text-slate-500" size={32} />
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-6">
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-left text-sm">
@@ -302,7 +353,7 @@ export default function AdminPage() {
                       key={target.uid}
                       className={`border-b border-slate-100 ${selectedId === target.uid ? "bg-slate-50" : "hover:bg-slate-50/70"}`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedId(target.uid)}>
                         {editingId === target.uid ? (
                           <input
                             value={editForm.displayName}
@@ -354,6 +405,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3">
                         {editingId === target.uid ? (
                           <select
+                            aria-label="Edit subscription status"
                             value={editForm.subscriptionStatus}
                             onChange={(e) => setEditForm({ ...editForm, subscriptionStatus: e.target.value as "trial" | "active" })}
                             className="rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
@@ -371,6 +423,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3">
                         {editingId === target.uid ? (
                           <select
+                            aria-label="Edit account status"
                             value={editForm.status}
                             onChange={(e) => setEditForm({ ...editForm, status: e.target.value as UserData["status"] })}
                             className="rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
@@ -426,13 +479,6 @@ export default function AdminPage() {
                               >
                                 {deletingId === target.uid ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                               </button>
-                              <button
-                                onClick={() => setSelectedId(target.uid)}
-                                className="rounded border border-slate-300 bg-white p-2 text-slate-700 hover:bg-slate-100"
-                                title="View details"
-                              >
-                                <ChevronRight size={15} />
-                              </button>
                             </>
                           )}
                         </div>
@@ -452,37 +498,128 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <aside className="rounded-xl border border-slate-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">User Details</h2>
+          <section className="grid gap-6 lg:grid-cols-[380px_1fr]">
+            <aside className="rounded-xl border border-slate-200 bg-white p-4">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Selected User</h2>
 
-            {!selectedUser ? (
-              <p className="text-sm text-slate-500">Select a row to inspect full account details.</p>
-            ) : (
-              <div className="space-y-3 text-sm">
-                <DetailRow label="Name" value={selectedUser.displayName || "(No name)"} />
-                <DetailRow label="Email" value={selectedUser.email || "(No email)"} breakWord />
-                <DetailRow label="UID" value={selectedUser.uid} mono breakWord />
-                <DetailRow label="Role" value={selectedUser.role} />
-                <DetailRow label="Status" value={selectedUser.status.replace("_", " ")} />
-                <DetailRow label="Subscription" value={selectedUser.subscriptionStatus || "none"} />
-                <DetailRow label="Students" value={String(selectedUser.studentCount)} />
-                <DetailRow label="School / Classroom" value={selectedUser.schoolName || "-"} />
-                <DetailRow label="Teacher Link" value={selectedUser.teacherName} />
-                <DetailRow label="Grade" value={selectedUser.gradeLevel || "-"} />
-                <DetailRow label="XP" value={String(selectedUser.xp || 0)} />
+              {!selectedUser ? (
+                <p className="text-sm text-slate-500">Select a row to inspect account details.</p>
+              ) : (
+                <div className="space-y-3 text-sm">
+                  <DetailRow label="Name" value={selectedUser.displayName || "(No name)"} />
+                  <DetailRow label="Email" value={selectedUser.email || "(No email)"} breakWord />
+                  <DetailRow label="UID" value={selectedUser.uid} mono breakWord />
+                  <DetailRow label="Role" value={selectedUser.role} />
+                  <DetailRow label="Status" value={selectedUser.status.replace("_", " ")} />
+                  <DetailRow label="Subscription" value={selectedUser.subscriptionStatus || "none"} />
+                  <DetailRow label="Sign Up Date" value={formatDate((selectedUser as any).createdAt)} />
+                  <DetailRow label="Sub Started" value={formatDate((selectedUser as any).subscriptionActivatedAt || (selectedUser as any).stripeCurrentPeriodStart)} />
+                  <DetailRow label="Sub Ends" value={formatDate((selectedUser as any).stripeCurrentPeriodEnd)} />
+                  <DetailRow label="School / Classroom" value={selectedUser.schoolName || "-"} />
+                  <DetailRow label="Teacher Link" value={selectedUser.teacherName} />
+                  <DetailRow label="Grade" value={selectedUser.gradeLevel || "-"} />
+                  <DetailRow label="XP" value={String(selectedUser.xp || 0)} />
 
-                {selectedUser.role === "teacher" && selectedUser.studentCount > 0 && (
-                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    <div className="mb-1 inline-flex items-center gap-1 font-medium">
-                      <AlertTriangle size={12} />
-                      Delete blocked
+                  {selectedUser.role === "teacher" && selectedUser.studentCount > 0 && (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <div className="mb-1 inline-flex items-center gap-1 font-medium">
+                        <AlertTriangle size={12} />
+                        Delete blocked
+                      </div>
+                      <p>This teacher has active students. Reassign or remove students before deleting this record.</p>
                     </div>
-                    <p>This teacher has active students. Reassign or remove students before deleting this record.</p>
-                  </div>
+                  )}
+                </div>
+              )}
+            </aside>
+
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Teacher Drilldown</h2>
+                {selectedTeacher && (
+                  <button
+                    onClick={() => setSelectedId(selectedTeacher.uid)}
+                    className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Focus Teacher
+                  </button>
                 )}
               </div>
-            )}
-          </aside>
+
+              {!selectedTeacher ? (
+                <p className="text-sm text-slate-500">Select a teacher (or a student with a linked teacher) to view class drilldown.</p>
+              ) : (
+                <>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center gap-2 text-slate-800">
+                      <GraduationCap size={16} />
+                      <p className="font-medium">{selectedTeacher.displayName || selectedTeacher.email || "Teacher"}</p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <Metric label="Students" value={String(teacherDrilldown?.studentCount || 0)} />
+                      <Metric label="Total XP" value={String(teacherDrilldown?.totalXP || 0)} />
+                      <Metric label="Average XP" value={String(teacherDrilldown?.avgXP || 0)} />
+                      <Metric label="Passed Missions" value={String(teacherDrilldown?.totalPassed || 0)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold text-slate-700">Students and Performance</h3>
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <table className="w-full text-left text-sm">
+                        <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2">Student</th>
+                            <th className="px-3 py-2">Grade</th>
+                            <th className="px-3 py-2">XP</th>
+                            <th className="px-3 py-2">Level</th>
+                            <th className="px-3 py-2">Completed Missions</th>
+                            <th className="px-3 py-2">Passes</th>
+                            <th className="px-3 py-2">Sign Up</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {teacherStudents.map((student) => {
+                            const progressEntries = Object.values(student.missionProgress || {});
+                            const completed = progressEntries.filter((entry) => entry?.completedAt).length;
+                            const passed = progressEntries.filter((entry) => entry?.passedEver).length;
+
+                            return (
+                              <tr key={student.uid} className="border-b border-slate-100 hover:bg-slate-50">
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => setSelectedId(student.uid)}
+                                    className="text-left text-slate-800 hover:underline"
+                                  >
+                                    {student.displayName || student.email || student.uid}
+                                  </button>
+                                </td>
+                                <td className="px-3 py-2">{student.gradeLevel || "-"}</td>
+                                <td className="px-3 py-2">{student.xp || 0}</td>
+                                <td className="px-3 py-2">{student.level || 1}</td>
+                                <td className="px-3 py-2">{completed}</td>
+                                <td className="px-3 py-2">{passed}</td>
+                                <td className="px-3 py-2">{formatDate((student as any).createdAt)}</td>
+                              </tr>
+                            );
+                          })}
+
+                          {teacherStudents.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">
+                                This teacher has no linked students.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
         </div>
       )}
     </div>
@@ -494,6 +631,15 @@ function StatCard({ label, value }: { label: string; value: number }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-200 bg-white p-3">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -515,4 +661,18 @@ function DetailRow({
       <p className={`${mono ? "font-mono text-xs" : ""} ${breakWord ? "break-all" : ""} text-slate-900`}>{value}</p>
     </div>
   );
+}
+
+function formatDate(value: any): string {
+  if (!value) return "Not available";
+
+  try {
+    if (value?.toDate) return value.toDate().toLocaleDateString();
+    if (value?.seconds) return new Date(value.seconds * 1000).toLocaleDateString();
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return "Not available";
+    return date.toLocaleDateString();
+  } catch {
+    return "Not available";
+  }
 }

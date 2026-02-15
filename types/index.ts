@@ -144,6 +144,18 @@ export interface UserData {
     
     // Teaching Team
     coTeacherEmails?: string[];
+
+    createdAt?: any;
+    stripeSubscriptionId?: string;
+    stripeCustomerId?: string;
+    stripePriceId?: string;
+    stripeSubscriptionInterval?: "month" | "year";
+    subscriptionActivatedAt?: any;
+    stripeCurrentPeriodStart?: any;
+    stripeCurrentPeriodEnd?: any;
+    stripeLastPaymentAt?: any;
+    stripeLastPaymentAmount?: number;
+    stripeCurrency?: string;
 }
   
 export interface Ship {
