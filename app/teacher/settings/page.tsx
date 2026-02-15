@@ -10,7 +10,7 @@ import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2, LogOut, Edit2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import RankEditor from "@/components/RankEditor";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -579,7 +579,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     </h3>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {AVATAR_OPTIONS.map(opt => (
+                        {PUBLIC_AVATAR_OPTIONS.map(opt => (
                             <button
                                 key={opt.id}
                                 onClick={() => handleSelectAvatar(opt.id)}

@@ -10,7 +10,7 @@ import { UserData, PLANETS, SpaceshipConfig, STUDENT_GRADES, StudentGrade } from
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
-import { UserAvatar, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
@@ -30,7 +30,7 @@ export default function RosterPage() {
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
     const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
-  const [selectedAvatarId, setSelectedAvatarId] = useState(AVATAR_OPTIONS[0].id);
+    const [selectedAvatarId, setSelectedAvatarId] = useState(PUBLIC_AVATAR_OPTIONS[0].id);
   const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
@@ -141,7 +141,7 @@ export default function RosterPage() {
           setStudents(prev => [...prev, newStudent]);
           setNewStudentData({ name: "", username: "", password: "" });
           setNewStudentGrade("3");
-          setSelectedAvatarId(AVATAR_OPTIONS[0].id);
+          setSelectedAvatarId(PUBLIC_AVATAR_OPTIONS[0].id);
           setSelectedShipId(SHIP_OPTIONS[0].id);
           setIsAddingStudent(false);
       } catch (e: any) {
@@ -339,7 +339,7 @@ export default function RosterPage() {
                             <div>
                                 <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Identity</label>
                                 <div className="grid grid-cols-4 gap-2">
-                                    {AVATAR_OPTIONS.map((opt) => (
+                                    {PUBLIC_AVATAR_OPTIONS.map((opt) => (
                                         <button
                                             key={opt.id}
                                             type="button" 
@@ -363,7 +363,7 @@ export default function RosterPage() {
                                     ))}
                                 </div>
                                 <div className="text-center mt-1 text-xs text-cyan-300 font-bold uppercase tracking-widest">
-                                    {AVATAR_OPTIONS.find(p => p.id === selectedAvatarId)?.name}
+                                    {PUBLIC_AVATAR_OPTIONS.find(p => p.id === selectedAvatarId)?.name}
                                 </div>
                             </div>
 
@@ -475,7 +475,7 @@ export default function RosterPage() {
                                                 <div>
                                                     <h4 className="text-xs text-white uppercase font-bold mb-2">Avatar</h4>
                                                     <div className="grid grid-cols-5 gap-2">
-                                                        {AVATAR_OPTIONS.map(opt => (
+                                                        {PUBLIC_AVATAR_OPTIONS.map(opt => (
                                                              <button
                                                                 key={opt.id}
                                                                 onClick={() => handleUpdateAvatar(opt.id)}

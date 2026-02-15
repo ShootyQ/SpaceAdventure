@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -503,7 +503,13 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
 
     const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
-    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(["bunny"]));
+    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(PUBLIC_AVATAR_OPTIONS.map(a => a.id)));
+
+    const secretUnlockRules: Record<string, { planetId: string; unlockKey: string }> = {
+        jovi: { planetId: "jupiter", unlockKey: "jovi" },
+        rusty: { planetId: "mars", unlockKey: "rusty" },
+        vylaet: { planetId: "mars", unlockKey: "vylaet" },
+    };
 
     useEffect(() => {
         const teacherId = userData?.teacherId;
@@ -513,10 +519,13 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             const map: Record<string, Record<string, number>> = {};
             snap.forEach((d) => {
                 const data = d.data() as any;
-                if (d.id === "jupiter") {
-                    const joviThreshold = Number(data?.unlocks?.avatars?.jovi || 0);
-                    map[d.id] = joviThreshold > 0 ? { jovi: joviThreshold } : {};
-                }
+                const rawUnlocks = data?.unlocks?.avatars || {};
+                const normalized: Record<string, number> = {};
+                Object.keys(rawUnlocks).forEach((key) => {
+                    const threshold = Number(rawUnlocks[key] || 0);
+                    if (threshold > 0) normalized[key] = threshold;
+                });
+                map[d.id] = normalized;
             });
             setPlanetAvatarUnlocks(map);
         });
@@ -526,13 +535,15 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
     useEffect(() => {
         const currentAvatar = userData?.avatar?.avatarId || "bunny";
-        const unlocked = new Set<string>(["bunny", currentAvatar]);
+        const unlocked = new Set<string>([...PUBLIC_AVATAR_OPTIONS.map(a => a.id), currentAvatar]);
 
-        const jupiterXP = Number((userData?.planetXP || {})?.jupiter || 0);
-        const joviThreshold = Number(planetAvatarUnlocks?.jupiter?.jovi || 0);
-        if (joviThreshold > 0 && jupiterXP >= joviThreshold) {
-            unlocked.add("jovi");
-        }
+        Object.entries(secretUnlockRules).forEach(([avatarId, rule]) => {
+            const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
+            const requiredXP = Number(planetAvatarUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
+            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+                unlocked.add(avatarId);
+            }
+        });
 
         setUnlockedAvatarIds(unlocked);
         if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
@@ -557,6 +568,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
         if (!user) return;
         setLoading(true);
         try {
+            const safeAvatarId = unlockedAvatarIds.has(avatarId) ? avatarId : (userData?.avatar?.avatarId || "bunny");
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
                 "avatar.hue": hue,
@@ -565,7 +577,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.bgSat": bgSat,
                 "avatar.bgLight": bgLight,
                 "avatar.activeHat": activeHat,
-                "avatar.avatarId": avatarId
+                "avatar.avatarId": safeAvatarId
             });
             onBack();
         } catch (e) {

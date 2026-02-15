@@ -21,7 +21,12 @@ export const AVATAR_OPTIONS = [
     { id: 'penguin', name: 'Power Penguin', src: '/images/avatar/spacepenguin.png' },
     { id: 'turtle', name: 'Turbo Turtle', src: '/images/avatar/spaceturtle.png' },
     { id: 'jovi', name: 'Jovi', src: '/images/avatar/JUPITER/jovi.png' },
+    { id: 'rusty', name: 'Rusty', src: '/images/avatar/MARS/rusty.png' },
+    { id: 'vylaet', name: 'Vylaet', src: '/images/avatar/SECRET%20UNLOCKS/spacevylaet.png' },
 ];
+
+export const SECRET_AVATAR_IDS = new Set(['jovi', 'rusty', 'vylaet']);
+export const PUBLIC_AVATAR_OPTIONS = AVATAR_OPTIONS.filter(a => !SECRET_AVATAR_IDS.has(a.id));
 
 export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[] = [
     { id: 'p1', name: 'Cadet Blue', config: { hue: 0, skinHue: 200, bgHue: 240, bgSat: 60, bgLight: 50, activeHat: 'none', avatarId: 'bunny' } },
