@@ -148,7 +148,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                             key={item.id}
                             onClick={() => {
                                 if (item.id === 'interior') {
-                                    window.location.href = '/student?interior=true';
+                                    window.location.href = '/student';
                                 } else {
                                     onNavigate(item.id);
                                 }

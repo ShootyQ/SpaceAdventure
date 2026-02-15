@@ -1,6 +1,13 @@
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { adminDb, adminInitialized } from '@/lib/firebase-admin';
+
+const ACTIVE_STRIPE_STATUSES = new Set(['active', 'trialing']);
+
+const toAppSubscriptionStatus = (stripeStatus?: string) => {
+    return stripeStatus && ACTIVE_STRIPE_STATUSES.has(stripeStatus) ? 'active' : 'trial';
+};
 
 export async function GET() {
     return NextResponse.json({ status: "Stripe Checkout API is online" });
@@ -42,12 +49,31 @@ export async function POST(req: Request) {
             );
 
             if (activeSubscription) {
-                 // If already subscribed, return the billing portal URL instead of a new checkout session?
-                 // Or just return an error. Returning an error is safer for now.
-                 return NextResponse.json({
-                     error: "You already have an active subscription.",
-                     redirect: "/teacher/settings" // Suggest redirection
-                 }, { status: 409 }); 
+                if (adminInitialized) {
+                    const firstItem = activeSubscription.items.data[0];
+                    await adminDb.collection('users').doc(userId).set({
+                        subscriptionStatus: toAppSubscriptionStatus(activeSubscription.status),
+                        subscriptionLifecycleStatus: activeSubscription.status,
+                        stripeSubscriptionId: activeSubscription.id,
+                        stripeCustomerId: typeof activeSubscription.customer === 'string' ? activeSubscription.customer : activeSubscription.customer?.id,
+                        stripePriceId: firstItem?.price?.id,
+                        stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
+                        stripeCancelAtPeriodEnd: (activeSubscription as any).cancel_at_period_end || false,
+                        stripeCurrentPeriodStart: (activeSubscription as any).current_period_start
+                            ? new Date((activeSubscription as any).current_period_start * 1000)
+                            : null,
+                        stripeCurrentPeriodEnd: (activeSubscription as any).current_period_end
+                            ? new Date((activeSubscription as any).current_period_end * 1000)
+                            : null,
+                        stripeLastPaymentAt: new Date(),
+                    }, { merge: true });
+                }
+
+                return NextResponse.json({
+                    alreadySubscribed: true,
+                    message: 'You already have an active subscription.',
+                    synced: adminInitialized,
+                });
             }
         }
 

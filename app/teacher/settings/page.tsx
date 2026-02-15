@@ -1025,7 +1025,13 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                 throw new Error(apiError);
             }
             
-            const { url } = await response.json();
+            const { url, alreadySubscribed, message } = await response.json();
+            if (alreadySubscribed) {
+                alert(message || "You already have an active subscription.");
+                window.location.reload();
+                return;
+            }
+
             if (url) {
                 window.location.href = url;
             } else {
