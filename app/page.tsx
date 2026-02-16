@@ -117,7 +117,7 @@ export default function Home() {
       {/* Navigation */}
       <nav className="w-full border-b border-black/10 bg-white/70 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-28 flex items-center justify-between">
-          <Link href="/" className="relative w-[32rem] h-24">
+          <Link href="/" className="relative w-48 md:w-96 h-24 hover:scale-105 transition-transform duration-300">
             <Image
               src="/images/logos/croppedclasscravelogo.png"
               alt="ClassCrave Logo"

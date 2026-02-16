@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Compass, Lock, Rocket, Power } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Compass, Lock, Rocket, Power, CreditCard, ChevronRight, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function TeacherAdventurePortal() {
   const { userData, loading, logout } = useAuth();
   const router = useRouter();
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -33,6 +34,42 @@ export default function TeacherAdventurePortal() {
       return;
     }
   }, [loading, userData, router]);
+
+  const handleManageSubscription = async () => {
+    if (!userData) return;
+    
+    // If active, go to portal
+    if (userData.subscriptionStatus === 'active') {
+       if (openingPortal) return;
+       setOpeningPortal(true);
+       try {
+           const res = await fetch('/api/stripe/portal', { 
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ 
+                   customerId: userData.stripeCustomerId,
+                   email: userData.email 
+               })
+           });
+           
+           if (!res.ok) throw new Error("Portal request failed");
+           
+           const data = await res.json();
+           if (data.url) {
+             window.location.href = data.url;
+           } else {
+             alert("Could not open billing portal.");
+             setOpeningPortal(false);
+           }
+       } catch (e) {
+           console.error(e);
+           alert("Error opening billing portal.");
+           setOpeningPortal(false);
+       }
+    } else {
+        router.push('/teacher/settings');
+    }
+  };
 
   if (loading || !userData) {
     return (
@@ -120,6 +157,57 @@ export default function TeacherAdventurePortal() {
             <h2 className="text-2xl font-semibold mb-2">Arcane Academy</h2>
             <p className="text-slate-600">Adventure selection will unlock here when this world launches.</p>
           </div>
+        </div>
+
+        {/* Account Section */}
+        <div className="relative z-10 mt-12 pt-10 border-t border-black/5">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <Power className="w-5 h-5 text-slate-400" />
+                Account & Billing
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 {/* Subscription Tile */}
+                 <div 
+                    onClick={handleManageSubscription} 
+                    className="cursor-pointer group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-slate-300 transition-all relative overflow-hidden"
+                 >
+                    <div className="flex items-start justify-between mb-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${userData.subscriptionStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${userData.subscriptionStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {userData.subscriptionStatus === 'active' ? 'Active' : 'Trial'}
+                        </div>
+                    </div>
+                    
+                    <h3 className="text-lg font-bold text-slate-900">Manage Subscription</h3>
+                    
+                    {userData.subscriptionStatus === 'active' ? (
+                        <>
+                            <p className="text-sm text-slate-500 mt-1">
+                                {userData.stripeSubscriptionInterval === 'year' ? 'Yearly' : 'Monthly'} Plan
+                            </p>
+                            {userData.stripeCurrentPeriodEnd && (
+                                <p className="text-xs text-slate-400 mt-4">
+                                    Renews: {new Date((userData.stripeCurrentPeriodEnd as any).seconds * 1000).toLocaleDateString()}
+                                </p>
+                            )}
+                            <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-emerald-700 group-hover:gap-2 transition-all">
+                                {openingPortal ? 'Loading portal...' : 'Update billing'} <ChevronRight className="w-4 h-4" />
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                             <p className="text-sm text-slate-500 mt-1">
+                                Upgrade to unlock full access.
+                            </p>
+                            <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-amber-700 group-hover:gap-2 transition-all">
+                                View plans <ChevronRight className="w-4 h-4" />
+                            </div>
+                        </>
+                    )}
+                 </div>
+            </div>
         </div>
       </div>
     </div>
