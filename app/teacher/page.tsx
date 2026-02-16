@@ -160,7 +160,7 @@ export default function TeacherAdventurePortal() {
         </div>
 
         {/* Account Section */}
-        <div className="relative z-10 mt-12 pt-10 border-t border-black/5">
+        <div id="billing" className="relative z-10 mt-12 pt-10 border-t border-black/5">
             <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                 <Power className="w-5 h-5 text-slate-400" />
                 Account & Billing
@@ -195,6 +195,17 @@ export default function TeacherAdventurePortal() {
                             <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-emerald-700 group-hover:gap-2 transition-all">
                                 {openingPortal ? 'Loading portal...' : 'Update billing'} <ChevronRight className="w-4 h-4" />
                             </div>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleManageSubscription();
+                              }}
+                              className="mt-3 w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                            >
+                              Manage or cancel in Stripe
+                            </button>
+                            <p className="mt-2 text-xs text-slate-500">No lock-in. You can cancel anytime from the Stripe portal.</p>
                         </>
                     ) : (
                         <>

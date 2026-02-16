@@ -367,8 +367,8 @@ export default function TeacherConsole() {
                      <QuickAction 
                         title="Subscriptions" 
                         icon={<CreditCard size={28} />} 
-                        desc="Billing"
-                        href="/teacher/settings?mode=billing"
+                        desc="Manage / Cancel"
+                        href="/teacher#billing"
                         color="text-emerald-400"
                         borderColor="border-emerald-500/30"
                     />
