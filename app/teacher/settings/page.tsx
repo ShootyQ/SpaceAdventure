@@ -1013,14 +1013,23 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
             });
 
             if (!response.ok) {
-                let apiError = "Network response was not ok";
+                let apiError = `Checkout failed (${response.status})`;
                 try {
                     const errorBody = await response.json();
                     if (errorBody?.error) {
                         apiError = errorBody.error;
+                    } else if (errorBody?.message) {
+                        apiError = errorBody.message;
                     }
                 } catch {
-                    // keep fallback
+                    try {
+                        const errorText = await response.text();
+                        if (errorText?.trim()) {
+                            apiError = `${apiError}: ${errorText.trim()}`;
+                        }
+                    } catch {
+                        // keep fallback
+                    }
                 }
                 throw new Error(apiError);
             }

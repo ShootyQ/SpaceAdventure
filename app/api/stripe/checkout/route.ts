@@ -1,7 +1,7 @@
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { adminDb, adminInitialized } from '@/lib/firebase-admin';
+import { adminDb, adminInitialized, adminInitError } from '@/lib/firebase-admin';
 
 const ACTIVE_STRIPE_STATUSES = new Set(['active', 'trialing']);
 
@@ -10,7 +10,14 @@ const toAppSubscriptionStatus = (stripeStatus?: string) => {
 };
 
 export async function GET() {
-    return NextResponse.json({ status: "Stripe Checkout API is online" });
+    return NextResponse.json({
+        status: "Stripe Checkout API is online",
+        hasStripeSecret: Boolean(process.env.STRIPE_SECRET_KEY),
+        hasMonthlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY),
+        hasYearlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY),
+        adminInitialized,
+        adminInitError: adminInitError || null,
+    });
 }
 
 export async function POST(req: Request) {
@@ -31,7 +38,9 @@ export async function POST(req: Request) {
 
         if (!userId || !email) {
             console.log("[STRIPE_CHECKOUT] Missing fields");
-            return new NextResponse("Missing required fields", { status: 400 });
+            return NextResponse.json({
+                error: "Missing required fields: userId and email are required."
+            }, { status: 400 });
         }
 
         // Check for existing customers/subscriptions by email to prevent double-subscription

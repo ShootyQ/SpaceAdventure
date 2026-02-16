@@ -108,7 +108,9 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
         { id: 'inventory', title: 'Cargo Hold', icon: Box, color: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/30' },
         { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30' },
         { id: 'flag', title: 'Flag Designer', icon: Flag, color: 'text-red-400', border: 'border-red-500', bg: 'bg-red-950/30' },
-        { id: 'interior', title: 'Spaceship Interior', icon: LayoutDashboard, color: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-950/30' },
+        { id: 'missions', title: 'Mission Log', icon: Activity, color: 'text-green-400', border: 'border-green-500', bg: 'bg-green-950/20', href: '/student/missions' },
+        { id: 'interior', title: 'Spaceship Interior', icon: LayoutDashboard, color: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-950/30', href: '/student' },
+        { id: 'solar', title: 'Solar System', icon: Map, color: 'text-cyan-400', border: 'border-cyan-500', bg: 'bg-cyan-950/20', href: '/student/map' },
     ];
 
     // Determine Rank
@@ -147,8 +149,8 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                         <motion.button
                             key={item.id}
                             onClick={() => {
-                                if (item.id === 'interior') {
-                                    window.location.href = '/student';
+                                if ((item as any).href) {
+                                    window.location.href = (item as any).href;
                                 } else {
                                     onNavigate(item.id);
                                 }
@@ -178,45 +180,15 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                                 <h3 className={`text-xl font-bold uppercase tracking-wider ${item.color} drop-shadow-md`}>
                                     {item.title}
                                 </h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">Access System</p>
+                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">
+                                    {item.id === 'missions' ? 'View Active Assignments' : item.id === 'interior' ? 'Enter Cabin View' : item.id === 'solar' ? 'Open Star Map' : 'Access System'}
+                                </p>
                             </div>
                             
                             {/* Decorative Corner */}
                             <div className={`absolute top-0 right-0 w-8 h-8 ${item.color.replace('text', 'bg').replace('400', '500')}/10 rounded-bl-3xl`} />
                         </motion.button>
                     ))}
-                    
-                    {/* Mission Log Link */}
-                    <Link href="/student/missions" className="md:col-span-2">
-                        <motion.div
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-green-500/30 bg-green-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-green-900/10 transition-colors group cursor-pointer"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-green-500 text-green-400">
-                                <Activity size={32} />
-                             </div>
-                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-green-400">Mission Log</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">View Active Assignments</p>
-                             </div>
-                        </motion.div>
-                    </Link>
-
-                          {/* Interior Link */}
-                    <Link href="/student" className="md:col-span-2">
-                        <motion.div
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-cyan-500/30 bg-cyan-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-cyan-900/10 transition-colors group cursor-pointer"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-cyan-500 text-cyan-400">
-                                <Crosshair size={32} className="animate-spin-slow" />
-                             </div>
-                             <div>
-                                          <h3 className="text-xl font-bold uppercase tracking-wider text-cyan-400">View Spaceship Interior</h3>
-                                          <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Enter Cabin View</p>
-                             </div>
-                        </motion.div>
-                    </Link>
                 </div>
             </div>
 
