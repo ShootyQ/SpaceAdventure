@@ -148,8 +148,9 @@ export async function POST(req: Request) {
             }, { status: 500 });
         }
 
+        const fallbackMessage = error instanceof Error ? error.message : "Unknown server error";
         return NextResponse.json({
-            error: "Internal Error",
+            error: `Internal Error: ${fallbackMessage}`,
         }, { status: 500 });
     }
 }
