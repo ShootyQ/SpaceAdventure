@@ -47,9 +47,9 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { priceId, cycle, userId, email } = body;
+        const { priceId, cycle, userId, email, syncOnly } = body;
         
-        console.log("[STRIPE_CHECKOUT] Body:", { priceId, cycle, userId, email });
+        console.log("[STRIPE_CHECKOUT] Body:", { priceId, cycle, userId, email, syncOnly: Boolean(syncOnly) });
 
         if (!userId || !email) {
             console.log("[STRIPE_CHECKOUT] Missing fields");
@@ -96,6 +96,14 @@ export async function POST(req: Request) {
                     },
                 });
             }
+        }
+
+        if (syncOnly) {
+            return NextResponse.json({
+                alreadySubscribed: false,
+                synced: false,
+                message: 'No active subscription found for this email.',
+            });
         }
 
         const line_items: any = [];

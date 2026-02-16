@@ -32,7 +32,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | UserData["role"]>("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | UserData["role"]>("teacher");
   const [statusFilter, setStatusFilter] = useState<"all" | UserData["status"]>("all");
   const [subFilter, setSubFilter] = useState<"all" | "trial" | "active" | "none">("all");
 
@@ -40,6 +40,8 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [extendDateInput, setExtendDateInput] = useState("");
+  const [extendingId, setExtendingId] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState<{
     displayName: string;
@@ -85,7 +87,10 @@ export default function AdminPage() {
       });
 
       setUsers(normalized);
-      if (!selectedId && normalized.length > 0) setSelectedId(normalized[0].uid);
+      if (!selectedId && normalized.length > 0) {
+        const firstTeacher = normalized.find((u) => u.role === "teacher");
+        setSelectedId((firstTeacher || normalized[0]).uid);
+      }
     } catch (error) {
       console.error("Admin Fetch Error:", error);
     } finally {
@@ -138,6 +143,23 @@ export default function AdminPage() {
     if (!selectedTeacher) return [];
     return users.filter((u) => u.role === "student" && u.teacherId === selectedTeacher.uid);
   }, [selectedTeacher, users]);
+
+  useEffect(() => {
+    if (!selectedUser) {
+      setExtendDateInput("");
+      return;
+    }
+
+    const currentEnd = parseDateValue((selectedUser as any).stripeCurrentPeriodEnd);
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 30);
+
+    const suggested = currentEnd && !Number.isNaN(currentEnd.getTime())
+      ? new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000)
+      : fallback;
+
+    setExtendDateInput(suggested.toISOString().slice(0, 10));
+  }, [selectedUser?.uid]);
 
   const teacherDrilldown = useMemo(() => {
     if (!selectedTeacher) return null;
@@ -232,6 +254,58 @@ export default function AdminPage() {
       alert("Failed to delete user.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const extendSubscriptionEndDate = async () => {
+    if (!selectedUser) return;
+    if (selectedUser.role !== "teacher") {
+      alert("End-date extension is only available for teacher accounts.");
+      return;
+    }
+    if (!extendDateInput) {
+      alert("Choose a new end date first.");
+      return;
+    }
+
+    const proposedEnd = new Date(`${extendDateInput}T23:59:59.999Z`);
+    if (Number.isNaN(proposedEnd.getTime())) {
+      alert("Invalid date.");
+      return;
+    }
+
+    const currentEnd = parseDateValue((selectedUser as any).stripeCurrentPeriodEnd);
+    if (currentEnd && proposedEnd.getTime() <= currentEnd.getTime()) {
+      alert("New end date must be later than the current end date. Shortening is blocked.");
+      return;
+    }
+
+    try {
+      setExtendingId(selectedUser.uid);
+
+      await updateDoc(doc(db, "users", selectedUser.uid), {
+        subscriptionStatus: "active",
+        stripeCurrentPeriodEnd: proposedEnd,
+      });
+
+      setUsers((prev) =>
+        prev.map((target) =>
+          target.uid === selectedUser.uid
+            ? {
+                ...target,
+                subscriptionStatus: "active",
+                stripeCurrentPeriodEnd: proposedEnd,
+              }
+            : target
+        )
+      );
+
+      alert("Subscription end date extended.");
+    } catch (error) {
+      console.error("Extend subscription failed:", error);
+      alert("Failed to extend subscription end date.");
+    } finally {
+      setExtendingId(null);
     }
   };
 
@@ -520,6 +594,29 @@ export default function AdminPage() {
                   <DetailRow label="Grade" value={selectedUser.gradeLevel || "-"} />
                   <DetailRow label="XP" value={String(selectedUser.xp || 0)} />
 
+                  {selectedUser.role === "teacher" && (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Extend Subscription End Date</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="date"
+                          value={extendDateInput}
+                          onChange={(e) => setExtendDateInput(e.target.value)}
+                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                        />
+                        <button
+                          onClick={extendSubscriptionEndDate}
+                          disabled={extendingId === selectedUser.uid}
+                          className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {extendingId === selectedUser.uid ? <Loader2 size={12} className="animate-spin" /> : null}
+                          Save End Date
+                        </button>
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">Only later dates are allowed. This tool cannot shorten access.</p>
+                    </div>
+                  )}
+
                   {selectedUser.role === "teacher" && selectedUser.studentCount > 0 && (
                     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                       <div className="mb-1 inline-flex items-center gap-1 font-medium">
@@ -661,6 +758,25 @@ function DetailRow({
       <p className={`${mono ? "font-mono text-xs" : ""} ${breakWord ? "break-all" : ""} text-slate-900`}>{value}</p>
     </div>
   );
+}
+
+function parseDateValue(value: any): Date | null {
+  if (!value) return null;
+
+  try {
+    if (value?.toDate) {
+      const converted = value.toDate();
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    }
+    if (value?.seconds) {
+      const converted = new Date(value.seconds * 1000);
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    }
+    const converted = new Date(value);
+    return Number.isNaN(converted.getTime()) ? null : converted;
+  } catch {
+    return null;
+  }
 }
 
 function formatDate(value: any): string {

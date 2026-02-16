@@ -975,6 +975,7 @@ function FlagDesigner() {
 function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
     const { userData } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [syncingSubscription, setSyncingSubscription] = useState(false);
     const [cycle, setCycle] = useState<"monthly" | "yearly">("yearly");
 
     const formatBillingDate = (value: any) => {
@@ -994,6 +995,71 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
         monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
         yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
     };
+
+    useEffect(() => {
+        if (!userData?.uid || !userData?.email) return;
+        if (userData.subscriptionStatus === "active") return;
+
+        const attemptKey = `billing-sync-attempted-${userData.uid}`;
+        if (typeof window !== "undefined" && window.sessionStorage.getItem(attemptKey) === "1") return;
+
+        let cancelled = false;
+
+        const syncFromStripe = async () => {
+            setSyncingSubscription(true);
+            if (typeof window !== "undefined") {
+                window.sessionStorage.setItem(attemptKey, "1");
+            }
+
+            try {
+                const response = await fetch("/api/stripe/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        userId: userData.uid,
+                        email: userData.email,
+                        syncOnly: true,
+                    }),
+                });
+
+                const responseText = await response.text();
+                const payload = responseText ? JSON.parse(responseText) : {};
+
+                if (!response.ok || cancelled) return;
+
+                if (payload?.alreadySubscribed && payload?.subscription) {
+                    if (!payload?.synced) {
+                        await updateDoc(doc(db, "users", userData.uid), {
+                            subscriptionStatus: (payload.subscription.status === "active" || payload.subscription.status === "trialing") ? "active" : "trial",
+                            subscriptionLifecycleStatus: payload.subscription.status,
+                            stripeSubscriptionId: payload.subscription.id,
+                            stripeCustomerId: payload.subscription.customerId || null,
+                            stripePriceId: payload.subscription.priceId || null,
+                            stripeSubscriptionInterval: payload.subscription.interval || null,
+                            stripeCancelAtPeriodEnd: Boolean(payload.subscription.cancelAtPeriodEnd),
+                            stripeCurrentPeriodStart: payload.subscription.currentPeriodStart ? new Date(payload.subscription.currentPeriodStart) : null,
+                            stripeCurrentPeriodEnd: payload.subscription.currentPeriodEnd ? new Date(payload.subscription.currentPeriodEnd) : null,
+                            stripeLastPaymentAt: new Date(),
+                        });
+                    }
+
+                    if (!cancelled) {
+                        window.location.reload();
+                    }
+                }
+            } catch (error) {
+                console.warn("Billing auto-sync skipped:", error);
+            } finally {
+                if (!cancelled) setSyncingSubscription(false);
+            }
+        };
+
+        syncFromStripe();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [userData?.uid, userData?.email, userData?.subscriptionStatus]);
 
     const handleSubscribe = async () => {
         if (!userData?.uid) return;
@@ -1176,7 +1242,7 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                                 }`}
                             >
                                 <CreditCard size={18} />
-                                {loading ? "Initializing..." : `Upgrade (${cycle})`}
+                                {loading ? "Initializing..." : syncingSubscription ? "Checking billing..." : `Upgrade (${cycle})`}
                             </button>
                         )}
                     </div>
