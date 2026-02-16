@@ -76,30 +76,56 @@ export async function POST(req: Request) {
             );
 
             if (activeSubscription) {
+                let synced = false;
+                let syncError: string | null = null;
+                const firstItem = activeSubscription.items.data[0];
+
                 if (adminLib.adminInitialized) {
-                    const firstItem = activeSubscription.items.data[0];
-                    await adminLib.adminDb.collection('users').doc(userId).set({
-                        subscriptionStatus: toAppSubscriptionStatus(activeSubscription.status),
-                        subscriptionLifecycleStatus: activeSubscription.status,
-                        stripeSubscriptionId: activeSubscription.id,
-                        stripeCustomerId: typeof activeSubscription.customer === 'string' ? activeSubscription.customer : activeSubscription.customer?.id,
-                        stripePriceId: firstItem?.price?.id,
-                        stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
-                        stripeCancelAtPeriodEnd: (activeSubscription as any).cancel_at_period_end || false,
-                        stripeCurrentPeriodStart: (activeSubscription as any).current_period_start
-                            ? new Date((activeSubscription as any).current_period_start * 1000)
-                            : null,
-                        stripeCurrentPeriodEnd: (activeSubscription as any).current_period_end
-                            ? new Date((activeSubscription as any).current_period_end * 1000)
-                            : null,
-                        stripeLastPaymentAt: new Date(),
-                    }, { merge: true });
+                    try {
+                        await adminLib.adminDb.collection('users').doc(userId).set({
+                            subscriptionStatus: toAppSubscriptionStatus(activeSubscription.status),
+                            subscriptionLifecycleStatus: activeSubscription.status,
+                            stripeSubscriptionId: activeSubscription.id,
+                            stripeCustomerId: typeof activeSubscription.customer === 'string' ? activeSubscription.customer : activeSubscription.customer?.id,
+                            stripePriceId: firstItem?.price?.id,
+                            stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
+                            stripeCancelAtPeriodEnd: (activeSubscription as any).cancel_at_period_end || false,
+                            stripeCurrentPeriodStart: (activeSubscription as any).current_period_start
+                                ? new Date((activeSubscription as any).current_period_start * 1000)
+                                : null,
+                            stripeCurrentPeriodEnd: (activeSubscription as any).current_period_end
+                                ? new Date((activeSubscription as any).current_period_end * 1000)
+                                : null,
+                            stripeLastPaymentAt: new Date(),
+                        }, { merge: true });
+                        synced = true;
+                    } catch (syncErr) {
+                        syncError = syncErr instanceof Error ? syncErr.message : 'Unknown admin sync error';
+                        console.error('[STRIPE_CHECKOUT] Admin sync failed for already subscribed user:', syncError);
+                    }
+                } else {
+                    syncError = adminLib.adminInitError || 'Firebase Admin not initialized';
                 }
 
                 return NextResponse.json({
                     alreadySubscribed: true,
                     message: 'You already have an active subscription.',
-                    synced: adminLib.adminInitialized,
+                    synced,
+                    syncError,
+                    subscription: {
+                        status: activeSubscription.status,
+                        id: activeSubscription.id,
+                        customerId: typeof activeSubscription.customer === 'string' ? activeSubscription.customer : activeSubscription.customer?.id,
+                        priceId: firstItem?.price?.id || null,
+                        interval: firstItem?.price?.recurring?.interval || null,
+                        cancelAtPeriodEnd: (activeSubscription as any).cancel_at_period_end || false,
+                        currentPeriodStart: (activeSubscription as any).current_period_start
+                            ? new Date((activeSubscription as any).current_period_start * 1000).toISOString()
+                            : null,
+                        currentPeriodEnd: (activeSubscription as any).current_period_end
+                            ? new Date((activeSubscription as any).current_period_end * 1000).toISOString()
+                            : null,
+                    },
                 });
             }
         }

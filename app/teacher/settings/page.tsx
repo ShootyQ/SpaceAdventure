@@ -1030,8 +1030,26 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                 throw new Error(apiError);
             }
             
-            const { url, alreadySubscribed, message } = await response.json();
+            const { url, alreadySubscribed, message, synced, syncError, subscription } = await response.json();
             if (alreadySubscribed) {
+                if (!synced && userData?.uid && subscription) {
+                    try {
+                        await updateDoc(doc(db, "users", userData.uid), {
+                            subscriptionStatus: (subscription.status === "active" || subscription.status === "trialing") ? "active" : "trial",
+                            subscriptionLifecycleStatus: subscription.status,
+                            stripeSubscriptionId: subscription.id,
+                            stripeCustomerId: subscription.customerId || null,
+                            stripePriceId: subscription.priceId || null,
+                            stripeSubscriptionInterval: subscription.interval || null,
+                            stripeCancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+                            stripeCurrentPeriodStart: subscription.currentPeriodStart ? new Date(subscription.currentPeriodStart) : null,
+                            stripeCurrentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
+                            stripeLastPaymentAt: new Date(),
+                        });
+                    } catch (clientSyncErr) {
+                        console.error("Client-side subscription sync failed", clientSyncErr, syncError);
+                    }
+                }
                 alert(message || "You already have an active subscription.");
                 window.location.reload();
                 return;
