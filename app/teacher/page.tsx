@@ -42,11 +42,12 @@ export default function TeacherAdventurePortal() {
     if (userData.subscriptionStatus === 'active') {
        if (openingPortal) return;
        setOpeningPortal(true);
-       try {
-           const res = await fetch('/api/stripe/portal', { 
+         try {
+           const res = await fetch('/api/stripe/checkout', { 
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({ 
+               intent: 'portal',
                    customerId: userData.stripeCustomerId,
                    email: userData.email 
                })

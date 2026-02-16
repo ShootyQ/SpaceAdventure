@@ -47,7 +47,36 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { priceId, cycle, userId, email, syncOnly } = body;
+        const { intent, priceId, cycle, userId, email, syncOnly, customerId } = body;
+
+        if (intent === 'portal') {
+            let targetCustomerId = customerId;
+
+            if (!targetCustomerId && email) {
+                const customers = await stripe.customers.list({
+                    email,
+                    limit: 1,
+                });
+                if (customers.data.length > 0) {
+                    targetCustomerId = customers.data[0].id;
+                }
+            }
+
+            if (!targetCustomerId) {
+                return NextResponse.json({
+                    error: 'No Stripe customer found for billing portal.'
+                }, { status: 404 });
+            }
+
+            const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.classcrave.com';
+
+            const portalSession = await stripe.billingPortal.sessions.create({
+                customer: targetCustomerId,
+                return_url: `${origin}/teacher#billing`,
+            });
+
+            return NextResponse.json({ url: portalSession.url });
+        }
         
         console.log("[STRIPE_CHECKOUT] Body:", { priceId, cycle, userId, email, syncOnly: Boolean(syncOnly) });
 
