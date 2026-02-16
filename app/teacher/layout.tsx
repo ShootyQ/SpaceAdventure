@@ -21,7 +21,7 @@ export default function TeacherLayout({
     if (loading) return;
 
     if (!userData) {
-      router.replace("/login");
+      router.replace(`/login?role=teacher&redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 

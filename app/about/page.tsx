@@ -33,10 +33,10 @@ export default function AboutPage() {
             <div className="mt-12 p-8 bg-emerald-50 border border-emerald-100 rounded-3xl relative">
                 <Quote className="absolute top-8 left-6 w-8 h-8 text-emerald-300" />
                 <p className="text-lg text-emerald-900 italic leading-relaxed pl-8">
-                    "I dreamed of creating something like this 12 years ago when I was a teacher. I wanted to create a classroom culture where students weren't just complying, but actively participating."
+                    "13 years ago, I wanted a classroom system that offered a yearlong progression and gamification approach that was fun, but wouldn't require students to sink hours into complex mechanics. I sketched pages, imagined how it might look, and today, I have a functioning product I'm excited to share. I'm committed to making this an incredible experience for everyone—I hope teachers, students, and parents find Space Adventure engaging, rewarding, and fun!"
                 </p>
                 <div className="mt-4 pl-8 text-sm font-bold text-emerald-700 uppercase tracking-widest">
-                     Founder's Note
+                     A Note from the Creator
                 </div>
             </div>
         </section>

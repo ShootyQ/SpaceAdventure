@@ -20,7 +20,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     if (loading) return;
 
     if (!userData) {
-      router.replace("/login");
+      router.replace("/login?role=student");
       return;
     }
 

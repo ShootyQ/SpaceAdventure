@@ -1736,12 +1736,24 @@ function SettingsContent() {
         }
     };
 
-    const { logout } = useAuth(); // Add logout logic
+    const { logout } = useAuth();
+    const isBilling = view === "billing" || restricted;
 
     return (
-        <div className="min-h-screen bg-space-950 p-6 font-mono pb-20 overflow-x-hidden">
-            {/* Background Grid Animation */}
-            <div className="fixed inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+        <div className={`min-h-screen ${isBilling ? "bg-[#f7f4ef] font-sans" : "bg-space-950 font-mono"} p-6 pb-20 overflow-x-hidden transition-colors duration-500`}>
+            {/* Background Grid Animation - Only for Space/Dark Modes */}
+            {!isBilling && (
+                <div className="fixed inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+            )}
+            
+            {/* Background Orbs - Only for Billing/Light Mode */}
+            {isBilling && (
+                <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute -top-32 -right-20 w-[520px] h-[520px] bg-emerald-200/40 blur-[140px] rounded-full" />
+                    <div className="absolute bottom-0 -left-20 w-[560px] h-[560px] bg-amber-200/40 blur-[160px] rounded-full" />
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto relative z-10">
 
                 {/* Header Navigation */}
@@ -1749,12 +1761,12 @@ function SettingsContent() {
                     <div className="flex items-center gap-4">
                         {/* Direct Link to Dashboard for Top-Level Modes */}
                         { restricted ? (
-                            <Link href="/" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                            <Link href="/" className="p-3 rounded-xl border border-black/10 hover:bg-black/5 text-slate-500 hover:text-slate-900 transition-all">
                                 <ArrowLeft size={20} />
                                 <span className="sr-only">Return to Home</span>
                             </Link>
                         ) : ["asteroids", "billing", "team", "cockpit"].includes(view) ? (
-                            <Link href="/teacher/space" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                            <Link href="/teacher/space" className={`p-3 rounded-xl border transition-all ${isBilling ? "border-black/10 hover:bg-black/5 text-slate-500 hover:text-slate-900" : "border-white/10 hover:bg-white/5 text-white/50 hover:text-white"}`}>
                                 <ArrowLeft size={20} />
                                 <span className="sr-only">Return to Dashboard</span>
                             </Link>
@@ -1767,12 +1779,12 @@ function SettingsContent() {
                         )}
                         
                         <div>
-                            <h1 className="text-3xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
-                                <Crosshair className="text-cyan-500 animate-spin-slow" />
+                            <h1 className={`text-3xl font-bold uppercase tracking-widest flex items-center gap-3 ${isBilling ? "font-heading text-slate-900 tracking-normal" : "text-white"}`}>
+                                {!isBilling && <Crosshair className="text-cyan-500 animate-spin-slow" />}
                                 {getTitle()}
                             </h1>
-                            <div className="text-xs text-cyan-500/50 uppercase tracking-[0.3em]">
-                                System Status: {restricted ? "Restricted / Billing Only" : "Normal"}
+                            <div className={`text-xs uppercase tracking-[0.3em] ${isBilling ? "text-slate-500 mt-1" : "text-cyan-500/50"}`}>
+                                {isBilling ? "Manage your plan" : `System Status: ${restricted ? "Restricted / Billing Only" : "Normal"}`}
                             </div>
                         </div>
                     </div>

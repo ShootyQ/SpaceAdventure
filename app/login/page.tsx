@@ -3,12 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, GraduationCap, School, ShieldCheck, Trophy, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const { userData, signInWithGoogle, signInStudent, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
+  const roleParam = searchParams.get("role");
 
   const [loginMode, setLoginMode] = useState<"selection" | "student">("selection");
   const [studentCreds, setStudentCreds] = useState({ username: "", classCode: "", password: "" });
@@ -16,16 +19,26 @@ export default function LoginPage() {
   const [studentLoading, setStudentLoading] = useState(false);
 
   useEffect(() => {
+    if (roleParam === "student") {
+      setLoginMode("student");
+    }
+  }, [roleParam]);
+
+  useEffect(() => {
     if (!loading && userData) {
       if (userData.status === "pending_approval") {
         router.push("/pending");
       } else if (userData.role === "teacher") {
-        router.push("/teacher");
+        if (redirect) {
+          router.push(redirect);
+        } else {
+          router.push("/teacher");
+        }
       } else if (userData.role === "student") {
         router.push("/student");
       }
     }
-  }, [userData, loading, router]);
+  }, [userData, loading, router, redirect]);
 
   const handleStudentLogin = async (e: FormEvent) => {
     e.preventDefault();

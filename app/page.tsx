@@ -207,7 +207,7 @@ export default function Home() {
               className="hidden lg:block"
             >
               <div className="flex flex-col gap-6">
-                <Link href="/teacher" className="group bg-white/90 backdrop-blur-sm border border-black/10 rounded-3xl p-8 hover:border-emerald-300 hover:shadow-[0_20px_40px_rgba(16,185,129,0.1)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+                <Link href="/login?role=teacher" className="group bg-white/90 backdrop-blur-sm border border-black/10 rounded-3xl p-8 hover:border-emerald-300 hover:shadow-[0_20px_40px_rgba(16,185,129,0.1)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/50 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-emerald-200/50" />
                   <div className="relative z-10 flex items-start gap-6">
                     <div className="w-14 h-14 rounded-2xl bg-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
@@ -223,7 +223,7 @@ export default function Home() {
                   </div>
                 </Link>
                 
-                <Link href="/student" className="group bg-white/90 backdrop-blur-sm border border-black/10 rounded-3xl p-8 hover:border-amber-300 hover:shadow-[0_20px_40px_rgba(245,158,11,0.1)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+                <Link href="/login?role=student" className="group bg-white/90 backdrop-blur-sm border border-black/10 rounded-3xl p-8 hover:border-amber-300 hover:shadow-[0_20px_40px_rgba(245,158,11,0.1)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100/50 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-amber-200/50" />
                   <div className="relative z-10 flex items-start gap-6">
                     <div className="w-14 h-14 rounded-2xl bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
@@ -257,15 +257,15 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-white/80 border border-black/10 rounded-3xl p-6">
+              <Link href="/roadmap" className="group bg-white/80 border border-black/10 rounded-3xl p-6 hover:shadow-lg hover:border-emerald-300 transition-all duration-300 cursor-pointer block">
                 <div className="flex items-center justify-between">
-                  <Link href="/roadmap" className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full hover:bg-emerald-200 transition-colors">Live Now</Link>
-                  <Gamepad2 className="text-emerald-600" />
+                  <span className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full group-hover:bg-emerald-200 transition-colors">Live Now</span>
+                  <Gamepad2 className="text-emerald-600 group-hover:scale-110 transition-transform" />
                 </div>
-                <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6">Space Adventure</h3>
+                <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6 group-hover:text-emerald-800 transition-colors">Space Adventure</h3>
                 <p className="text-slate-600 mt-2">Students customize ships, earn XP, rank up, and travel to planets with teacher-set rewards.</p>
                 <p className="text-slate-500 text-sm mt-3">Coming next: deeper RPG upgrades, new solar systems, and group challenges.</p>
-              </div>
+              </Link>
 
               <div className="bg-white/80 border border-black/10 rounded-3xl p-6">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500 bg-slate-100 px-3 py-1 rounded-full inline-block">Coming Soon</div>
