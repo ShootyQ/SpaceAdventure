@@ -1,7 +1,5 @@
-import { stripe, stripeInitialized, stripeInitErrorMessage } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { adminDb, adminInitialized, adminInitError } from '@/lib/firebase-admin';
 
 const ACTIVE_STRIPE_STATUSES = new Set(['active', 'trialing']);
 
@@ -10,21 +8,33 @@ const toAppSubscriptionStatus = (stripeStatus?: string) => {
 };
 
 export async function GET() {
+    try {
+        const stripeLib = await import('@/lib/stripe');
+        const adminLib = await import('@/lib/firebase-admin');
+
     return NextResponse.json({
         status: "Stripe Checkout API is online",
         hasStripeSecret: Boolean(process.env.STRIPE_SECRET_KEY),
-        stripeInitialized,
-        stripeInitError: stripeInitErrorMessage || null,
+            stripeInitialized: stripeLib.stripeInitialized,
+            stripeInitError: stripeLib.stripeInitErrorMessage || null,
         hasMonthlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY),
         hasYearlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY),
-        adminInitialized,
-        adminInitError: adminInitError || null,
+            adminInitialized: adminLib.adminInitialized,
+            adminInitError: adminLib.adminInitError || null,
     });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown checkout GET init error';
+        return NextResponse.json({ error: `Checkout diagnostics failed: ${message}` }, { status: 500 });
+    }
 }
 
 export async function POST(req: Request) {
     console.log("[STRIPE_CHECKOUT] POST request received");
     try {
+        const stripeLib = await import('@/lib/stripe');
+        const adminLib = await import('@/lib/firebase-admin');
+        const stripe = stripeLib.stripe;
+
         const stripeKey = process.env.STRIPE_SECRET_KEY || "";
         if (!stripeKey || !stripeKey.startsWith("sk_")) {
             console.error("[STRIPE_CHECKOUT] Missing STRIPE_SECRET_KEY in runtime environment");
@@ -33,9 +43,9 @@ export async function POST(req: Request) {
             }, { status: 500 });
         }
 
-        if (!stripeInitialized) {
+        if (!stripeLib.stripeInitialized) {
             return NextResponse.json({
-                error: `Stripe initialization failed: ${stripeInitErrorMessage || 'Unknown Stripe init error'}`
+                error: `Stripe initialization failed: ${stripeLib.stripeInitErrorMessage || 'Unknown Stripe init error'}`
             }, { status: 500 });
         }
 
@@ -66,9 +76,9 @@ export async function POST(req: Request) {
             );
 
             if (activeSubscription) {
-                if (adminInitialized) {
+                if (adminLib.adminInitialized) {
                     const firstItem = activeSubscription.items.data[0];
-                    await adminDb.collection('users').doc(userId).set({
+                    await adminLib.adminDb.collection('users').doc(userId).set({
                         subscriptionStatus: toAppSubscriptionStatus(activeSubscription.status),
                         subscriptionLifecycleStatus: activeSubscription.status,
                         stripeSubscriptionId: activeSubscription.id,
@@ -89,7 +99,7 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     alreadySubscribed: true,
                     message: 'You already have an active subscription.',
-                    synced: adminInitialized,
+                    synced: adminLib.adminInitialized,
                 });
             }
         }
