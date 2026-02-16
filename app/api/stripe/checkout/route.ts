@@ -47,10 +47,21 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { intent, priceId, cycle, userId, email, syncOnly, customerId } = body;
+        const { intent, priceId, cycle, userId, email, syncOnly, customerId, subscriptionId } = body;
 
         if (intent === 'portal') {
             let targetCustomerId = customerId;
+
+            if (!targetCustomerId && subscriptionId) {
+                try {
+                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                    targetCustomerId = typeof subscription.customer === 'string'
+                        ? subscription.customer
+                        : subscription.customer?.id;
+                } catch (subscriptionLookupError) {
+                    console.warn('[STRIPE_CHECKOUT] Portal subscription lookup failed', subscriptionLookupError);
+                }
+            }
 
             if (!targetCustomerId && email) {
                 const customers = await stripe.customers.list({
@@ -64,8 +75,8 @@ export async function POST(req: Request) {
 
             if (!targetCustomerId) {
                 return NextResponse.json({
-                    error: 'No Stripe customer found for billing portal.'
-                }, { status: 404 });
+                    error: 'No Stripe billing profile found yet. Open Subscriptions to start or sync billing first.'
+                }, { status: 400 });
             }
 
             const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.classcrave.com';

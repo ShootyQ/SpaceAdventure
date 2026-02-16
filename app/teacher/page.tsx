@@ -49,22 +49,34 @@ export default function TeacherAdventurePortal() {
                body: JSON.stringify({ 
                intent: 'portal',
                    customerId: userData.stripeCustomerId,
+                 subscriptionId: userData.stripeSubscriptionId,
                    email: userData.email 
                })
            });
            
-           if (!res.ok) throw new Error("Portal request failed");
+           if (!res.ok) {
+             let message = "Portal request failed";
+             try {
+               const payload = await res.json();
+               if (payload?.error) message = payload.error;
+             } catch {
+               // keep fallback message
+             }
+             throw new Error(message);
+           }
            
            const data = await res.json();
            if (data.url) {
              window.location.href = data.url;
            } else {
-             alert("Could not open billing portal.");
+             alert("Could not open billing portal. Taking you to billing settings.");
+             router.push('/teacher/settings?mode=billing');
              setOpeningPortal(false);
            }
        } catch (e) {
            console.error(e);
-           alert("Error opening billing portal.");
+           alert("Could not open Stripe portal yet. Redirecting to billing settings.");
+           router.push('/teacher/settings?mode=billing');
            setOpeningPortal(false);
        }
     } else {
