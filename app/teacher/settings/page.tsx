@@ -1252,7 +1252,12 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
 
                         <div className="flex-1">
-                            <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full inline-block">Full access</div>
+                            <div className="flex items-center justify-between">
+                                <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full inline-block">Full access</div>
+                                <div className="animate-pulse text-[10px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-pink-500 to-rose-500 px-2 py-1 rounded-lg transform rotate-2">
+                                    Code: LAUNCHSALE
+                                </div>
+                            </div>
 
                             {/* Toggle */}
                             <div className="mt-5 flex bg-slate-100/80 p-1 rounded-xl border border-black/10 w-fit">
@@ -1272,7 +1277,8 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                                 </button>
                             </div>
 
-                            <div className="mt-6 flex items-baseline gap-2">
+                            <div className="mt-6 flex flex-col gap-1">
+                                <div className="flex items-baseline gap-2">
                                 <span className="text-5xl font-bold text-slate-900">{formatCurrency(activePlanPricing.amountCents)}</span>
                                 <span className="text-slate-600 font-medium">/{cycle === "yearly" ? "year" : "month"}</span>
                                 {activePlanPricing.discountPercent > 0 && (
@@ -1280,6 +1286,10 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                                         {activePlanPricing.discountPercent}% Off
                                     </span>
                                 )}
+                                </div>
+                                <div className="text-xs font-bold text-rose-500 uppercase tracking-widest">
+                                    Use code <span className="underline decoration-2 underline-offset-2">LAUNCHSALE</span> for 50% off
+                                </div>
                             </div>
 
                             {activePlanPricing.compareAtCents && activePlanPricing.compareAtCents > activePlanPricing.amountCents && (

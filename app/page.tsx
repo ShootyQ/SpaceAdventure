@@ -4,10 +4,20 @@ import Link from "next/link";
 import Image from "next/image";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ArrowRight, CheckCircle2, GraduationCap, ShieldCheck, UserCircle2, Gamepad2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowRight, CheckCircle2, GraduationCap, ShieldCheck, UserCircle2, Gamepad2, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
+  const [showCoupon, setShowCoupon] = useState(false);
+  
+  useEffect(() => {
+    // Show coupon popup after a short delay
+    const timer = setTimeout(() => {
+      setShowCoupon(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [educatorCount, setEducatorCount] = useState(2);
   const [educatorInitialsList, setEducatorInitialsList] = useState<string[]>(["CD", "SK"]);
   const [activeStudents, setActiveStudents] = useState(24);
@@ -196,86 +206,44 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="hidden lg:block"
             >
-              <Link href="/login" className="block group cursor-pointer">
-                <div className="bg-white/80 border border-black/10 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] transition-transform group-hover:scale-[1.02]">
-                  <div className="flex items-center justify-between border-b border-black/5 pb-4">
+              <div className="flex flex-col gap-6">
+                <Link href="/teacher" className="group bg-white/90 backdrop-blur-sm border border-black/10 rounded-3xl p-8 hover:border-emerald-300 hover:shadow-[0_20px_40px_rgba(16,185,129,0.1)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/50 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-emerald-200/50" />
+                  <div className="relative z-10 flex items-start gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                      <GraduationCap className="w-7 h-7" />
+                    </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Demo</p>
-                      <h2 className="font-heading text-2xl font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">Classroom Snapshot</h2>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        {isLandingStatsLoading ? "Syncing..." : `Data updated ${statsFreshness}`}
-                      </p>
-                    </div>
-                    <div className="text-xs text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 group-hover:bg-emerald-200 transition-colors">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        Live Now
+                      <h3 className="font-heading text-xl font-bold text-slate-900">Teacher Portal</h3>
+                      <p className="text-sm text-slate-600 mt-2 leading-relaxed">Launch missions, manage roster, and track behavior.</p>
+                      <span className="text-xs text-emerald-700 font-bold uppercase tracking-wider mt-4 inline-flex items-center gap-2 group-hover:gap-3 transition-all">
+                        Enter Classroom <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
                     </div>
                   </div>
-                  <div className="mt-6 grid grid-cols-2 gap-4">
-                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                      <p className="text-xs text-slate-500 uppercase">Active Students</p>
-                      <p className="text-3xl font-semibold text-slate-900 mt-2">{activeStudents}</p>
-                      <p className="text-xs text-slate-500 mt-2">On-task rate: 91%</p>
+                </Link>
+                
+                <Link href="/student" className="group bg-white/90 backdrop-blur-sm border border-black/10 rounded-3xl p-8 hover:border-amber-300 hover:shadow-[0_20px_40px_rgba(245,158,11,0.1)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100/50 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-amber-200/50" />
+                  <div className="relative z-10 flex items-start gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                      <UserCircle2 className="w-7 h-7" />
                     </div>
-                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                      <p className="text-xs text-slate-500 uppercase">Weekly Missions</p>
-                      <p className="text-3xl font-semibold text-slate-900 mt-2">{weeklyMissions}</p>
-                      <p className="text-xs text-slate-500 mt-2">Completion: 84%</p>
-                    </div>
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 col-span-2">
-                    <p className="text-xs text-slate-500 uppercase">Teacher Actions</p>
-                    <div className="mt-3 space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-700">Awarded Focus Points</span>
-                        <span className="text-slate-900 font-semibold">+{Math.round(focusPointsAwarded).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-700">Behavior Trends Logged</span>
-                        <span className="text-slate-900 font-semibold">{Math.round(awardEvents).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-700">Families Notified</span>
-                        <span className="text-slate-900 font-semibold">{Math.round(studentsAwarded).toLocaleString()}</span>
-                      </div>
+                    <div>
+                      <h3 className="font-heading text-xl font-bold text-slate-900">Student Portal</h3>
+                      <p className="text-sm text-slate-600 mt-2 leading-relaxed">Check your rank, view ship, and launch missions.</p>
+                      <span className="text-xs text-amber-700 font-bold uppercase tracking-wider mt-4 inline-flex items-center gap-2 group-hover:gap-3 transition-all">
+                        Launch Mission <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               </div>
-            </Link>
             </motion.div>
           </div>
         </div>
 
-        <section className="py-20" id="roles">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12">
-              <h2 className="font-heading text-3xl md:text-4xl font-semibold text-slate-900">Pick the path that matches you</h2>
-              <p className="text-slate-600 mt-3">Clear entry points for teachers, students, and administrators.</p>
-            </div>
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <Link href="/teacher" className="group bg-white/80 border border-black/10 rounded-3xl p-8 hover:border-emerald-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-6">
-                  <GraduationCap className="w-8 h-8" />
-                </div>
-                <h3 className="font-heading text-2xl font-semibold text-slate-900">Teacher Portal</h3>
-                <p className="text-base text-slate-600 mt-3 leading-relaxed">Launch your classroom missions. Manage roster, set expectations, and track behavior.</p>
-                <span className="text-sm text-emerald-700 font-bold uppercase tracking-wider mt-6 inline-flex items-center gap-2 group-hover:gap-3 transition-all">Enter Classroom <ArrowRight className="w-4 h-4" /></span>
-              </Link>
-              
-              <Link href="/student" className="group bg-white/80 border border-black/10 rounded-3xl p-8 hover:border-amber-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mb-6">
-                  <UserCircle2 className="w-8 h-8" />
-                </div>
-                <h3 className="font-heading text-2xl font-semibold text-slate-900">Student Portal</h3>
-                <p className="text-base text-slate-600 mt-3 leading-relaxed">Join the adventure. Check your rank, view your ship, and contribute to the class fleet.</p>
-                <span className="text-sm text-amber-700 font-bold uppercase tracking-wider mt-6 inline-flex items-center gap-2 group-hover:gap-3 transition-all">Launch Mission <ArrowRight className="w-4 h-4" /></span>
-              </Link>
-            </div>
-          </div>
-        </section>
+
 
         <section className="py-20 border-t border-black/5" id="games">
           <div className="max-w-7xl mx-auto px-6">
@@ -291,7 +259,7 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-white/80 border border-black/10 rounded-3xl p-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">Live Now</div>
+                  <Link href="/roadmap" className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full hover:bg-emerald-200 transition-colors">Live Now</Link>
                   <Gamepad2 className="text-emerald-600" />
                 </div>
                 <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-6">Space Adventure</h3>
@@ -354,12 +322,51 @@ export default function Home() {
             <p>&copy; {new Date().getFullYear()} ClassCrave. Built for teachers, by teachers.</p>
           </div>
           <div className="flex gap-6">
-            <Link href="#" className="hover:text-slate-900 transition-colors">Privacy Policy</Link>
-            <Link href="#" className="hover:text-slate-900 transition-colors">Terms of Service</Link>
-            <Link href="#" className="hover:text-slate-900 transition-colors">Support</Link>
+            <Link href="/privacy" className="hover:text-slate-900 transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-slate-900 transition-colors">Terms of Service</Link>
+            <Link href="/support" className="hover:text-slate-900 transition-colors">Support</Link>
           </div>
         </div>
       </footer>
+      
+      <AnimatePresence>
+        {showCoupon && (
+          <motion.div 
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-50 max-w-sm w-full p-4"
+          >
+            <div className="bg-white rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-rose-100 p-6 relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-rose-100/50 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none" />
+               
+               <button 
+                  onClick={() => setShowCoupon(false)}
+                  className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-white/50 hover:bg-white rounded-full p-1 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+               </button>
+
+               <div className="relative z-10">
+                 <div className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    Launch Special
+                 </div>
+                 <h3 className="font-heading text-xl font-bold text-slate-900 mb-1">Get 50% Off</h3>
+                 <p className="text-sm text-slate-600 mb-4">
+                    Join the adventure during our launch week. Use code <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1 rounded">LAUNCHSALE</span> at checkout.
+                 </p>
+                 <Link 
+                   href="/teacher" 
+                   className="block w-full text-center py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-emerald-600 transition-colors shadow-lg shadow-slate-900/10"
+                 >
+                    Claim Offer
+                 </Link>
+               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
