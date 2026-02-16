@@ -1,4 +1,4 @@
-import { stripe } from "@/lib/stripe";
+import { stripe, stripeInitialized, stripeInitErrorMessage } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { adminDb, adminInitialized, adminInitError } from "@/lib/firebase-admin";
@@ -16,6 +16,8 @@ export async function GET() {
     route: "stripe-webhook",
     expects: "POST from Stripe",
     adminInitialized,
+    stripeInitialized,
+    stripeInitError: stripeInitErrorMessage || null,
     hasWebhookSecret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
     adminInitError: adminInitError || null,
   });

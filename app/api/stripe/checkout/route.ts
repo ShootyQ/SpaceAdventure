@@ -1,4 +1,4 @@
-import { stripe } from '@/lib/stripe';
+import { stripe, stripeInitialized, stripeInitErrorMessage } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { adminDb, adminInitialized, adminInitError } from '@/lib/firebase-admin';
@@ -13,6 +13,8 @@ export async function GET() {
     return NextResponse.json({
         status: "Stripe Checkout API is online",
         hasStripeSecret: Boolean(process.env.STRIPE_SECRET_KEY),
+        stripeInitialized,
+        stripeInitError: stripeInitErrorMessage || null,
         hasMonthlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY),
         hasYearlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY),
         adminInitialized,
@@ -28,6 +30,12 @@ export async function POST(req: Request) {
             console.error("[STRIPE_CHECKOUT] Missing STRIPE_SECRET_KEY in runtime environment");
             return NextResponse.json({
                 error: "Stripe is not configured on the server (missing STRIPE_SECRET_KEY)."
+            }, { status: 500 });
+        }
+
+        if (!stripeInitialized) {
+            return NextResponse.json({
+                error: `Stripe initialization failed: ${stripeInitErrorMessage || 'Unknown Stripe init error'}`
             }, { status: 500 });
         }
 
