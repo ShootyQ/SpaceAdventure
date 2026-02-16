@@ -974,8 +974,22 @@ function FlagDesigner() {
 
 function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
     const { userData } = useAuth();
+
+    type PlanPricing = {
+        amountCents: number;
+        compareAtCents: number | null;
+        discountPercent: number;
+        savingsCents: number;
+    };
+
+    const fallbackPricing: Record<"monthly" | "yearly", PlanPricing> = {
+        monthly: { amountCents: 1000, compareAtCents: null, discountPercent: 0, savingsCents: 0 },
+        yearly: { amountCents: 8000, compareAtCents: null, discountPercent: 0, savingsCents: 0 },
+    };
+
     const [loading, setLoading] = useState(false);
     const [syncingSubscription, setSyncingSubscription] = useState(false);
+    const [pricing, setPricing] = useState<Record<"monthly" | "yearly", PlanPricing>>(fallbackPricing);
     const [cycle, setCycle] = useState<"monthly" | "yearly">("yearly");
 
     const formatBillingDate = (value: any) => {
@@ -995,6 +1009,55 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
         monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
         yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
     };
+
+    const formatCurrency = (amountCents: number) => {
+        return new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 0,
+        }).format(amountCents / 100);
+    };
+
+    const activePlanPricing = pricing[cycle] || fallbackPricing[cycle];
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadLivePricing = async () => {
+            try {
+                const response = await fetch("/api/stripe/pricing", { method: "GET" });
+                if (!response.ok) return;
+
+                const payload = await response.json();
+                if (cancelled) return;
+
+                const nextPricing: Record<"monthly" | "yearly", PlanPricing> = {
+                    monthly: {
+                        amountCents: Number(payload?.monthly?.amountCents) || fallbackPricing.monthly.amountCents,
+                        compareAtCents: typeof payload?.monthly?.compareAtCents === "number" ? payload.monthly.compareAtCents : null,
+                        discountPercent: Number(payload?.monthly?.discountPercent) || 0,
+                        savingsCents: Number(payload?.monthly?.savingsCents) || 0,
+                    },
+                    yearly: {
+                        amountCents: Number(payload?.yearly?.amountCents) || fallbackPricing.yearly.amountCents,
+                        compareAtCents: typeof payload?.yearly?.compareAtCents === "number" ? payload.yearly.compareAtCents : null,
+                        discountPercent: Number(payload?.yearly?.discountPercent) || 0,
+                        savingsCents: Number(payload?.yearly?.savingsCents) || 0,
+                    },
+                };
+
+                setPricing(nextPricing);
+            } catch {
+                // Keep fallback pricing if live lookup fails.
+            }
+        };
+
+        loadLivePricing();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         if (!userData?.uid || !userData?.email) return;
@@ -1210,14 +1273,21 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                             </div>
 
                             <div className="mt-6 flex items-baseline gap-2">
-                                <span className="text-5xl font-bold text-slate-900">{cycle === "yearly" ? "$80" : "$10"}</span>
+                                <span className="text-5xl font-bold text-slate-900">{formatCurrency(activePlanPricing.amountCents)}</span>
                                 <span className="text-slate-600 font-medium">/{cycle === "yearly" ? "year" : "month"}</span>
-                                {cycle === "yearly" && (
+                                {activePlanPricing.discountPercent > 0 && (
                                     <span className="ml-2 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        Save $40
+                                        {activePlanPricing.discountPercent}% Off
                                     </span>
                                 )}
                             </div>
+
+                            {activePlanPricing.compareAtCents && activePlanPricing.compareAtCents > activePlanPricing.amountCents && (
+                                <div className="mt-2 text-sm text-slate-500">
+                                    <span className="line-through">{formatCurrency(activePlanPricing.compareAtCents)}</span>
+                                    <span className="ml-2 font-semibold text-emerald-700">Save {formatCurrency(activePlanPricing.savingsCents)}</span>
+                                </div>
+                            )}
 
                             <ul className="space-y-3 text-sm text-slate-700 mt-6">
                                 <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Up to 30 students</li>
