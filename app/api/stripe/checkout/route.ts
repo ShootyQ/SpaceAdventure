@@ -10,7 +10,6 @@ const toAppSubscriptionStatus = (stripeStatus?: string) => {
 export async function GET() {
     try {
         const stripeLib = await import('@/lib/stripe');
-        const adminLib = await import('@/lib/firebase-admin');
 
     return NextResponse.json({
         status: "Stripe Checkout API is online",
@@ -19,8 +18,7 @@ export async function GET() {
             stripeInitError: stripeLib.stripeInitErrorMessage || null,
         hasMonthlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY),
         hasYearlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY),
-            adminInitialized: adminLib.adminInitialized,
-            adminInitError: adminLib.adminInitError || null,
+            adminSyncInCheckout: false,
     });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown checkout GET init error';
@@ -32,7 +30,6 @@ export async function POST(req: Request) {
     console.log("[STRIPE_CHECKOUT] POST request received");
     try {
         const stripeLib = await import('@/lib/stripe');
-        const adminLib = await import('@/lib/firebase-admin');
         const stripe = stripeLib.stripe;
 
         const stripeKey = process.env.STRIPE_SECRET_KEY || "";
@@ -76,42 +73,13 @@ export async function POST(req: Request) {
             );
 
             if (activeSubscription) {
-                let synced = false;
-                let syncError: string | null = null;
                 const firstItem = activeSubscription.items.data[0];
-
-                if (adminLib.adminInitialized) {
-                    try {
-                        await adminLib.adminDb.collection('users').doc(userId).set({
-                            subscriptionStatus: toAppSubscriptionStatus(activeSubscription.status),
-                            subscriptionLifecycleStatus: activeSubscription.status,
-                            stripeSubscriptionId: activeSubscription.id,
-                            stripeCustomerId: typeof activeSubscription.customer === 'string' ? activeSubscription.customer : activeSubscription.customer?.id,
-                            stripePriceId: firstItem?.price?.id,
-                            stripeSubscriptionInterval: firstItem?.price?.recurring?.interval,
-                            stripeCancelAtPeriodEnd: (activeSubscription as any).cancel_at_period_end || false,
-                            stripeCurrentPeriodStart: (activeSubscription as any).current_period_start
-                                ? new Date((activeSubscription as any).current_period_start * 1000)
-                                : null,
-                            stripeCurrentPeriodEnd: (activeSubscription as any).current_period_end
-                                ? new Date((activeSubscription as any).current_period_end * 1000)
-                                : null,
-                            stripeLastPaymentAt: new Date(),
-                        }, { merge: true });
-                        synced = true;
-                    } catch (syncErr) {
-                        syncError = syncErr instanceof Error ? syncErr.message : 'Unknown admin sync error';
-                        console.error('[STRIPE_CHECKOUT] Admin sync failed for already subscribed user:', syncError);
-                    }
-                } else {
-                    syncError = adminLib.adminInitError || 'Firebase Admin not initialized';
-                }
 
                 return NextResponse.json({
                     alreadySubscribed: true,
                     message: 'You already have an active subscription.',
-                    synced,
-                    syncError,
+                    synced: false,
+                    syncError: 'Checkout route does not perform server-side Firebase sync.',
                     subscription: {
                         status: activeSubscription.status,
                         id: activeSubscription.id,
