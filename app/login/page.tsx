@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, GraduationCap, School, ShieldCheck, Trophy, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-export default function LoginPage() {
+function LoginContent() {
   const { userData, signInWithGoogle, signInStudent, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -225,5 +225,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f7f4ef] flex items-center justify-center">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
