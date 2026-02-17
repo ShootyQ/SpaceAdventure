@@ -1,15 +1,13 @@
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
+import { ProfessionalFooter, ProfessionalHeader } from "@/components/ProfessionalChrome";
 
 export default function Support() {
   return (
-    <div className="min-h-screen bg-[#f7f4ef] py-12 px-6">
-      <div className="max-w-xl mx-auto">
-        <Link href="/" className="inline-flex items-center text-slate-600 hover:text-slate-900 mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
-        </Link>
+    <div className="landing-theme flex min-h-screen flex-col bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60">
+      <ProfessionalHeader />
+      <div className="max-w-xl mx-auto w-full py-10 sm:py-12 px-4 sm:px-6 flex-1">
         
         <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-black/5 text-center">
           <h1 className="font-heading text-3xl md:text-4xl font-bold text-slate-900 mb-6">Need Help?</h1>
@@ -35,6 +33,7 @@ export default function Support() {
 
         </div>
       </div>
+      <ProfessionalFooter />
     </div>
   );
 }

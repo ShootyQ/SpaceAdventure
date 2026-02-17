@@ -1,5 +1,6 @@
 ﻿import Link from 'next/link';
-import { ArrowLeft, CheckCircle, GraduationCap, School } from 'lucide-react';
+import { CheckCircle, School } from 'lucide-react';
+import { ProfessionalFooter, ProfessionalHeader } from '@/components/ProfessionalChrome';
 
 export default function EducatorsPage() {
     
@@ -40,18 +41,9 @@ export default function EducatorsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
-      
-       {/* Navigation */}
-       <nav className="w-full border-b border-black/10 bg-white/70 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 font-bold text-lg text-slate-600 hover:text-slate-900 transition-colors">
-                <ArrowLeft className="w-5 h-5" /> Back to Home
-            </Link>
-           <span className="font-heading font-bold text-xl tracking-tight text-emerald-800">For Educators</span>
-        </div>
-      </nav>
+      <ProfessionalHeader />
 
-      <main className="flex-1 max-w-5xl mx-auto px-6 py-16">
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         
         <div className="text-center mb-16">
             <h1 className="font-heading text-4xl md:text-6xl font-extrabold text-slate-900 mb-6">Built by Teachers, <br/><span className="text-emerald-600">For Teachers</span></h1>
@@ -107,9 +99,7 @@ export default function EducatorsPage() {
         </div>
 
       </main>
-       <footer className="border-t border-black/5 py-12 bg-white/50 text-center text-slate-500 text-sm">
-         &copy; {new Date().getFullYear()} ClassCrave.
-      </footer>
+      <ProfessionalFooter />
     </div>
   );
 }

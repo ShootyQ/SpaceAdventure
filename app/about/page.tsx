@@ -1,41 +1,33 @@
 ﻿import Link from 'next/link';
-import { ArrowLeft, BookOpen, User, Quote, Users, Layers, Zap, Star, Rocket, Shield, Printer, Hammer, Map, CheckCircle2 } from 'lucide-react';
+import { User, Quote, Users, Zap, Star, Rocket, Shield, Printer, Hammer, CheckCircle2 } from 'lucide-react';
+import { ProfessionalFooter, ProfessionalHeader } from '@/components/ProfessionalChrome';
 
 export default function AboutPage() {
   return (
     <div className="landing-theme flex min-h-screen flex-col font-sans bg-[#f7f4ef] text-slate-900 selection:bg-emerald-200/60">
-      
-      {/* Navigation */}
-      <nav className="w-full border-b border-black/10 bg-white/70 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 font-bold text-lg text-slate-600 hover:text-slate-900 transition-colors">
-                <ArrowLeft className="w-5 h-5" /> Back to Home
-            </Link>
-           <span className="font-heading font-bold text-xl tracking-tight text-emerald-800">About ClassCrave</span>
-        </div>
-      </nav>
+            <ProfessionalHeader />
 
-      <main className="flex-1 max-w-4xl mx-auto px-6 py-16">
+    <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         
         {/* About Section */}
         <section className="mb-20">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold uppercase tracking-widest mb-6">
                 <Users className="w-3 h-3" /> Our Mission
             </div>
-            <h1 className="font-heading text-4xl md:text-5xl font-extrabold text-slate-900 mb-8 leading-tight">Fueling the Desire to Learn</h1>
-            <p className="text-xl text-slate-600 leading-relaxed mb-6">
+            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 mb-6 sm:mb-8 leading-tight">Fueling the Desire to Learn</h1>
+            <p className="text-lg sm:text-xl text-slate-600 leading-relaxed mb-6">
                 ClassCrave was born from a simple observation: students learn best when they are emotionally invested in the outcome.
             </p>
-            <p className="text-xl text-slate-600 leading-relaxed">
+            <p className="text-lg sm:text-xl text-slate-600 leading-relaxed">
                 We build immersive, gamified systems that wrap standard curriculum in engaging narratives. By transforming the classroom into a dynamic environment, we turn "assignments" into "milestones" and "grades" into "visible progress".
             </p>
 
-            <div className="mt-12 p-8 bg-emerald-50 border border-emerald-100 rounded-3xl relative">
-                <Quote className="absolute top-8 left-6 w-8 h-8 text-emerald-300" />
-                <p className="text-lg text-emerald-900 italic leading-relaxed pl-8">
+            <div className="mt-10 sm:mt-12 p-5 sm:p-8 bg-emerald-50 border border-emerald-100 rounded-3xl relative">
+                <Quote className="absolute top-6 sm:top-8 left-4 sm:left-6 w-7 h-7 sm:w-8 sm:h-8 text-emerald-300" />
+                <p className="text-base sm:text-lg text-emerald-900 italic leading-relaxed pl-6 sm:pl-8">
                     "13 years ago, I wanted a classroom system that offered a yearlong progression and gamification approach that was fun, but wouldn't require students to sink hours into complex mechanics. I sketched pages, imagined how it might look, and today, I have a functioning product I'm excited to share. I'm committed to making this an incredible experience for everyone—I hope teachers, students, and parents find Space Adventure engaging, rewarding, and fun!"
                 </p>
-                <div className="mt-4 pl-8 text-sm font-bold text-emerald-700 uppercase tracking-widest">
+                <div className="mt-4 pl-6 sm:pl-8 text-xs sm:text-sm font-bold text-emerald-700 uppercase tracking-widest">
                      A Note from the Creator
                 </div>
             </div>
@@ -146,9 +138,7 @@ export default function AboutPage() {
 
       </main>
 
-      <footer className="border-t border-black/5 py-12 bg-white/50 text-center text-slate-500 text-sm">
-         &copy; {new Date().getFullYear()} ClassCrave.
-      </footer>
+            <ProfessionalFooter />
     </div>
   );
 }
