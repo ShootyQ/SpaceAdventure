@@ -1064,7 +1064,16 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
         if (userData.subscriptionStatus === "active") return;
 
         const attemptKey = `billing-sync-attempted-${userData.uid}`;
-        if (typeof window !== "undefined" && window.sessionStorage.getItem(attemptKey) === "1") return;
+        const checkoutReturnedSuccess =
+            typeof window !== "undefined" && new URLSearchParams(window.location.search).has("success");
+
+        if (
+            typeof window !== "undefined" &&
+            window.sessionStorage.getItem(attemptKey) === "1" &&
+            !checkoutReturnedSuccess
+        ) {
+            return;
+        }
 
         let cancelled = false;
 
@@ -1075,39 +1084,48 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
             }
 
             try {
-                const response = await fetch("/api/stripe/checkout", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        userId: userData.uid,
-                        email: userData.email,
-                        syncOnly: true,
-                    }),
-                });
+                const maxAttempts = checkoutReturnedSuccess ? 4 : 1;
 
-                const responseText = await response.text();
-                const payload = responseText ? JSON.parse(responseText) : {};
+                for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                    const response = await fetch("/api/stripe/checkout", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            userId: userData.uid,
+                            email: userData.email,
+                            syncOnly: true,
+                        }),
+                    });
 
-                if (!response.ok || cancelled) return;
+                    const responseText = await response.text();
+                    const payload = responseText ? JSON.parse(responseText) : {};
 
-                if (payload?.alreadySubscribed && payload?.subscription) {
-                    if (!payload?.synced) {
-                        await updateDoc(doc(db, "users", userData.uid), {
-                            subscriptionStatus: (payload.subscription.status === "active" || payload.subscription.status === "trialing") ? "active" : "trial",
-                            subscriptionLifecycleStatus: payload.subscription.status,
-                            stripeSubscriptionId: payload.subscription.id,
-                            stripeCustomerId: payload.subscription.customerId || null,
-                            stripePriceId: payload.subscription.priceId || null,
-                            stripeSubscriptionInterval: payload.subscription.interval || null,
-                            stripeCancelAtPeriodEnd: Boolean(payload.subscription.cancelAtPeriodEnd),
-                            stripeCurrentPeriodStart: payload.subscription.currentPeriodStart ? new Date(payload.subscription.currentPeriodStart) : null,
-                            stripeCurrentPeriodEnd: payload.subscription.currentPeriodEnd ? new Date(payload.subscription.currentPeriodEnd) : null,
-                            stripeLastPaymentAt: new Date(),
-                        });
+                    if (!response.ok || cancelled) return;
+
+                    if (payload?.alreadySubscribed && payload?.subscription) {
+                        if (!payload?.synced) {
+                            await updateDoc(doc(db, "users", userData.uid), {
+                                subscriptionStatus: (payload.subscription.status === "active" || payload.subscription.status === "trialing") ? "active" : "trial",
+                                subscriptionLifecycleStatus: payload.subscription.status,
+                                stripeSubscriptionId: payload.subscription.id,
+                                stripeCustomerId: payload.subscription.customerId || null,
+                                stripePriceId: payload.subscription.priceId || null,
+                                stripeSubscriptionInterval: payload.subscription.interval || null,
+                                stripeCancelAtPeriodEnd: Boolean(payload.subscription.cancelAtPeriodEnd),
+                                stripeCurrentPeriodStart: payload.subscription.currentPeriodStart ? new Date(payload.subscription.currentPeriodStart) : null,
+                                stripeCurrentPeriodEnd: payload.subscription.currentPeriodEnd ? new Date(payload.subscription.currentPeriodEnd) : null,
+                                stripeLastPaymentAt: new Date(),
+                            });
+                        }
+
+                        if (!cancelled) {
+                            window.location.reload();
+                        }
+                        return;
                     }
 
-                    if (!cancelled) {
-                        window.location.reload();
+                    if (checkoutReturnedSuccess && attempt < maxAttempts - 1) {
+                        await new Promise((resolve) => setTimeout(resolve, 1500));
                     }
                 }
             } catch (error) {
