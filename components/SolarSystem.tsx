@@ -343,18 +343,17 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [pan]);
 
   // Award Queue Processor
-  const prevQueueLength = useRef(0);
   const awardTimer = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-      // If new awards come in, reset timer
-      if (awardQueue.length > prevQueueLength.current) {
-          if (awardTimer.current) clearTimeout(awardTimer.current);
+      if (awardTimer.current) clearTimeout(awardTimer.current);
+
+      if (awardQueue.length > 0) {
           awardTimer.current = setTimeout(() => {
               setAwardQueue([]);
-          }, awardQueue.length >= 10 ? 30000 : 20000);
+          }, 7000);
       }
-      prevQueueLength.current = awardQueue.length;
+
       return () => {
           if (awardTimer.current) clearTimeout(awardTimer.current);
       }
@@ -372,6 +371,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   useEffect(() => {
       if (awardQueue.length === 0) return;
+
+      const activeAwardIds = new Set(awardQueue.map((award) => award.id));
+      const scheduledAwardIds = Array.from(scheduledUnlockRevealAwardIdsRef.current);
+
+      scheduledAwardIds.forEach((awardId) => {
+          if (!activeAwardIds.has(awardId)) {
+              scheduledUnlockRevealAwardIdsRef.current.delete(awardId);
+              const timerId = unlockRevealTimerMapRef.current.get(awardId);
+              if (timerId) {
+                  clearTimeout(timerId);
+                  unlockRevealTimerMapRef.current.delete(awardId);
+              }
+          }
+      });
 
       awardQueue.forEach((award) => {
           const hasUnlocks = Boolean(
@@ -574,7 +587,14 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         audioElement.play().catch(() => {});
                     }
 
-                    setAwardQueue(prev => [...prev, event]);
+                    setAwardQueue((prev) => {
+                        const existingIndex = prev.findIndex((queuedAward) => queuedAward.ship.id === event.ship.id);
+                        if (existingIndex === -1) return [...prev, event];
+
+                        const next = [...prev];
+                        next[existingIndex] = event;
+                        return next;
+                    });
                 }
              }
 
@@ -749,6 +769,124 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       return {
           x: r * Math.sin(angleRad),
           y: -r * Math.cos(angleRad)
+      };
+  };
+
+  const normalizeVector = (point: { x: number; y: number }, fallback = { x: 0, y: -1 }) => {
+      const len = Math.hypot(point.x, point.y);
+      if (len < 0.0001) return fallback;
+      return { x: point.x / len, y: point.y / len };
+  };
+
+  const getOrbitEdgePadding = (planetPixelSize: number) => {
+      if (planetPixelSize >= 90) return 36;
+      if (planetPixelSize >= 70) return 30;
+      if (planetPixelSize >= 50) return 26;
+      return 22;
+  };
+
+  const getPlanetOrbitEdgePosition = (planetId: string, timestamp: number, padding?: number) => {
+      const center = getPlanetPosition(planetId, timestamp);
+      const planet = PLANETS.find((p) => p.id === planetId);
+      if (!planet) return center;
+
+      const outward = normalizeVector(center);
+      const resolvedPadding = padding ?? getOrbitEdgePadding(planet.pixelSize);
+      const offset = (planet.pixelSize / 2) + resolvedPadding;
+      return {
+          x: center.x + (outward.x * offset),
+          y: center.y + (outward.y * offset),
+      };
+  };
+
+  const distancePointToSegment = (
+      point: { x: number; y: number },
+      start: { x: number; y: number },
+      end: { x: number; y: number }
+  ) => {
+      const segment = { x: end.x - start.x, y: end.y - start.y };
+      const lengthSq = (segment.x * segment.x) + (segment.y * segment.y);
+      if (lengthSq <= 0.0001) return Math.hypot(point.x - start.x, point.y - start.y);
+
+      const t = Math.max(0, Math.min(1, (((point.x - start.x) * segment.x) + ((point.y - start.y) * segment.y)) / lengthSq));
+      const projection = {
+          x: start.x + (segment.x * t),
+          y: start.y + (segment.y * t),
+      };
+      return Math.hypot(point.x - projection.x, point.y - projection.y);
+  };
+
+  const getTravelCurve = (ship: Ship) => {
+      const start = getPlanetOrbitEdgePosition(ship.locationId, ship.travelStart || now);
+      const end = getPlanetOrbitEdgePosition(ship.destinationId || ship.locationId, ship.travelEnd || now);
+
+      const midpoint = {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+      };
+
+      const sun = PLANETS.find((planet) => planet.id === 'sun');
+      const sunAvoidRadius = ((sun?.pixelSize || 128) / 2) + 120;
+      const straightClearance = distancePointToSegment({ x: 0, y: 0 }, start, end);
+
+      let control = midpoint;
+
+      if (straightClearance < sunAvoidRadius) {
+          const segment = { x: end.x - start.x, y: end.y - start.y };
+          const segmentLen = Math.hypot(segment.x, segment.y) || 1;
+          const perpendicular = { x: -segment.y / segmentLen, y: segment.x / segmentLen };
+          const lift = (sunAvoidRadius - straightClearance) + 180;
+
+          const candidateA = {
+              x: midpoint.x + (perpendicular.x * lift),
+              y: midpoint.y + (perpendicular.y * lift),
+          };
+          const candidateB = {
+              x: midpoint.x - (perpendicular.x * lift),
+              y: midpoint.y - (perpendicular.y * lift),
+          };
+
+          const distA = Math.hypot(candidateA.x, candidateA.y);
+          const distB = Math.hypot(candidateB.x, candidateB.y);
+          control = distA >= distB ? candidateA : candidateB;
+      }
+
+      const minControlDist = sunAvoidRadius + 80;
+      const controlDist = Math.hypot(control.x, control.y);
+      if (controlDist < minControlDist) {
+          const push = normalizeVector(control, normalizeVector(midpoint));
+          const needed = minControlDist - controlDist;
+          control = {
+              x: control.x + (push.x * needed),
+              y: control.y + (push.y * needed),
+          };
+      }
+
+      return { start, control, end };
+  };
+
+  const getQuadraticBezierPoint = (
+      start: { x: number; y: number },
+      control: { x: number; y: number },
+      end: { x: number; y: number },
+      t: number
+  ) => {
+      const oneMinusT = 1 - t;
+      return {
+          x: (oneMinusT * oneMinusT * start.x) + (2 * oneMinusT * t * control.x) + (t * t * end.x),
+          y: (oneMinusT * oneMinusT * start.y) + (2 * oneMinusT * t * control.y) + (t * t * end.y),
+      };
+  };
+
+  const getQuadraticBezierTangent = (
+      start: { x: number; y: number },
+      control: { x: number; y: number },
+      end: { x: number; y: number },
+      t: number
+  ) => {
+      return {
+          x: 2 * (1 - t) * (control.x - start.x) + 2 * t * (end.x - control.x),
+          y: 2 * (1 - t) * (control.y - start.y) + 2 * t * (end.y - control.y),
       };
   };
 
@@ -1188,31 +1326,29 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
           {/* Traveling Ships Layer - Render BEHIND planets but atop orbits */}
           {ships.map(ship => {
               if (ship.status !== 'traveling' || !ship.destinationId || !ship.travelStart || !ship.travelEnd) return null;
-              
-              const startPos = getPlanetPosition(ship.locationId, now);
-              const endPos = getPlanetPosition(ship.destinationId, now);
-              
+
+                            const travelCurve = getTravelCurve(ship);
               const totalDuration = ship.travelEnd - ship.travelStart;
+                            if (totalDuration <= 0) return null;
+
               const elapsed = now - ship.travelStart;
               const progress = Math.min(Math.max(elapsed / totalDuration, 0), 1);
               
               if (progress >= 1 || progress <= 0) return null; // Or render at destination?
 
-              // Simple Lerp
-              const currentX = startPos.x + (endPos.x - startPos.x) * progress;
-              const currentY = startPos.y + (endPos.y - startPos.y) * progress;
-              
-              // Angle for the rocket to point towards destination
-              const dx = endPos.x - startPos.x;
-              const dy = endPos.y - startPos.y;
-              const rotationData = (Math.atan2(dy, dx) * 180 / Math.PI) + 45; // +45 because icon is tilted
+                            const currentPoint = getQuadraticBezierPoint(travelCurve.start, travelCurve.control, travelCurve.end, progress);
+                            const tangent = getQuadraticBezierTangent(travelCurve.start, travelCurve.control, travelCurve.end, progress);
+                            const toEndX = travelCurve.end.x - currentPoint.x;
+                            const toEndY = travelCurve.end.y - currentPoint.y;
+
+                            const rotationData = (Math.atan2(tangent.y, tangent.x) * 180 / Math.PI) + 45;
 
               return (
                   <div 
                     key={`travel-${ship.id}`}
                     className="absolute z-10 flex flex-col items-center justify-center transition-opacity"
                     style={{
-                        transform: `translate(${currentX}px, ${currentY}px)`
+                                                transform: `translate(${currentPoint.x}px, ${currentPoint.y}px)`
                     }}
                   >
                        {/* Trajectory Line (Optional - from start to end? No, from current to end looks better?) */}
@@ -1220,8 +1356,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                        <div 
                          className="absolute top-1/2 left-1/2 h-0.5 bg-dashed from-transparent to-cyan-500/50 origin-left opacity-30 pointer-events-none"
                          style={{
-                             width: Math.sqrt(dx*dx + dy*dy) * (1-progress),
-                             transform: `rotate(${Math.atan2(dy, dx)}rad)`
+                                                         width: Math.hypot(toEndX, toEndY),
+                                                         transform: `rotate(${Math.atan2(toEndY, toEndX)}rad)`
                          }}
                        />
 
