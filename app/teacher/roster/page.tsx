@@ -260,7 +260,7 @@ export default function RosterPage() {
       setEditForm(prev => ({
           ...prev,
           selectedPetId: petId,
-          unlockedPetIds: [...unlockedPetIds]
+          unlockedPetIds: Array.from(unlockedPetIds)
       }));
   };
 
