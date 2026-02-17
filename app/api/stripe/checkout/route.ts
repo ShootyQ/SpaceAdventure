@@ -181,8 +181,9 @@ export async function POST(req: Request) {
             customer_email: email,
             line_items: line_items,
             mode: 'subscription',
-            success_url: `${origin}/teacher/settings?success=true`,
-            cancel_url: `${origin}/teacher/settings?canceled=true`,
+            allow_promotion_codes: true,
+            success_url: `${origin}/teacher/settings?mode=billing&success=true`,
+            cancel_url: `${origin}/teacher/settings?mode=billing&canceled=true`,
             metadata: {
                 userId: userId,
             },

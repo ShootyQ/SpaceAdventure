@@ -368,7 +368,7 @@ export default function TeacherConsole() {
                         title="Subscriptions" 
                         icon={<CreditCard size={28} />} 
                         desc="Manage / Cancel"
-                        href="/teacher#billing"
+                        href="/teacher/settings?mode=billing"
                         color="text-emerald-400"
                         borderColor="border-emerald-500/30"
                     />

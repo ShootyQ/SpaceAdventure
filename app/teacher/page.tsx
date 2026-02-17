@@ -80,7 +80,7 @@ export default function TeacherAdventurePortal() {
            setOpeningPortal(false);
        }
     } else {
-        router.push('/teacher/settings');
+      router.push('/teacher/settings?mode=billing');
     }
   };
 
