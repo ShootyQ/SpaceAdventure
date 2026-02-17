@@ -38,6 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <AdminTab href="/admin" label="Admin" active={pathname === "/admin"} />
                     <AdminTab href="/admin/payments" label="Payments" active={pathname === "/admin/payments"} />
                     <AdminTab href="/admin/collectibles" label="Collectibles" active={pathname === "/admin/collectibles"} />
+                    <AdminTab href="/admin/analytics" label="Analytics" active={pathname === "/admin/analytics"} />
                 </div>
             </div>
             {children}
