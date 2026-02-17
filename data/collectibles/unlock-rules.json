@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "starter_pets",
+      "type": "grant-on-account-created",
+      "targets": [
+        "batpet",
+        "mothpet",
+        "otterpet",
+        "snakepet"
+      ],
+      "active": true
+    },
+    {
+      "id": "neptune_xp_rare_galaxy_cat",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "neptune"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 1000
+      },
+      "targets": ["galaxycatpet"],
+      "active": true,
+      "notes": "XP amount does not matter; evaluates on each XP award event."
+    },
+    {
+      "id": "testing_any_planet_puddlepup",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "any"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 20
+      },
+      "targets": ["puddlepup"],
+      "active": true,
+      "notes": "Testing rule: any XP event can unlock Puddle Pup regardless of XP amount."
+    },
+    {
+      "id": "placeholder_teacher_configurable_threshold",
+      "type": "threshold",
+      "event": "xp_awarded",
+      "conditions": {
+        "teacherSettingKey": "collectibles.thresholds.neptuneAvatar"
+      },
+      "targets": ["avatar_placeholder_neptune_scout"],
+      "active": false
+    }
+  ]
+}

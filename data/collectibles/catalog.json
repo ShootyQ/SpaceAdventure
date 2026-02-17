@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "updatedAt": "2026-02-17",
+  "items": [
+    {
+      "id": "batpet",
+      "type": "pet",
+      "rarity": "common",
+      "name": "Space Bat",
+      "asset": "/images/collectibles/pets/common/batpet.png",
+      "active": true,
+      "tags": ["starter", "pet"]
+    },
+    {
+      "id": "mothpet",
+      "type": "pet",
+      "rarity": "common",
+      "name": "Cosmic Moth",
+      "asset": "/images/collectibles/pets/common/mothpet.png",
+      "active": true,
+      "tags": ["starter", "pet"]
+    },
+    {
+      "id": "otterpet",
+      "type": "pet",
+      "rarity": "common",
+      "name": "Orbit Otter",
+      "asset": "/images/collectibles/pets/common/otterpet.png",
+      "active": true,
+      "tags": ["starter", "pet"]
+    },
+    {
+      "id": "snakepet",
+      "type": "pet",
+      "rarity": "common",
+      "name": "Nebula Snake",
+      "asset": "/images/collectibles/pets/common/snakepet.png",
+      "active": true,
+      "tags": ["starter", "pet"]
+    },
+    {
+      "id": "galaxycatpet",
+      "type": "pet",
+      "rarity": "extremely-rare",
+      "name": "Galaxy Cat",
+      "asset": "/images/collectibles/pets/extremely-rare/galaxycatpet.png",
+      "active": true,
+      "tags": ["rare-drop", "neptune", "pet"]
+    },
+    {
+      "id": "puddlepup",
+      "type": "pet",
+      "rarity": "testing",
+      "name": "Puddle Pup",
+      "asset": "/images/collectibles/pets/testing/puddlepup.png",
+      "active": true,
+      "tags": ["testing", "any-planet", "pet"]
+    },
+    {
+      "id": "avatar_placeholder_neptune_scout",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Neptune Scout",
+      "asset": "/images/collectibles/avatars/rare/neptune-scout.png",
+      "active": false,
+      "tags": ["placeholder", "avatar"]
+    },
+    {
+      "id": "ship_placeholder_void_runner",
+      "type": "ship",
+      "rarity": "rare",
+      "name": "Void Runner",
+      "asset": "/images/collectibles/ships/rare/void-runner.png",
+      "active": false,
+      "tags": ["placeholder", "ship"]
+    },
+    {
+      "id": "object_placeholder_holo_plant",
+      "type": "object",
+      "rarity": "common",
+      "name": "Holo Plant",
+      "asset": "/images/collectibles/objects/common/holo-plant.png",
+      "active": false,
+      "tags": ["placeholder", "interior"]
+    }
+  ]
+}

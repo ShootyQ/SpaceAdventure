@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "pools": [
+    {
+      "id": "neptune_rare_pool",
+      "active": true,
+      "roll": {
+        "type": "weighted"
+      },
+      "entries": [
+        {
+          "itemId": "galaxycatpet",
+          "weight": 100,
+          "active": true
+        },
+        {
+          "itemId": "avatar_placeholder_neptune_scout",
+          "weight": 25,
+          "active": false
+        },
+        {
+          "itemId": "ship_placeholder_void_runner",
+          "weight": 10,
+          "active": false
+        }
+      ]
+    }
+  ]
+}

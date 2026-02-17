@@ -15,6 +15,8 @@ import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, Asteroid
 import {
     GALAXY_CAT_CHANCE_DENOMINATOR,
     GALAXY_CAT_PET_ID,
+    TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR,
+    TESTING_PUDDLE_PUP_ID,
     getPetById,
     getUnlockPetIdsForPlanet,
 } from "@/lib/pets";
@@ -459,6 +461,29 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             unlocks = {
                                 ...unlocks,
                                 pets: [...(unlocks?.pets || []), GALAXY_CAT_PET_ID]
+                            };
+                        }
+                    }
+
+                    if (
+                        canRollRarePet &&
+                        Boolean(planetId) &&
+                        !currentUnlockedPets.has(TESTING_PUDDLE_PUP_ID) &&
+                        !previousUnlockedPets.has(TESTING_PUDDLE_PUP_ID)
+                    ) {
+                        const testRoll = Math.random();
+                        const puddlePupUnlockedNow = testRoll < (1 / TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR);
+
+                        if (puddlePupUnlockedNow) {
+                            updateDoc(doc(db, "users", shipData.id), {
+                                unlockedPetIds: arrayUnion(TESTING_PUDDLE_PUP_ID)
+                            }).catch((err) => {
+                                console.error("Failed to persist Puddle Pup unlock:", err);
+                            });
+
+                            unlocks = {
+                                ...unlocks,
+                                pets: [...(unlocks?.pets || []), TESTING_PUDDLE_PUP_ID]
                             };
                         }
                     }

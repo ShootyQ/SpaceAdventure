@@ -1,4 +1,5 @@
 import { UserData } from "@/types";
+import collectiblesCatalog from "@/data/collectibles/catalog.json";
 
 export interface PetOption {
     id: string;
@@ -12,21 +13,50 @@ export interface PetOption {
 
 export const GALAXY_CAT_PET_ID = "galaxycatpet";
 export const GALAXY_CAT_CHANCE_DENOMINATOR = 1000;
+export const TESTING_PUDDLE_PUP_ID = "puddlepup";
+export const TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR = 20;
 
-export const PET_OPTIONS: PetOption[] = [
-    { id: "batpet", name: "Space Bat", emoji: "🦇", imageSrc: "/images/pets/batpet.png", starter: true },
-    { id: "mothpet", name: "Cosmic Moth", emoji: "🦋", imageSrc: "/images/pets/mothpet.png", starter: true },
-    { id: "otterpet", name: "Orbit Otter", emoji: "🦦", imageSrc: "/images/pets/otterpet.png", starter: true },
-    { id: "snakepet", name: "Nebula Snake", emoji: "🐍", imageSrc: "/images/pets/snakepet.png", starter: true },
-    {
-        id: GALAXY_CAT_PET_ID,
-        name: "Galaxy Cat",
-        emoji: "🐱",
-        imageSrc: "/images/pets/randomly%20found/extremely%20rare/galaxycatpet.png",
-        starter: false,
-        unlockPlanetId: "neptune",
-        unlockHint: `Gain XP while orbiting Neptune (${GALAXY_CAT_CHANCE_DENOMINATOR.toLocaleString()}-to-1 chance)`
-    },
+const PET_EMOJI_FALLBACKS: Record<string, string> = {
+    batpet: "🦇",
+    mothpet: "🦋",
+    otterpet: "🦦",
+    snakepet: "🐍",
+    [GALAXY_CAT_PET_ID]: "🐱",
+    [TESTING_PUDDLE_PUP_ID]: "🐶",
+};
+
+type CatalogItem = {
+    id: string;
+    type: string;
+    rarity?: string;
+    name: string;
+    asset?: string;
+    active?: boolean;
+    tags?: string[];
+};
+
+const catalogPetItems = ((collectiblesCatalog as any)?.items || [])
+    .filter((item: CatalogItem) => item.type === "pet" && item.active !== false)
+    .map((item: CatalogItem): PetOption => ({
+        id: item.id,
+        name: item.name,
+        emoji: PET_EMOJI_FALLBACKS[item.id] || "🐾",
+        imageSrc: item.asset,
+        starter: Boolean((item.tags || []).includes("starter")),
+        unlockPlanetId: item.id === GALAXY_CAT_PET_ID ? "neptune" : undefined,
+        unlockHint:
+            item.id === GALAXY_CAT_PET_ID
+                ? `Gain XP while orbiting Neptune (${GALAXY_CAT_CHANCE_DENOMINATOR.toLocaleString()}-to-1 chance)`
+                : item.id === TESTING_PUDDLE_PUP_ID
+                    ? `Testing drop: Gain XP on any planet (${TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR.toLocaleString()}-to-1 chance)`
+                    : undefined,
+    }));
+
+export const PET_OPTIONS: PetOption[] = catalogPetItems.length > 0 ? catalogPetItems : [
+    { id: "batpet", name: "Space Bat", emoji: "🦇", imageSrc: "/images/collectibles/pets/common/batpet.png", starter: true },
+    { id: "mothpet", name: "Cosmic Moth", emoji: "🦋", imageSrc: "/images/collectibles/pets/common/mothpet.png", starter: true },
+    { id: "otterpet", name: "Orbit Otter", emoji: "🦦", imageSrc: "/images/collectibles/pets/common/otterpet.png", starter: true },
+    { id: "snakepet", name: "Nebula Snake", emoji: "🐍", imageSrc: "/images/collectibles/pets/common/snakepet.png", starter: true },
 ];
 
 export const STARTER_PET_IDS = PET_OPTIONS.filter((pet) => pet.starter).map((pet) => pet.id);
