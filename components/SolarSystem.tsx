@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft } from "lucide-react";
 import Link from 'next/link';
 import MapTutorial from "@/app/teacher/map/MapTutorial";
@@ -96,6 +97,13 @@ interface SolarSystemProps {
         studentView?: boolean;
 }
 
+type PlanetDiscoveredUnlocks = {
+    pets?: string[];
+    avatars?: string[];
+    ships?: string[];
+    objects?: string[];
+};
+
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
     const isStudentPersonalView = studentView && userData?.role === 'student';
@@ -116,7 +124,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
   const [currentAward, setCurrentAward] = useState<AwardEvent | null>(null);
-    const [revealedUnlockAwardIds, setRevealedUnlockAwardIds] = useState<Set<string>>(new Set());
+    const [unlockRevealQueue, setUnlockRevealQueue] = useState<AwardEvent[]>([]);
+    const [activeUnlockReveal, setActiveUnlockReveal] = useState<AwardEvent | null>(null);
+    const scheduledUnlockRevealAwardIdsRef = useRef<Set<string>>(new Set());
+    const unlockRevealTimerMapRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
     const previousPlanetXPRef = useRef<Map<string, Record<string, number>>>(new Map());
         const previousUnlockedPetsRef = useRef<Map<string, Set<string>>>(new Map());
@@ -188,15 +199,17 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       setIsSoundOn(newState);
       if (newState) {
           // Unlock audio context
-          const audio = document.getElementById('map-notification-audio') as HTMLAudioElement;
-          if (audio) {
+          const notificationAudio = document.getElementById('map-notification-audio') as HTMLAudioElement;
+          const revealAudio = document.getElementById('map-reveal-audio') as HTMLAudioElement;
+          [notificationAudio, revealAudio].forEach((audio) => {
+              if (!audio) return;
               audio.volume = 0;
               audio.play().then(() => {
                   audio.pause();
                   audio.currentTime = 0;
                   audio.volume = 0.5;
               }).catch(e => console.error("Audio unlock failed", e));
-          }
+          });
       }
   };
 
@@ -348,41 +361,80 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [awardQueue]);
 
   useEffect(() => {
-      if (awardQueue.length === 0 && revealedUnlockAwardIds.size > 0) {
-          setRevealedUnlockAwardIds(new Set());
+      if (awardQueue.length === 0) {
+          scheduledUnlockRevealAwardIdsRef.current.clear();
+          unlockRevealTimerMapRef.current.forEach((timerId) => clearTimeout(timerId));
+          unlockRevealTimerMapRef.current.clear();
+          setUnlockRevealQueue([]);
+          setActiveUnlockReveal(null);
       }
-  }, [awardQueue.length, revealedUnlockAwardIds.size]);
+  }, [awardQueue.length]);
 
   useEffect(() => {
       if (awardQueue.length === 0) return;
-
-      const timerIds: NodeJS.Timeout[] = [];
 
       awardQueue.forEach((award) => {
           const hasUnlocks = Boolean(
               award.unlocks?.ships?.length ||
               award.unlocks?.avatars?.length ||
-              award.unlocks?.pets?.length
+              award.unlocks?.pets?.length ||
+              award.unlocks?.objects?.length
           );
 
-          if (!hasUnlocks || revealedUnlockAwardIds.has(award.id)) return;
+          if (!hasUnlocks || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
+
+          scheduledUnlockRevealAwardIdsRef.current.add(award.id);
 
           const timerId = setTimeout(() => {
-              setRevealedUnlockAwardIds((prev) => {
-                  if (prev.has(award.id)) return prev;
-                  const next = new Set(prev);
-                  next.add(award.id);
-                  return next;
-              });
+              unlockRevealTimerMapRef.current.delete(award.id);
+              setUnlockRevealQueue((prev) => (prev.some((queuedAward) => queuedAward.id === award.id) ? prev : [...prev, award]));
           }, 5000);
 
-          timerIds.push(timerId);
+          unlockRevealTimerMapRef.current.set(award.id, timerId);
       });
+  }, [awardQueue]);
 
+  useEffect(() => {
+      if (activeUnlockReveal || unlockRevealQueue.length === 0) return;
+      setActiveUnlockReveal(unlockRevealQueue[0]);
+      setUnlockRevealQueue((prev) => prev.slice(1));
+  }, [activeUnlockReveal, unlockRevealQueue]);
+
+  useEffect(() => {
+      if (!activeUnlockReveal) return;
+
+      try {
+          confetti({ particleCount: 180, spread: 100, startVelocity: 55, origin: { y: 0.62 } });
+          setTimeout(() => {
+              confetti({ particleCount: 120, spread: 75, startVelocity: 45, origin: { x: 0.2, y: 0.62 } });
+              confetti({ particleCount: 120, spread: 75, startVelocity: 45, origin: { x: 0.8, y: 0.62 } });
+          }, 300);
+      } catch {
+          // no-op
+      }
+
+      if (isSoundOnRef.current) {
+          const revealAudio = document.getElementById('map-reveal-audio') as HTMLAudioElement;
+          if (revealAudio) {
+              revealAudio.currentTime = 0;
+              revealAudio.volume = 0.75;
+              revealAudio.play().catch(() => {});
+          }
+      }
+
+      const dismissTimer = setTimeout(() => {
+          setActiveUnlockReveal(null);
+      }, 7000);
+
+      return () => clearTimeout(dismissTimer);
+  }, [activeUnlockReveal]);
+
+  useEffect(() => {
       return () => {
-          timerIds.forEach((timerId) => clearTimeout(timerId));
+          unlockRevealTimerMapRef.current.forEach((timerId) => clearTimeout(timerId));
+          unlockRevealTimerMapRef.current.clear();
       };
-  }, [awardQueue, revealedUnlockAwardIds]);
+  }, []);
 
   // Real-time subscription to all star travelers
   useEffect(() => {
@@ -430,7 +482,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const previousUnlockedPets = previousUnlockedPetsRef.current.get(shipData.id) || new Set<string>();
                     const canRollRarePet = userData.role === 'teacher' || userData.role === 'admin';
 
-                    let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[] } | undefined;
+                    let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
                     if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
                         const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
                         const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
@@ -497,6 +549,23 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         reason: shipData.lastXpReason,
                         unlocks
                     };
+
+                    if (canRollRarePet && unlocks && userData.uid) {
+                        const discoveredUpdates: Record<string, any> = {};
+                        if (unlocks.pets?.length) discoveredUpdates["discoveredUnlocks.pets"] = arrayUnion(...unlocks.pets);
+                        if (unlocks.avatars?.length) discoveredUpdates["discoveredUnlocks.avatars"] = arrayUnion(...unlocks.avatars);
+                        if (unlocks.ships?.length) discoveredUpdates["discoveredUnlocks.ships"] = arrayUnion(...unlocks.ships);
+                        if (unlocks.objects?.length) discoveredUpdates["discoveredUnlocks.objects"] = arrayUnion(...unlocks.objects);
+
+                        if (Object.keys(discoveredUpdates).length > 0) {
+                            const ownerId = userData.role === 'student' ? userData.teacherId : userData.uid;
+                            if (ownerId) {
+                                updateDoc(doc(db, `users/${ownerId}/planets`, planetId), discoveredUpdates).catch((err) => {
+                                    console.error("Failed to persist discovered planet unlocks:", err);
+                                });
+                            }
+                        }
+                    }
 
                     const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
                     if (audioElement && isSoundOnRef.current) {
@@ -625,7 +694,13 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [isStudentPersonalView, selectedPlanet, userData]);
 
 
-    const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+    const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, {
+        currentXP: number,
+        xpGoal: number,
+        rewardName?: string,
+        rewardDescription?: string,
+        discoveredUnlocks?: PlanetDiscoveredUnlocks
+    }>>(new Map());
     const dynamicPlanetsRef = useRef<Map<string, any>>(new Map());
 
     useEffect(() => {
@@ -1070,6 +1145,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     >
        {/* Hidden Audio Element */}
        <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
+    <audio id="map-reveal-audio" src={getAssetPath("/sounds/newnormalreveal.mp3")} preload="auto" />
 
        {/* Class Name HUD */}
     <div className={`absolute ${userData?.role === 'teacher' ? 'top-6 left-44' : (isStudentPersonalView ? 'top-20 left-6' : 'top-6 left-6')} z-40 pointer-events-none`}>
@@ -1169,7 +1245,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                       />
                                       {/* Avatar Window */}
                                       <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                            <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
+                                            <UserAvatar userData={ship} transparentBg className="w-full h-full scale-[1.35] translate-y-1" />
                                       </div>
                                   </div>
                               </div>
@@ -1340,7 +1416,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
                                                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                                    <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
+                                                    <UserAvatar userData={ship} transparentBg className="w-full h-full scale-[1.35] translate-y-1" />
                                                 </div>
                                             </div>
                                         </div>
@@ -1478,6 +1554,18 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                    const current = stats?.currentXP || 0;
                    const goal = stats?.xpGoal || 1000;
                    const progress = Math.min((current/goal)*100, 100);
+                   const discoveredUnlocks = (stats?.discoveredUnlocks || {}) as PlanetDiscoveredUnlocks;
+                   const discoveredCount =
+                       (discoveredUnlocks.pets?.length || 0) +
+                       (discoveredUnlocks.avatars?.length || 0) +
+                       (discoveredUnlocks.ships?.length || 0) +
+                       (discoveredUnlocks.objects?.length || 0);
+
+                   const renderKnownUnlock = (id: string, label: string) => (
+                        <div key={`${label}-${id}`} className="text-[10px] text-emerald-200/90 uppercase tracking-widest bg-emerald-500/10 border border-emerald-400/20 rounded px-2 py-1">
+                            {label}: {id}
+                        </div>
+                   );
                    
                    return (
                        <div className="mb-6 p-4 bg-cyan-950/20 rounded-lg border border-cyan-900/50">
@@ -1503,6 +1591,22 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                    {stats.rewardDescription && <div className="text-gray-400 text-xs italic mt-1">{stats.rewardDescription}</div>}
                                </div>
                            )}
+
+                           <div className="border-t border-cyan-800/30 pt-3 mt-3">
+                               <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold mb-2">
+                                   Known Discoveries
+                               </div>
+                               {discoveredCount > 0 ? (
+                                   <div className="flex flex-wrap gap-2">
+                                       {(discoveredUnlocks.pets || []).map((id) => renderKnownUnlock(id, "Pet"))}
+                                       {(discoveredUnlocks.avatars || []).map((id) => renderKnownUnlock(id, "Avatar"))}
+                                       {(discoveredUnlocks.ships || []).map((id) => renderKnownUnlock(id, "Ship"))}
+                                       {(discoveredUnlocks.objects || []).map((id) => renderKnownUnlock(id, "Object"))}
+                                   </div>
+                               ) : (
+                                   <div className="text-[11px] text-gray-400 italic">Mystery… first discovery will reveal what this planet can drop.</div>
+                               )}
+                           </div>
                        </div>
                    );
                })()}
@@ -1766,7 +1870,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                      */}
                                     <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
                                         {award.ship.avatar && (
-                                            <UserAvatar userData={award.ship as any} className="w-full h-full scale-[1.35] translate-y-1" />
+                                            <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full scale-[1.35] translate-y-1" />
                                         )}
                                     </div>
                                 </div>
@@ -1815,55 +1919,81 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 </motion.div>
                                 )}
                             </div>
-
-                            {(award.unlocks?.ships?.length || award.unlocks?.avatars?.length || award.unlocks?.pets?.length) && revealedUnlockAwardIds.has(award.id) && (
-                                <motion.div
-                                    initial={{ scale: 0.9, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    className="mt-6 w-full bg-purple-500/10 border border-purple-400/40 rounded-2xl p-4 relative overflow-hidden"
-                                >
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-700/30 via-transparent to-transparent" />
-                                    <div className="relative z-10">
-                                        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-purple-200 text-center mb-3">
-                                            NEW UNLOCK!
-                                        </div>
-                                        <div className="flex flex-wrap gap-3 items-center justify-center">
-                                            {(award.unlocks.ships || []).map((id) => (
-                                                <div key={`ship-${id}`} className="flex flex-col items-center gap-1">
-                                                    <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-12 h-12 object-contain drop-shadow-md" />
-                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Ship</div>
-                                                </div>
-                                            ))}
-                                            {(award.unlocks.avatars || []).map((id) => (
-                                                <div key={`avatar-${id}`} className="flex flex-col items-center gap-1">
-                                                    <div className="w-12 h-12 rounded-full border border-purple-400/40 overflow-hidden">
-                                                        <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
-                                                    </div>
-                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Avatar</div>
-                                                </div>
-                                            ))}
-                                            {(award.unlocks.pets || []).map((id) => {
-                                                const pet = getPetById(id);
-                                                return (
-                                                    <div key={`pet-${id}`} className="flex flex-col items-center gap-1">
-                                                        <div className="w-12 h-12 rounded-full border border-purple-400/40 overflow-hidden bg-black/40 flex items-center justify-center text-xl">
-                                                            {pet.imageSrc ? (
-                                                                <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
-                                                            ) : (
-                                                                <>{pet.emoji}</>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Pet</div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
                         </motion.div>
                     ))}
                 </div>
+
+                <AnimatePresence>
+                    {activeUnlockReveal && (
+                        <motion.div
+                            key={`unlock-reveal-${activeUnlockReveal.id}`}
+                            initial={{ opacity: 0, scale: 0.8, y: 30 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                            transition={{ type: "spring", stiffness: 220, damping: 18 }}
+                            className="absolute inset-0 z-[380] flex items-center justify-center pointer-events-none"
+                        >
+                            <div className="relative w-[760px] max-w-[92vw] bg-black/95 border-2 border-fuchsia-400 rounded-3xl shadow-[0_0_80px_rgba(217,70,239,0.7)] p-8 overflow-hidden">
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-fuchsia-700/40 via-purple-800/10 to-transparent" />
+                                <motion.div
+                                    initial={{ scale: 0.95, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="relative z-10"
+                                >
+                                    <div className="text-center mb-6">
+                                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/20 border border-fuchsia-300/40 text-fuchsia-100 text-xs font-black uppercase tracking-[0.25em]">
+                                            <Award size={14} />
+                                            New Discovery
+                                        </div>
+                                        <div className="mt-3 text-2xl md:text-3xl font-black text-white uppercase tracking-wider">
+                                            {activeUnlockReveal.ship.cadetName}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start justify-items-center">
+                                        {(activeUnlockReveal.unlocks?.ships || []).map((id) => (
+                                            <div key={`reveal-ship-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-16 h-16 object-contain drop-shadow-md" />
+                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Ship</div>
+                                            </div>
+                                        ))}
+                                        {(activeUnlockReveal.unlocks?.avatars || []).map((id) => (
+                                            <div key={`reveal-avatar-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                <div className="w-16 h-16 rounded-full border border-fuchsia-300/40 overflow-hidden">
+                                                    <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
+                                                </div>
+                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Avatar</div>
+                                            </div>
+                                        ))}
+                                        {(activeUnlockReveal.unlocks?.pets || []).map((id) => {
+                                            const pet = getPetById(id);
+                                            return (
+                                                <div key={`reveal-pet-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                    <div className="w-16 h-16 rounded-full border border-fuchsia-300/40 overflow-hidden bg-black/40 flex items-center justify-center text-3xl">
+                                                        {pet.imageSrc ? (
+                                                            <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                        ) : (
+                                                            <>{pet.emoji}</>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Pet</div>
+                                                </div>
+                                            );
+                                        })}
+                                        {(activeUnlockReveal.unlocks?.objects || []).map((id) => (
+                                            <div key={`reveal-object-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                <div className="w-16 h-16 rounded-xl border border-fuchsia-300/40 bg-black/40 flex items-center justify-center text-xs text-fuchsia-100 font-bold px-2 text-center leading-tight">
+                                                    {id}
+                                                </div>
+                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Object</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
          )}
        </AnimatePresence>

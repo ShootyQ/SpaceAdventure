@@ -106,6 +106,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                 <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
                     <UserAvatar 
                         userData={student as any} 
+                        transparentBg
                         className="w-full h-full scale-[1.35] translate-y-1" 
                     />
                 </div>

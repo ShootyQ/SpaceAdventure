@@ -189,7 +189,7 @@ export interface AwardEvent {
       newRank?: string;
       startPos: { x: number, y: number }; // Screen coordinates to fly from
       reason?: string;
-    unlocks?: { ships?: string[]; avatars?: string[]; pets?: string[] };
+    unlocks?: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] };
 }
   
 export interface Behavior {
