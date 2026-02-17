@@ -7,6 +7,37 @@ const toAppSubscriptionStatus = (stripeStatus?: string) => {
     return stripeStatus && ACTIVE_STRIPE_STATUSES.has(stripeStatus) ? 'active' : 'trial';
 };
 
+const findActiveSubscriptionByEmail = async (stripe: Stripe, email: string) => {
+    const customers = await stripe.customers.list({
+        email,
+        limit: 100,
+    });
+
+    for (const customer of customers.data) {
+        const subscriptions = await stripe.subscriptions.list({
+            customer: customer.id,
+            status: 'all',
+            limit: 100,
+        });
+
+        const activeSubscription = subscriptions.data.find(
+            (sub) => sub.status === 'active' || sub.status === 'trialing'
+        );
+
+        if (activeSubscription) {
+            return {
+                customerId: customer.id,
+                subscription: activeSubscription,
+            };
+        }
+    }
+
+    return {
+        customerId: customers.data[0]?.id || null,
+        subscription: null,
+    };
+};
+
 export async function GET() {
     try {
         const stripeLib = await import('@/lib/stripe');
@@ -101,23 +132,13 @@ export async function POST(req: Request) {
             }, { status: 400 });
         }
 
-        // Check for existing customers/subscriptions by email to prevent double-subscription
-        // This handles cases where our DB might be out of sync (e.g. missed webhooks)
-        const customers = await stripe.customers.list({
-            email: email,
-            limit: 1,
-            expand: ['data.subscriptions']
-        });
+        // Check for existing customers/subscriptions by email to prevent double-subscription.
+        // Scan all matching customers because some accounts have duplicates over time.
+        const existingStripeState = await findActiveSubscriptionByEmail(stripe, email);
+        const existingCustomerId = existingStripeState.customerId;
 
-        const existingCustomerId = customers.data[0]?.id || null;
-
-        if (customers.data.length > 0) {
-            const customer = customers.data[0];
-            const activeSubscription = customer.subscriptions?.data.find(
-                (sub) => sub.status === 'active' || sub.status === 'trialing'
-            );
-
-            if (activeSubscription) {
+        if (existingStripeState.subscription) {
+                const activeSubscription = existingStripeState.subscription;
                 const firstItem = activeSubscription.items.data[0];
 
                 return NextResponse.json({
@@ -140,7 +161,6 @@ export async function POST(req: Request) {
                             : null,
                     },
                 });
-            }
         }
 
         if (syncOnly) {

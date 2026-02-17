@@ -1063,25 +1063,13 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
         if (!userData?.uid || !userData?.email) return;
         if (userData.subscriptionStatus === "active") return;
 
-        const attemptKey = `billing-sync-attempted-${userData.uid}`;
         const checkoutReturnedSuccess =
             typeof window !== "undefined" && new URLSearchParams(window.location.search).has("success");
-
-        if (
-            typeof window !== "undefined" &&
-            window.sessionStorage.getItem(attemptKey) === "1" &&
-            !checkoutReturnedSuccess
-        ) {
-            return;
-        }
 
         let cancelled = false;
 
         const syncFromStripe = async () => {
             setSyncingSubscription(true);
-            if (typeof window !== "undefined") {
-                window.sessionStorage.setItem(attemptKey, "1");
-            }
 
             try {
                 const maxAttempts = checkoutReturnedSuccess ? 4 : 1;
