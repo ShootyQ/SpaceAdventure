@@ -21,11 +21,11 @@ Recommended pattern:
 
 ## Rarity values
 
+- `standard` (starter/default loadout)
 - `common`
+- `uncommon`
 - `rare`
-- `very-rare`
 - `extremely-rare`
-- `legendary`
 
 ## Asset paths
 

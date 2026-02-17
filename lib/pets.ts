@@ -1,28 +1,80 @@
 import { UserData } from "@/types";
+import { PLANETS } from "@/types";
 import collectiblesCatalog from "@/data/collectibles/catalog.json";
+
+export type PetRarity = "standard" | "common" | "uncommon" | "rare" | "extremely-rare" | "testing";
+export type RollablePetRarity = "common" | "uncommon" | "rare" | "extremely-rare";
 
 export interface PetOption {
     id: string;
     name: string;
     emoji: string;
     imageSrc?: string;
+    rarity: PetRarity;
     unlockPlanetId?: string;
     unlockHint?: string;
     starter: boolean;
 }
 
-export const GALAXY_CAT_PET_ID = "galaxycatpet";
-export const GALAXY_CAT_CHANCE_DENOMINATOR = 1000;
-export const TESTING_PUDDLE_PUP_ID = "puddlepup";
-export const TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR = 20;
+export interface PetUnlockChanceConfig {
+    planet: Record<RollablePetRarity, number>;
+    anyPlanet: Record<RollablePetRarity, number>;
+    testing: number;
+    enabled: {
+        planet: Record<RollablePetRarity, boolean>;
+        anyPlanet: Record<RollablePetRarity, boolean>;
+        testing: boolean;
+    };
+}
+
+const DEFAULT_PLANET_RARITY_CHANCES: Record<RollablePetRarity, number> = {
+    common: 50,
+    uncommon: 500,
+    rare: 1000,
+    "extremely-rare": 5000,
+};
+
+const DEFAULT_ANY_PLANET_RARITY_CHANCES: Record<RollablePetRarity, number> = {
+    common: 250,
+    uncommon: 2500,
+    rare: 5000,
+    "extremely-rare": 25000,
+};
+
+const DEFAULT_TESTING_CHANCE_DENOMINATOR = 20;
+
+export const DEFAULT_PET_UNLOCK_CHANCE_CONFIG: PetUnlockChanceConfig = {
+    planet: { ...DEFAULT_PLANET_RARITY_CHANCES },
+    anyPlanet: { ...DEFAULT_ANY_PLANET_RARITY_CHANCES },
+    testing: DEFAULT_TESTING_CHANCE_DENOMINATOR,
+    enabled: {
+        planet: {
+            common: true,
+            uncommon: true,
+            rare: true,
+            "extremely-rare": true,
+        },
+        anyPlanet: {
+            common: true,
+            uncommon: true,
+            rare: true,
+            "extremely-rare": true,
+        },
+        testing: true,
+    },
+};
 
 const PET_EMOJI_FALLBACKS: Record<string, string> = {
     batpet: "🦇",
     mothpet: "🦋",
     otterpet: "🦦",
     snakepet: "🐍",
-    [GALAXY_CAT_PET_ID]: "🐱",
-    [TESTING_PUDDLE_PUP_ID]: "🐶",
+    galaxycatpet: "🐱",
+    puddlepup: "🐶",
+    cloudcub: "🐻",
+    canyonraptor: "🦖",
+    "acidic-axolotl": "🦎",
+    rockcat: "🐈",
 };
 
 type CatalogItem = {
@@ -35,44 +87,204 @@ type CatalogItem = {
     tags?: string[];
 };
 
+const KNOWN_PLANET_IDS = new Set(PLANETS.map((planet) => planet.id.toLowerCase()).filter((planetId) => planetId !== "sun"));
+
+const toTitleCase = (value: string) => {
+    return value
+        .split("-")
+        .filter(Boolean)
+        .map((part) => `${part[0]?.toUpperCase() || ""}${part.slice(1)}`)
+        .join(" ");
+};
+
+const resolvePlanetIdFromItem = (item: CatalogItem): string | undefined => {
+    const tagPlanet = (item.tags || []).find((tag) => KNOWN_PLANET_IDS.has(String(tag).toLowerCase()));
+    if (tagPlanet) return String(tagPlanet).toLowerCase();
+
+    const assetFile = decodeURIComponent(String(item.asset || "")).split("/").pop() || "";
+    const [planetPrefix] = assetFile.toLowerCase().split(".");
+    if (KNOWN_PLANET_IDS.has(planetPrefix)) return planetPrefix;
+
+    return undefined;
+};
+
+const resolveRarity = (value?: string): PetRarity => {
+    const rarity = String(value || "").toLowerCase();
+    if (rarity === "standard" || rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare" || rarity === "testing") {
+        return rarity;
+    }
+    return "common";
+};
+
+const sanitizeDenominator = (value: unknown, fallback: number) => {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return fallback;
+    return Math.max(1, Math.round(num));
+};
+
+export const normalizePetUnlockChanceConfig = (raw?: Partial<PetUnlockChanceConfig> | null): PetUnlockChanceConfig => {
+    const planet = {
+        common: sanitizeDenominator(raw?.planet?.common, DEFAULT_PLANET_RARITY_CHANCES.common),
+        uncommon: sanitizeDenominator(raw?.planet?.uncommon, DEFAULT_PLANET_RARITY_CHANCES.uncommon),
+        rare: sanitizeDenominator(raw?.planet?.rare, DEFAULT_PLANET_RARITY_CHANCES.rare),
+        "extremely-rare": sanitizeDenominator(raw?.planet?.["extremely-rare"], DEFAULT_PLANET_RARITY_CHANCES["extremely-rare"]),
+    };
+
+    const anyPlanet = {
+        common: sanitizeDenominator(raw?.anyPlanet?.common, DEFAULT_ANY_PLANET_RARITY_CHANCES.common),
+        uncommon: sanitizeDenominator(raw?.anyPlanet?.uncommon, DEFAULT_ANY_PLANET_RARITY_CHANCES.uncommon),
+        rare: sanitizeDenominator(raw?.anyPlanet?.rare, DEFAULT_ANY_PLANET_RARITY_CHANCES.rare),
+        "extremely-rare": sanitizeDenominator(raw?.anyPlanet?.["extremely-rare"], DEFAULT_ANY_PLANET_RARITY_CHANCES["extremely-rare"]),
+    };
+
+    return {
+        planet,
+        anyPlanet,
+        testing: sanitizeDenominator(raw?.testing, DEFAULT_TESTING_CHANCE_DENOMINATOR),
+        enabled: {
+            planet: {
+                common: raw?.enabled?.planet?.common !== false,
+                uncommon: raw?.enabled?.planet?.uncommon !== false,
+                rare: raw?.enabled?.planet?.rare !== false,
+                "extremely-rare": raw?.enabled?.planet?.["extremely-rare"] !== false,
+            },
+            anyPlanet: {
+                common: raw?.enabled?.anyPlanet?.common !== false,
+                uncommon: raw?.enabled?.anyPlanet?.uncommon !== false,
+                rare: raw?.enabled?.anyPlanet?.rare !== false,
+                "extremely-rare": raw?.enabled?.anyPlanet?.["extremely-rare"] !== false,
+            },
+            testing: raw?.enabled?.testing !== false,
+        },
+    };
+};
+
+const getChanceDenominator = (rarity: PetRarity, unlockPlanetId: string | undefined, config: PetUnlockChanceConfig) => {
+    if (rarity === "testing") return config.testing;
+    if (rarity === "standard") return undefined;
+    if (unlockPlanetId) return config.planet[rarity];
+    return config.anyPlanet[rarity];
+};
+
+export const getPetUnlockHint = (pet: Pick<PetOption, "rarity" | "unlockPlanetId" | "starter">, config?: Partial<PetUnlockChanceConfig> | null) => {
+    const normalizedConfig = normalizePetUnlockChanceConfig(config || null);
+    const rarity = pet.rarity;
+    const unlockPlanetId = pet.unlockPlanetId;
+
+    if (rarity === "standard") return undefined;
+
+    const chance = getChanceDenominator(rarity, unlockPlanetId, normalizedConfig);
+    if (!chance) return "Locked";
+
+    if (rarity === "testing") {
+        return `Testing drop: Gain XP on any planet (1-in-${chance.toLocaleString()} chance)`;
+    }
+
+    if (unlockPlanetId) {
+        return `Gain XP while orbiting ${toTitleCase(unlockPlanetId)} (1-in-${chance.toLocaleString()} chance)`;
+    }
+
+    return `Gain XP on any planet (1-in-${chance.toLocaleString()} chance)`;
+};
+
 const catalogPetItems = ((collectiblesCatalog as any)?.items || [])
     .filter((item: CatalogItem) => item.type === "pet" && item.active !== false)
-    .map((item: CatalogItem): PetOption => ({
-        id: item.id,
-        name: item.name,
-        emoji: PET_EMOJI_FALLBACKS[item.id] || "🐾",
-        imageSrc: item.asset,
-        starter: Boolean((item.tags || []).includes("starter")),
-        unlockPlanetId: item.id === GALAXY_CAT_PET_ID ? "neptune" : undefined,
-        unlockHint:
-            item.id === GALAXY_CAT_PET_ID
-                ? `Gain XP while orbiting Neptune (${GALAXY_CAT_CHANCE_DENOMINATOR.toLocaleString()}-to-1 chance)`
-                : item.id === TESTING_PUDDLE_PUP_ID
-                    ? `Testing drop: Gain XP on any planet (${TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR.toLocaleString()}-to-1 chance)`
-                    : undefined,
-    }));
+    .map((item: CatalogItem): PetOption => {
+        const rarity = resolveRarity(item.rarity);
+        const unlockPlanetId = resolvePlanetIdFromItem(item);
+        const starter = rarity === "standard" || Boolean((item.tags || []).includes("starter"));
+
+        return {
+            id: item.id,
+            name: item.name,
+            emoji: PET_EMOJI_FALLBACKS[item.id] || "🐾",
+            imageSrc: item.asset,
+            rarity,
+            starter,
+            unlockPlanetId,
+            unlockHint: getPetUnlockHint({ rarity, unlockPlanetId, starter }),
+        };
+    });
 
 export const PET_OPTIONS: PetOption[] = catalogPetItems.length > 0 ? catalogPetItems : [
-    { id: "batpet", name: "Space Bat", emoji: "🦇", imageSrc: "/images/collectibles/pets/common/batpet.png", starter: true },
-    { id: "mothpet", name: "Cosmic Moth", emoji: "🦋", imageSrc: "/images/collectibles/pets/common/mothpet.png", starter: true },
-    { id: "otterpet", name: "Orbit Otter", emoji: "🦦", imageSrc: "/images/collectibles/pets/common/otterpet.png", starter: true },
-    { id: "snakepet", name: "Nebula Snake", emoji: "🐍", imageSrc: "/images/collectibles/pets/common/snakepet.png", starter: true },
+    { id: "batpet", name: "Space Bat", emoji: "🦇", imageSrc: "/images/collectibles/pets/standard/batpet.png", rarity: "standard", starter: true },
+    { id: "mothpet", name: "Cosmic Moth", emoji: "🦋", imageSrc: "/images/collectibles/pets/standard/mothpet.png", rarity: "standard", starter: true },
+    { id: "otterpet", name: "Orbit Otter", emoji: "🦦", imageSrc: "/images/collectibles/pets/standard/otterpet.png", rarity: "standard", starter: true },
+    { id: "snakepet", name: "Nebula Snake", emoji: "🐍", imageSrc: "/images/collectibles/pets/standard/snakepet.png", rarity: "standard", starter: true },
 ];
 
 export const STARTER_PET_IDS = PET_OPTIONS.filter((pet) => pet.starter).map((pet) => pet.id);
 export const DEFAULT_PET_ID = STARTER_PET_IDS[0] || PET_OPTIONS[0].id;
 
-export const PLANET_PET_UNLOCKS = PET_OPTIONS.reduce<Record<string, string[]>>((acc, pet) => {
-    if (!pet.unlockPlanetId) return acc;
-    const planetId = pet.unlockPlanetId.toLowerCase();
-    const current = acc[planetId] || [];
-    acc[planetId] = [...current, pet.id];
-    return acc;
-}, {});
+const ROLLABLE_RARITIES: RollablePetRarity[] = ["common", "uncommon", "rare", "extremely-rare"];
 
-export const getUnlockPetIdsForPlanet = (planetId?: string | null): string[] => {
-    if (!planetId) return [];
-    return PLANET_PET_UNLOCKS[planetId.toLowerCase()] || [];
+const pickRandomPetId = (pool: PetOption[]) => {
+    if (pool.length === 0) return null;
+    const index = Math.floor(Math.random() * pool.length);
+    return pool[index]?.id || null;
+};
+
+export const rollPetUnlocksForXpEvent = ({
+    planetId,
+    currentlyUnlockedPetIds,
+    chanceConfig,
+}: {
+    planetId: string;
+    currentlyUnlockedPetIds: Set<string>;
+    chanceConfig?: Partial<PetUnlockChanceConfig> | null;
+}): string[] => {
+    const normalizedConfig = normalizePetUnlockChanceConfig(chanceConfig || null);
+    const normalizedPlanetId = String(planetId || "").toLowerCase();
+    if (!normalizedPlanetId || normalizedPlanetId === "sun") return [];
+
+    const unlocked = new Set(currentlyUnlockedPetIds);
+    const newlyUnlocked: string[] = [];
+
+    const rollPool = (pool: PetOption[], denominator?: number) => {
+        if (!denominator || pool.length === 0) return;
+        const hit = Math.random() < (1 / denominator);
+        if (!hit) return;
+
+        const pickedId = pickRandomPetId(pool);
+        if (!pickedId || unlocked.has(pickedId)) return;
+
+        unlocked.add(pickedId);
+        newlyUnlocked.push(pickedId);
+    };
+
+    ROLLABLE_RARITIES.forEach((rarity) => {
+        const planetPool = PET_OPTIONS.filter((pet) => (
+            pet.rarity === rarity &&
+            pet.unlockPlanetId === normalizedPlanetId &&
+            !pet.starter &&
+            !unlocked.has(pet.id)
+        ));
+
+        const anyPlanetPool = PET_OPTIONS.filter((pet) => (
+            pet.rarity === rarity &&
+            !pet.unlockPlanetId &&
+            !pet.starter &&
+            !unlocked.has(pet.id)
+        ));
+
+        if (normalizedConfig.enabled.planet[rarity]) {
+            rollPool(planetPool, normalizedConfig.planet[rarity]);
+        }
+        if (normalizedConfig.enabled.anyPlanet[rarity]) {
+            rollPool(anyPlanetPool, normalizedConfig.anyPlanet[rarity]);
+        }
+    });
+
+    const testingPool = PET_OPTIONS.filter((pet) => (
+        pet.rarity === "testing" &&
+        !pet.starter &&
+        !unlocked.has(pet.id)
+    ));
+    if (normalizedConfig.enabled.testing) {
+        rollPool(testingPool, normalizedConfig.testing);
+    }
+
+    return newlyUnlocked;
 };
 
 export const getEffectiveUnlockedPetIds = (userData?: Pick<UserData, "unlockedPetIds"> | null): Set<string> => {

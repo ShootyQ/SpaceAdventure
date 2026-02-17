@@ -5,38 +5,74 @@
     {
       "id": "batpet",
       "type": "pet",
-      "rarity": "common",
+      "rarity": "standard",
       "name": "Space Bat",
-      "asset": "/images/collectibles/pets/common/batpet.png",
+      "asset": "/images/collectibles/pets/standard/batpet.png",
       "active": true,
       "tags": ["starter", "pet"]
     },
     {
       "id": "mothpet",
       "type": "pet",
-      "rarity": "common",
+      "rarity": "standard",
       "name": "Cosmic Moth",
-      "asset": "/images/collectibles/pets/common/mothpet.png",
+      "asset": "/images/collectibles/pets/standard/mothpet.png",
       "active": true,
       "tags": ["starter", "pet"]
     },
     {
       "id": "otterpet",
       "type": "pet",
-      "rarity": "common",
+      "rarity": "standard",
       "name": "Orbit Otter",
-      "asset": "/images/collectibles/pets/common/otterpet.png",
+      "asset": "/images/collectibles/pets/standard/otterpet.png",
       "active": true,
       "tags": ["starter", "pet"]
     },
     {
       "id": "snakepet",
       "type": "pet",
-      "rarity": "common",
+      "rarity": "standard",
       "name": "Nebula Snake",
-      "asset": "/images/collectibles/pets/common/snakepet.png",
+      "asset": "/images/collectibles/pets/standard/snakepet.png",
       "active": true,
       "tags": ["starter", "pet"]
+    },
+    {
+      "id": "cloudcub",
+      "type": "pet",
+      "rarity": "uncommon",
+      "name": "Cloud Cub",
+      "asset": "/images/collectibles/pets/uncommon/venus.cloudcub.png",
+      "active": true,
+      "tags": ["pet"]
+    },
+    {
+      "id": "canyonraptor",
+      "type": "pet",
+      "rarity": "uncommon",
+      "name": "Canyon Raptor",
+      "asset": "/images/collectibles/pets/uncommon/mars.canyonraptor.png",
+      "active": true,
+      "tags": ["pet"]
+    },
+    {
+      "id": "acidic-axolotl",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Acidic Axolotl",
+      "asset": "/images/collectibles/pets/rare/venus.Acidic Axolotl.png",
+      "active": true,
+      "tags": ["pet"]
+    },
+    {
+      "id": "rockcat",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Rock Cat",
+      "asset": "/images/collectibles/pets/rare/mars.rockcat.png",
+      "active": true,
+      "tags": ["pet"]
     },
     {
       "id": "galaxycatpet",
@@ -45,7 +81,7 @@
       "name": "Galaxy Cat",
       "asset": "/images/collectibles/pets/extremely-rare/galaxycatpet.png",
       "active": true,
-      "tags": ["rare-drop", "neptune", "pet"]
+      "tags": ["neptune", "pet"]
     },
     {
       "id": "puddlepup",

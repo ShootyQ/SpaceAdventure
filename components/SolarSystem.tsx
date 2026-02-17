@@ -14,12 +14,11 @@ import ManifestOverlay from "@/components/ManifestOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 import {
-    GALAXY_CAT_CHANCE_DENOMINATOR,
-    GALAXY_CAT_PET_ID,
-    TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR,
-    TESTING_PUDDLE_PUP_ID,
+    DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
     getPetById,
-    getUnlockPetIdsForPlanet,
+    normalizePetUnlockChanceConfig,
+    PetUnlockChanceConfig,
+    rollPetUnlocksForXpEvent,
 } from "@/lib/pets";
 
 // Note: Removed local interface definitions in favor of @/types
@@ -135,6 +134,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
+    const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
@@ -163,6 +163,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
     return () => unsub();
   }, [userData]);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
+            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+        });
+
+        return () => unsub();
+    }, []);
 
   // Trigger Bonus Victory
   useEffect(() => {
@@ -480,6 +489,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         setShips(fleet);
 
         fleet.forEach(shipData => {
+               let unlockedPetIdsThisPass: string[] = [];
              if (!isFirstLoad.current && !isStudentPersonalView) {
                 const oldXP = previousXPRef.current.get(shipData.id);
                 if (oldXP !== undefined && shipData.xp > oldXP) {
@@ -493,7 +503,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
                     const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
                     const previousUnlockedPets = previousUnlockedPetsRef.current.get(shipData.id) || new Set<string>();
-                    const canRollRarePet = userData.role === 'teacher' || userData.role === 'admin';
+                    const effectiveUnlockedPets = new Set<string>([
+                        ...Array.from(currentUnlockedPets),
+                        ...Array.from(previousUnlockedPets)
+                    ]);
+                    const canRollPetUnlocks = userData.role === 'teacher' || userData.role === 'admin';
 
                     let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
                     if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
@@ -507,48 +521,24 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         }
                     }
 
-                    if (
-                        canRollRarePet &&
-                        planetId === 'neptune' &&
-                        !currentUnlockedPets.has(GALAXY_CAT_PET_ID) &&
-                        !previousUnlockedPets.has(GALAXY_CAT_PET_ID)
-                    ) {
-                        const rareRoll = Math.random();
-                        const galaxyCatUnlockedNow = rareRoll < (1 / GALAXY_CAT_CHANCE_DENOMINATOR);
+                    if (canRollPetUnlocks && Boolean(planetId)) {
+                        const unlockedPetIds = rollPetUnlocksForXpEvent({
+                            planetId,
+                            currentlyUnlockedPetIds: effectiveUnlockedPets,
+                            chanceConfig: petUnlockChanceConfig,
+                        });
 
-                        if (galaxyCatUnlockedNow) {
+                        if (unlockedPetIds.length > 0) {
+                            unlockedPetIdsThisPass = unlockedPetIds;
                             updateDoc(doc(db, "users", shipData.id), {
-                                unlockedPetIds: arrayUnion(GALAXY_CAT_PET_ID)
+                                unlockedPetIds: arrayUnion(...unlockedPetIds)
                             }).catch((err) => {
-                                console.error("Failed to persist Galaxy Cat unlock:", err);
+                                console.error("Failed to persist pet unlocks:", err);
                             });
 
                             unlocks = {
                                 ...unlocks,
-                                pets: [...(unlocks?.pets || []), GALAXY_CAT_PET_ID]
-                            };
-                        }
-                    }
-
-                    if (
-                        canRollRarePet &&
-                        Boolean(planetId) &&
-                        !currentUnlockedPets.has(TESTING_PUDDLE_PUP_ID) &&
-                        !previousUnlockedPets.has(TESTING_PUDDLE_PUP_ID)
-                    ) {
-                        const testRoll = Math.random();
-                        const puddlePupUnlockedNow = testRoll < (1 / TESTING_PUDDLE_PUP_CHANCE_DENOMINATOR);
-
-                        if (puddlePupUnlockedNow) {
-                            updateDoc(doc(db, "users", shipData.id), {
-                                unlockedPetIds: arrayUnion(TESTING_PUDDLE_PUP_ID)
-                            }).catch((err) => {
-                                console.error("Failed to persist Puddle Pup unlock:", err);
-                            });
-
-                            unlocks = {
-                                ...unlocks,
-                                pets: [...(unlocks?.pets || []), TESTING_PUDDLE_PUP_ID]
+                                pets: [...(unlocks?.pets || []), ...unlockedPetIds]
                             };
                         }
                     }
@@ -563,7 +553,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         unlocks
                     };
 
-                    if (canRollRarePet && unlocks && userData.uid) {
+                    if (canRollPetUnlocks && unlocks && userData.uid) {
                         const discoveredUpdates: Record<string, any> = {};
                         if (unlocks.pets?.length) discoveredUpdates["discoveredUnlocks.pets"] = arrayUnion(...unlocks.pets);
                         if (unlocks.avatars?.length) discoveredUpdates["discoveredUnlocks.avatars"] = arrayUnion(...unlocks.avatars);
@@ -598,9 +588,12 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 }
              }
 
-             previousXPRef.current.set(shipData.id, shipData.xp);
-             previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
-               previousUnlockedPetsRef.current.set(shipData.id, new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id))));
+                         previousXPRef.current.set(shipData.id, shipData.xp);
+                         previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
+
+                         const cachedUnlocked = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
+                         unlockedPetIdsThisPass.forEach((petId) => cachedUnlocked.add(String(petId)));
+                         previousUnlockedPetsRef.current.set(shipData.id, cachedUnlocked);
         });
 
         isFirstLoad.current = false;
@@ -666,7 +659,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, isStudentPersonalView]);
+    }, [userData, isStudentPersonalView, petUnlockChanceConfig]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -1041,7 +1034,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                      try {
                           const userRef = doc(db, "users", ship.id);
                           const destinationId = (ship.destinationId || 'earth').toLowerCase();
-                          const petUnlocks = getUnlockPetIdsForPlanet(destinationId);
 
                           const landingUpdates: Record<string, any> = {
                               travelStatus: 'idle',
@@ -1051,10 +1043,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                               travelEnd: null,
                               visitedPlanets: arrayUnion(destinationId),
                           };
-
-                          if (petUnlocks.length > 0) {
-                              landingUpdates.unlockedPetIds = arrayUnion(...petUnlocks);
-                          }
 
                           await updateDoc(userRef, landingUpdates);
                      } catch (e) {

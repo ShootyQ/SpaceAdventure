@@ -12,7 +12,7 @@ import {
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
-import { PET_OPTIONS, getEffectiveUnlockedPetIds, getResolvedSelectedPetId } from "@/lib/pets";
+import { DEFAULT_PET_UNLOCK_CHANCE_CONFIG, getEffectiveUnlockedPetIds, getPetUnlockHint, normalizePetUnlockChanceConfig, PET_OPTIONS, PetUnlockChanceConfig, getResolvedSelectedPetId } from "@/lib/pets";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -485,6 +485,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
     const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
     const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(PUBLIC_AVATAR_OPTIONS.map(a => a.id)));
+    const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
 
     const secretUnlockRules: Record<string, { planetId: string; unlockKey: string }> = {
         jovi: { planetId: "jupiter", unlockKey: "jovi" },
@@ -513,6 +514,15 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
         return () => unsub();
     }, [userData?.teacherId]);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
+            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+        });
+
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         const currentAvatar = userData?.avatar?.avatarId || "bunny";
@@ -690,7 +700,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                         {!isUnlocked ? (
                                             <div className="mt-1 text-[10px] text-purple-300/80 uppercase tracking-widest flex items-center gap-1">
                                                 <Lock size={10} />
-                                                {pet.unlockHint || (pet.unlockPlanetId ? `Land on ${pet.unlockPlanetId}` : 'Locked')}
+                                                {getPetUnlockHint(pet, petUnlockChanceConfig) || (pet.unlockPlanetId ? `Land on ${pet.unlockPlanetId}` : 'Locked')}
                                             </div>
                                         ) : (
                                             <div className="mt-1 text-[10px] text-green-300/80 uppercase tracking-widest">Unlocked</div>

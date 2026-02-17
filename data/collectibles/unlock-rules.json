@@ -13,19 +13,121 @@
       "active": true
     },
     {
-      "id": "neptune_xp_rare_galaxy_cat",
+      "id": "planet_common",
       "type": "chance-on-event",
       "event": "xp_awarded",
       "conditions": {
-        "locationId": "neptune"
+        "locationId": "planet-tagged"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 50
+      },
+      "targets": ["rarity:common"],
+      "active": true,
+      "notes": "Planet-specific common drops."
+    },
+    {
+      "id": "planet_uncommon",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "planet-tagged"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 500
+      },
+      "targets": ["rarity:uncommon"],
+      "active": true,
+      "notes": "Planet-specific uncommon drops."
+    },
+    {
+      "id": "planet_rare",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "planet-tagged"
       },
       "probability": {
         "numerator": 1,
         "denominator": 1000
       },
-      "targets": ["galaxycatpet"],
+      "targets": ["rarity:rare"],
       "active": true,
-      "notes": "XP amount does not matter; evaluates on each XP award event."
+      "notes": "Planet-specific rare drops."
+    },
+    {
+      "id": "planet_extremely_rare",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "planet-tagged"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 5000
+      },
+      "targets": ["rarity:extremely-rare"],
+      "active": true,
+      "notes": "Planet-specific extremely rare drops."
+    },
+    {
+      "id": "any_planet_common_harder",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "any"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 250
+      },
+      "targets": ["rarity:common", "scope:any"],
+      "active": true,
+      "notes": "Any-planet common pool is harder than planet-specific."
+    },
+    {
+      "id": "any_planet_uncommon_harder",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "any"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 2500
+      },
+      "targets": ["rarity:uncommon", "scope:any"],
+      "active": true
+    },
+    {
+      "id": "any_planet_rare_harder",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "any"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 5000
+      },
+      "targets": ["rarity:rare", "scope:any"],
+      "active": true
+    },
+    {
+      "id": "any_planet_extremely_rare_harder",
+      "type": "chance-on-event",
+      "event": "xp_awarded",
+      "conditions": {
+        "locationId": "any"
+      },
+      "probability": {
+        "numerator": 1,
+        "denominator": 25000
+      },
+      "targets": ["rarity:extremely-rare", "scope:any"],
+      "active": true
     },
     {
       "id": "testing_any_planet_puddlepup",
@@ -40,17 +142,7 @@
       },
       "targets": ["puddlepup"],
       "active": true,
-      "notes": "Testing rule: any XP event can unlock Puddle Pup regardless of XP amount."
-    },
-    {
-      "id": "placeholder_teacher_configurable_threshold",
-      "type": "threshold",
-      "event": "xp_awarded",
-      "conditions": {
-        "teacherSettingKey": "collectibles.thresholds.neptuneAvatar"
-      },
-      "targets": ["avatar_placeholder_neptune_scout"],
-      "active": false
+      "notes": "Testing-only override drop."
     }
   ]
 }
