@@ -48,6 +48,9 @@ export async function POST(req: Request) {
 
         const body = await req.json();
         const { intent, priceId, cycle, userId, email, syncOnly, customerId, subscriptionId } = body;
+        const monthlyPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || '';
+        const yearlyPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || '';
+        const normalizedCycle = cycle === 'yearly' ? 'yearly' : 'monthly';
 
         if (intent === 'portal') {
             let targetCustomerId = customerId;
@@ -106,6 +109,8 @@ export async function POST(req: Request) {
             expand: ['data.subscriptions']
         });
 
+        const existingCustomerId = customers.data[0]?.id || null;
+
         if (customers.data.length > 0) {
             const customer = customers.data[0];
             const activeSubscription = customer.subscriptions?.data.find(
@@ -146,15 +151,18 @@ export async function POST(req: Request) {
             });
         }
 
+        const resolvedPriceId = typeof priceId === 'string' && priceId.trim().length > 0
+            ? priceId.trim()
+            : (normalizedCycle === 'yearly' ? yearlyPriceId : monthlyPriceId);
+
         const line_items: any = [];
 
-        if (priceId) {
+        if (resolvedPriceId) {
             line_items.push({
-                price: priceId,
+                price: resolvedPriceId,
                 quantity: 1,
             });
         } else {
-            const normalizedCycle = cycle === 'yearly' ? 'yearly' : 'monthly';
             const isYearly = normalizedCycle === 'yearly';
 
             // Fallback for Sandbox/Demo Mode if no Price ID is configured.
@@ -177,8 +185,7 @@ export async function POST(req: Request) {
 
         const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.classcrave.com';
 
-        const session = await stripe.checkout.sessions.create({
-            customer_email: email,
+        const checkoutSessionPayload: Stripe.Checkout.SessionCreateParams = {
             line_items: line_items,
             mode: 'subscription',
             allow_promotion_codes: true,
@@ -187,7 +194,15 @@ export async function POST(req: Request) {
             metadata: {
                 userId: userId,
             },
-        });
+        };
+
+        if (existingCustomerId) {
+            checkoutSessionPayload.customer = existingCustomerId;
+        } else {
+            checkoutSessionPayload.customer_email = email;
+        }
+
+        const session = await stripe.checkout.sessions.create(checkoutSessionPayload);
 
         return NextResponse.json({ url: session.url });
     } catch (error) {

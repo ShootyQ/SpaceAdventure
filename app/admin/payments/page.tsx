@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserData } from "@/types";
-import { ArrowLeft, Download, Loader2, RefreshCw } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 
 interface PaymentUser extends UserData {
   uid: string;
@@ -150,13 +149,6 @@ export default function AdminPaymentsPage() {
           <p className="mt-1 text-sm text-slate-600">Subscription growth, collections, and downloadable report rows.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/admin"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft size={16} />
-            Back to Admin
-          </Link>
           <button
             onClick={() => fetchData(false)}
             disabled={refreshing}
