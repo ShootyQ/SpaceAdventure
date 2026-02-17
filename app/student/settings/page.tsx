@@ -690,7 +690,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                         {!isUnlocked ? (
                                             <div className="mt-1 text-[10px] text-purple-300/80 uppercase tracking-widest flex items-center gap-1">
                                                 <Lock size={10} />
-                                                Land on {pet.unlockPlanetId}
+                                                {pet.unlockHint || (pet.unlockPlanetId ? `Land on ${pet.unlockPlanetId}` : 'Locked')}
                                             </div>
                                         ) : (
                                             <div className="mt-1 text-[10px] text-green-300/80 uppercase tracking-widest">Unlocked</div>

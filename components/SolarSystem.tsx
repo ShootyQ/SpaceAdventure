@@ -12,7 +12,12 @@ import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
-import { getUnlockPetIdsForPlanet } from "@/lib/pets";
+import {
+    GALAXY_CAT_CHANCE_DENOMINATOR,
+    GALAXY_CAT_PET_ID,
+    getPetById,
+    getUnlockPetIdsForPlanet,
+} from "@/lib/pets";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -109,8 +114,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
   const [currentAward, setCurrentAward] = useState<AwardEvent | null>(null);
+    const [revealedUnlockAwardIds, setRevealedUnlockAwardIds] = useState<Set<string>>(new Set());
 
     const previousPlanetXPRef = useRef<Map<string, Record<string, number>>>(new Map());
+        const previousUnlockedPetsRef = useRef<Map<string, Set<string>>>(new Map());
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
@@ -338,6 +345,43 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       }
   }, [awardQueue]);
 
+  useEffect(() => {
+      if (awardQueue.length === 0 && revealedUnlockAwardIds.size > 0) {
+          setRevealedUnlockAwardIds(new Set());
+      }
+  }, [awardQueue.length, revealedUnlockAwardIds.size]);
+
+  useEffect(() => {
+      if (awardQueue.length === 0) return;
+
+      const timerIds: NodeJS.Timeout[] = [];
+
+      awardQueue.forEach((award) => {
+          const hasUnlocks = Boolean(
+              award.unlocks?.ships?.length ||
+              award.unlocks?.avatars?.length ||
+              award.unlocks?.pets?.length
+          );
+
+          if (!hasUnlocks || revealedUnlockAwardIds.has(award.id)) return;
+
+          const timerId = setTimeout(() => {
+              setRevealedUnlockAwardIds((prev) => {
+                  if (prev.has(award.id)) return prev;
+                  const next = new Set(prev);
+                  next.add(award.id);
+                  return next;
+              });
+          }, 5000);
+
+          timerIds.push(timerId);
+      });
+
+      return () => {
+          timerIds.forEach((timerId) => clearTimeout(timerId));
+      };
+  }, [awardQueue, revealedUnlockAwardIds]);
+
   // Real-time subscription to all star travelers
   useEffect(() => {
     if (!userData) return;
@@ -360,7 +404,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
             lastXpReason: data.lastXpReason,
             flag: data.flag,
             visitedPlanets: data.visitedPlanets || [],
-            planetXP: data.planetXP || {}
+            planetXP: data.planetXP || {},
+            unlockedPetIds: data.unlockedPetIds || []
         };
     };
 
@@ -379,8 +424,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
                     const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
                     const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
+                    const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
+                    const previousUnlockedPets = previousUnlockedPetsRef.current.get(shipData.id) || new Set<string>();
+                    const canRollRarePet = userData.role === 'teacher' || userData.role === 'admin';
 
-                    let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
+                    let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[] } | undefined;
                     if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
                         const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
                         const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
@@ -388,6 +436,29 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         if (joviUnlockedNow) {
                             unlocks = {
                                 avatars: ['jovi'],
+                            };
+                        }
+                    }
+
+                    if (
+                        canRollRarePet &&
+                        planetId === 'neptune' &&
+                        !currentUnlockedPets.has(GALAXY_CAT_PET_ID) &&
+                        !previousUnlockedPets.has(GALAXY_CAT_PET_ID)
+                    ) {
+                        const rareRoll = Math.random();
+                        const galaxyCatUnlockedNow = rareRoll < (1 / GALAXY_CAT_CHANCE_DENOMINATOR);
+
+                        if (galaxyCatUnlockedNow) {
+                            updateDoc(doc(db, "users", shipData.id), {
+                                unlockedPetIds: arrayUnion(GALAXY_CAT_PET_ID)
+                            }).catch((err) => {
+                                console.error("Failed to persist Galaxy Cat unlock:", err);
+                            });
+
+                            unlocks = {
+                                ...unlocks,
+                                pets: [...(unlocks?.pets || []), GALAXY_CAT_PET_ID]
                             };
                         }
                     }
@@ -415,6 +486,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
              previousXPRef.current.set(shipData.id, shipData.xp);
              previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
+               previousUnlockedPetsRef.current.set(shipData.id, new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id))));
         });
 
         isFirstLoad.current = false;
@@ -1719,7 +1791,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 )}
                             </div>
 
-                            {(award.unlocks?.ships?.length || award.unlocks?.avatars?.length) && (
+                            {(award.unlocks?.ships?.length || award.unlocks?.avatars?.length || award.unlocks?.pets?.length) && revealedUnlockAwardIds.has(award.id) && (
                                 <motion.div
                                     initial={{ scale: 0.9, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
@@ -1745,6 +1817,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Avatar</div>
                                                 </div>
                                             ))}
+                                            {(award.unlocks.pets || []).map((id) => {
+                                                const pet = getPetById(id);
+                                                return (
+                                                    <div key={`pet-${id}`} className="flex flex-col items-center gap-1">
+                                                        <div className="w-12 h-12 rounded-full border border-purple-400/40 overflow-hidden bg-black/40 flex items-center justify-center text-xl">
+                                                            {pet.imageSrc ? (
+                                                                <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                            ) : (
+                                                                <>{pet.emoji}</>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Pet</div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </motion.div>

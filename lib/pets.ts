@@ -6,14 +6,27 @@ export interface PetOption {
     emoji: string;
     imageSrc?: string;
     unlockPlanetId?: string;
+    unlockHint?: string;
     starter: boolean;
 }
+
+export const GALAXY_CAT_PET_ID = "galaxycatpet";
+export const GALAXY_CAT_CHANCE_DENOMINATOR = 1000;
 
 export const PET_OPTIONS: PetOption[] = [
     { id: "batpet", name: "Space Bat", emoji: "🦇", imageSrc: "/images/pets/batpet.png", starter: true },
     { id: "mothpet", name: "Cosmic Moth", emoji: "🦋", imageSrc: "/images/pets/mothpet.png", starter: true },
     { id: "otterpet", name: "Orbit Otter", emoji: "🦦", imageSrc: "/images/pets/otterpet.png", starter: true },
     { id: "snakepet", name: "Nebula Snake", emoji: "🐍", imageSrc: "/images/pets/snakepet.png", starter: true },
+    {
+        id: GALAXY_CAT_PET_ID,
+        name: "Galaxy Cat",
+        emoji: "🐱",
+        imageSrc: "/images/pets/randomly%20found/extremely%20rare/galaxycatpet.png",
+        starter: false,
+        unlockPlanetId: "neptune",
+        unlockHint: `Gain XP while orbiting Neptune (${GALAXY_CAT_CHANCE_DENOMINATOR.toLocaleString()}-to-1 chance)`
+    },
 ];
 
 export const STARTER_PET_IDS = PET_OPTIONS.filter((pet) => pet.starter).map((pet) => pet.id);

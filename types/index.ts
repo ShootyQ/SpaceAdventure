@@ -179,6 +179,7 @@ export interface Ship {
     flag?: FlagConfig;
     visitedPlanets?: string[];
     planetXP?: Record<string, number>;
+    unlockedPetIds?: string[];
 }
   
 export interface AwardEvent {
@@ -188,7 +189,7 @@ export interface AwardEvent {
       newRank?: string;
       startPos: { x: number, y: number }; // Screen coordinates to fly from
       reason?: string;
-    unlocks?: { ships?: string[]; avatars?: string[] };
+    unlocks?: { ships?: string[]; avatars?: string[]; pets?: string[] };
 }
   
 export interface Behavior {
