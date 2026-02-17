@@ -1296,6 +1296,9 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                                 <div className="text-xs font-bold text-rose-500 uppercase tracking-widest">
                                     Use code <span className="underline decoration-2 underline-offset-2">LAUNCHSALE</span> for 50% off
                                 </div>
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                    Prices are shown in USD. Final charge may include applicable taxes.
+                                </p>
                             </div>
 
                             {activePlanPricing.compareAtCents && activePlanPricing.compareAtCents > activePlanPricing.amountCents && (
@@ -1340,6 +1343,12 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         <h4 className="text-slate-900 font-bold text-sm uppercase tracking-wider mb-1">Teacher Guarantee</h4>
                         <p className="text-slate-600 text-sm leading-relaxed">If you don’t see an increase in student engagement within the first 30 days, we’ll refund your subscription in full.</p>
                     </div>
+                </div>
+
+                <div className="p-5 bg-white/80 border border-black/10 rounded-2xl text-xs text-slate-600 space-y-2">
+                    <p>Subscriptions renew automatically until canceled. You can cancel anytime from Billing settings.</p>
+                    <p>If canceled, paid access remains active through the current billing period and then returns to trial limits.</p>
+                    <p>Promo codes apply only to eligible plans and billing cycles, and may be limited to one redemption per customer.</p>
                 </div>
 
                 <div className="p-5 bg-white/80 border border-black/10 rounded-2xl grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -159,6 +159,10 @@ export interface UserData {
     stripeCurrentPeriodEnd?: any;
     stripeLastPaymentAt?: any;
     stripeLastPaymentAmount?: number;
+    stripeLastDiscountAmount?: number;
+    stripeLastPromoCode?: string | null;
+    stripeLastCouponId?: string | null;
+    stripeLastInvoiceId?: string | null;
     stripeCurrency?: string;
 }
   

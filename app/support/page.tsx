@@ -26,6 +26,16 @@ export default function Support() {
               We typically respond within 24 hours.
             </p>
           </div>
+
+          <div className="text-left bg-white border border-black/5 rounded-2xl p-5 mb-8">
+            <h3 className="font-semibold text-slate-900 mb-3">Billing FAQ</h3>
+            <ul className="space-y-2 text-sm text-slate-600">
+              <li><strong className="text-slate-800">How do I cancel?</strong> Cancel anytime from your Billing settings.</li>
+              <li><strong className="text-slate-800">Do I keep access after canceling?</strong> Yes, through your current paid period.</li>
+              <li><strong className="text-slate-800">Can I use promo codes?</strong> Promo codes are limited by eligibility, plan, and billing cycle.</li>
+              <li><strong className="text-slate-800">Are taxes included?</strong> Taxes may apply based on billing location.</li>
+            </ul>
+          </div>
           
           <div className="text-slate-500 text-sm">
              Check the <Link href="/about" className="text-emerald-600 hover:text-emerald-700 underline">Product page</Link> to see how it works.

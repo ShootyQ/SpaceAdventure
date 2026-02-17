@@ -33,6 +33,24 @@ export default function TermsOfService() {
               The materials on ClassCrave's website are provided on an 'as is' basis. ClassCrave makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.
             </p>
 
+            <h3 className="text-xl font-semibold text-slate-900 mt-8 mb-4">Billing, Renewals, and Cancellations</h3>
+            <p className="mb-4">
+              Paid subscriptions renew automatically unless canceled before the next renewal date. You may cancel at any time from account billing settings. If canceled, paid access remains available through the end of the current paid billing period unless otherwise required by law.
+            </p>
+            <p className="mb-4">
+              Pricing is listed in USD unless otherwise stated. Final charges may include applicable taxes depending on billing jurisdiction.
+            </p>
+
+            <h3 className="text-xl font-semibold text-slate-900 mt-8 mb-4">Promotions and Discounts</h3>
+            <p className="mb-4">
+              Promotion codes and discounts may be limited by plan, billing cycle, account eligibility, expiration date, redemption count, and one-time use restrictions. Promotions may be modified or discontinued at any time unless prohibited by law.
+            </p>
+
+            <h3 className="text-xl font-semibold text-slate-900 mt-8 mb-4">Refunds</h3>
+            <p className="mb-4">
+              Refund requests are reviewed according to the currently published refund policy, applicable plan terms, and governing law. Any discretionary guarantees or promotional refund offers may include additional eligibility requirements.
+            </p>
+
             <h3 className="text-xl font-semibold text-slate-900 mt-8 mb-4">Limitations</h3>
             <p className="mb-4">
               In no event shall ClassCrave or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on ClassCrave's website, even if ClassCrave or a ClassCrave authorized representative has been notified orally or in writing of the possibility of such damage.
