@@ -12,6 +12,7 @@ import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
+import { getUnlockPetIdsForPlanet } from "@/lib/pets";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -728,14 +729,24 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                  const arrive = async () => {
                      try {
-                          const userRef = doc(db, "users", ship.id); 
-                          await updateDoc(userRef, {
+                          const userRef = doc(db, "users", ship.id);
+                          const destinationId = (ship.destinationId || 'earth').toLowerCase();
+                          const petUnlocks = getUnlockPetIdsForPlanet(destinationId);
+
+                          const landingUpdates: Record<string, any> = {
                               travelStatus: 'idle',
-                              location: ship.destinationId || 'earth',
+                              location: destinationId,
                               destinationId: null,
                               travelStart: null,
-                              travelEnd: null
-                          });
+                              travelEnd: null,
+                              visitedPlanets: arrayUnion(destinationId),
+                          };
+
+                          if (petUnlocks.length > 0) {
+                              landingUpdates.unlockedPetIds = arrayUnion(...petUnlocks);
+                          }
+
+                          await updateDoc(userRef, landingUpdates);
                      } catch (e) {
                          console.error(`Landing failed for ${ship.cadetName}:`, e);
                          landingProcessing.current.delete(ship.id); // Unlock to retry

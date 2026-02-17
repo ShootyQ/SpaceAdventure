@@ -7,11 +7,12 @@ import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/fire
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
-    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity
+    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, Lock
 } from "lucide-react";
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { PET_OPTIONS, getEffectiveUnlockedPetIds, getResolvedSelectedPetId } from "@/lib/pets";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -480,6 +481,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [bgLight, setBgLight] = useState(userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20);
     const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
     const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
+    const [petId, setPetId] = useState(getResolvedSelectedPetId(userData));
 
     const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
     const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(PUBLIC_AVATAR_OPTIONS.map(a => a.id)));
@@ -528,6 +530,10 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
         if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
     }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, avatarId]);
 
+    useEffect(() => {
+        setPetId(getResolvedSelectedPetId(userData));
+    }, [userData?.selectedPetId, userData?.unlockedPetIds]);
+
     const handleSelectPreset = (presetId: string) => {
         const preset = AVATAR_PRESETS.find(p => p.id === presetId);
         if (preset) {
@@ -542,12 +548,14 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     };
 
     const visiblePresets = AVATAR_PRESETS.filter(p => unlockedAvatarIds.has(p.config.avatarId));
+    const unlockedPetIds = getEffectiveUnlockedPetIds(userData);
 
     const handleSave = async () => {
         if (!user) return;
         setLoading(true);
         try {
             const safeAvatarId = unlockedAvatarIds.has(avatarId) ? avatarId : (userData?.avatar?.avatarId || "bunny");
+            const safePetId = unlockedPetIds.has(petId) ? petId : getResolvedSelectedPetId(userData);
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
                 "avatar.hue": hue,
@@ -556,7 +564,9 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.bgSat": bgSat,
                 "avatar.bgLight": bgLight,
                 "avatar.activeHat": activeHat,
-                "avatar.avatarId": safeAvatarId
+                "avatar.avatarId": safeAvatarId,
+                "selectedPetId": safePetId,
+                "unlockedPetIds": Array.from(unlockedPetIds)
             });
             onBack();
         } catch (e) {
@@ -642,6 +652,49 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                 <span className={`text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${avatarId === opt.id ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>{opt.name}</span>
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Sparkles size={20} className="text-purple-400" />
+                        <span className="uppercase tracking-wider">Companion Selection</span>
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        {PET_OPTIONS.map((pet) => {
+                            const isUnlocked = unlockedPetIds.has(pet.id);
+                            return (
+                                <button
+                                    key={pet.id}
+                                    type="button"
+                                    disabled={!isUnlocked}
+                                    onClick={() => isUnlocked && setPetId(pet.id)}
+                                    className={`group relative p-3 rounded-xl border transition-all flex items-center gap-3 ${!isUnlocked
+                                        ? 'border-white/10 bg-black/30 opacity-60 cursor-not-allowed'
+                                        : petId === pet.id
+                                            ? 'bg-purple-900/40 border-purple-400'
+                                            : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'
+                                        }`}
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-2xl">
+                                        {pet.emoji}
+                                    </div>
+                                    <div className="text-left min-w-0">
+                                        <div className={`text-xs font-bold uppercase tracking-wider truncate ${petId === pet.id && isUnlocked ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>
+                                            {pet.name}
+                                        </div>
+                                        {!isUnlocked ? (
+                                            <div className="mt-1 text-[10px] text-purple-300/80 uppercase tracking-widest flex items-center gap-1">
+                                                <Lock size={10} />
+                                                Land on {pet.unlockPlanetId}
+                                            </div>
+                                        ) : (
+                                            <div className="mt-1 text-[10px] text-green-300/80 uppercase tracking-widest">Unlocked</div>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

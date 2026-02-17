@@ -136,6 +136,8 @@ export interface UserData {
     unlockedHats?: string[];
     completedMissions?: string[];
     missionProgress?: Record<string, MissionProgress>;
+    selectedPetId?: string;
+    unlockedPetIds?: string[];
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)

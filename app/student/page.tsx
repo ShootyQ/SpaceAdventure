@@ -10,6 +10,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AVATAR_OPTIONS } from '@/components/UserAvatar';
 import interiorZones from '@/data/interior-zones/defaultinterior.zones.json';
+import { getPetById, getResolvedSelectedPetId } from '@/lib/pets';
 
 const DEFAULT_RANKS: Rank[] = [
     { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
@@ -42,6 +43,7 @@ export default function StudentConsole() {
     const badgeZone = findZone('zone_currentBadge');
     const avatarZone = findZone('zone_playerAvatar');
     const shipZone = findZone('zone_player_currentShip');
+    const petZone = findZone('zone_playerPet');
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "game-config", "ranks"), (doc) => {
@@ -70,6 +72,8 @@ export default function StudentConsole() {
     const selectedShipId = userData?.spaceship?.modelId || userData?.spaceship?.id || 'finalship';
     const selectedAvatarId = userData?.avatar?.avatarId || 'bunny';
     const selectedAvatar = AVATAR_OPTIONS.find((avatar) => avatar.id === selectedAvatarId) || AVATAR_OPTIONS[0];
+    const selectedPetId = getResolvedSelectedPetId(userData);
+    const selectedPet = getPetById(selectedPetId);
 
     const zoneStyle = (zone?: { x: number; y: number; w: number; h: number; z?: number }) => {
         if (!zone) return undefined;
@@ -160,6 +164,25 @@ export default function StudentConsole() {
                                         alt="Current Ship"
                                         className="w-full h-full object-contain drop-shadow-[0_0_16px_rgba(34,211,238,0.35)]"
                                     />
+                                </div>
+                            )}
+
+                            {petZone && (
+                                <div className="absolute p-1" style={zoneStyle(petZone)}>
+                                    {selectedPet.imageSrc ? (
+                                        <img
+                                            src={getAssetPath(selectedPet.imageSrc)}
+                                            alt={selectedPet.name}
+                                            className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(167,139,250,0.35)]"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full rounded-xl bg-black/35 border border-purple-400/40 flex flex-col items-center justify-center">
+                                            <div className="text-3xl md:text-4xl leading-none">{selectedPet.emoji}</div>
+                                            <div className="mt-1 text-[10px] md:text-xs uppercase tracking-widest text-purple-200 text-center px-1">
+                                                {selectedPet.name}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -13,6 +13,7 @@ import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { getTeacherStudentLimit, isSubscriptionActive } from "@/lib/subscription";
+import { DEFAULT_PET_ID, STARTER_PET_IDS } from "@/lib/pets";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
@@ -137,6 +138,8 @@ export default function RosterPage() {
                  bgLight: 20,
                  activeHat: 'none'
               },
+                  selectedPetId: DEFAULT_PET_ID,
+                  unlockedPetIds: [...STARTER_PET_IDS],
               // Storing credentials for classroom management features (Print Cards)
               username: newStudentData.username,
               password: newStudentData.password
