@@ -10,10 +10,10 @@ export interface PetOption {
 }
 
 export const PET_OPTIONS: PetOption[] = [
-    { id: "stardust-fox", name: "Stardust Fox", emoji: "🦊", starter: true },
-    { id: "orbit-bunny", name: "Orbit Bunny", emoji: "🐰", starter: true },
-    { id: "nova-otter", name: "Nova Otter", emoji: "🦦", starter: true },
-    { id: "cosmo-pup", name: "Cosmo Pup", emoji: "🐶", starter: true },
+    { id: "batpet", name: "Space Bat", emoji: "🦇", imageSrc: "/images/pets/batpet.png", starter: true },
+    { id: "mothpet", name: "Cosmic Moth", emoji: "🦋", imageSrc: "/images/pets/mothpet.png", starter: true },
+    { id: "otterpet", name: "Orbit Otter", emoji: "🦦", imageSrc: "/images/pets/otterpet.png", starter: true },
+    { id: "snakepet", name: "Nebula Snake", emoji: "🐍", imageSrc: "/images/pets/snakepet.png", starter: true },
 ];
 
 export const STARTER_PET_IDS = PET_OPTIONS.filter((pet) => pet.starter).map((pet) => pet.id);

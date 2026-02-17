@@ -676,8 +676,12 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                             : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'
                                         }`}
                                 >
-                                    <div className="w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-2xl">
-                                        {pet.emoji}
+                                    <div className="w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-2xl overflow-hidden">
+                                        {pet.imageSrc ? (
+                                            <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <>{pet.emoji}</>
+                                        )}
                                     </div>
                                     <div className="text-left min-w-0">
                                         <div className={`text-xs font-bold uppercase tracking-wider truncate ${petId === pet.id && isUnlocked ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>

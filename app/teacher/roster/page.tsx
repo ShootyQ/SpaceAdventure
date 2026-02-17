@@ -13,7 +13,7 @@ import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { getTeacherStudentLimit, isSubscriptionActive } from "@/lib/subscription";
-import { DEFAULT_PET_ID, STARTER_PET_IDS } from "@/lib/pets";
+import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
@@ -34,6 +34,7 @@ export default function RosterPage() {
     const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
     const [selectedAvatarId, setSelectedAvatarId] = useState(PUBLIC_AVATAR_OPTIONS[0].id);
   const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
+    const [selectedPetId, setSelectedPetId] = useState(DEFAULT_PET_ID);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
 
@@ -138,7 +139,7 @@ export default function RosterPage() {
                  bgLight: 20,
                  activeHat: 'none'
               },
-                  selectedPetId: DEFAULT_PET_ID,
+                  selectedPetId,
                   unlockedPetIds: [...STARTER_PET_IDS],
               // Storing credentials for classroom management features (Print Cards)
               username: newStudentData.username,
@@ -152,6 +153,7 @@ export default function RosterPage() {
           setNewStudentGrade("3");
           setSelectedAvatarId(PUBLIC_AVATAR_OPTIONS[0].id);
           setSelectedShipId(SHIP_OPTIONS[0].id);
+          setSelectedPetId(DEFAULT_PET_ID);
           setIsAddingStudent(false);
       } catch (e: any) {
           console.error("Error creating student:", e);
@@ -175,7 +177,9 @@ export default function RosterPage() {
           gradeLevel: student.gradeLevel || '3',
           status: student.status,
           avatar: student.avatar,
-          spaceship: student.spaceship // Include spaceship
+          spaceship: student.spaceship,
+          selectedPetId: student.selectedPetId || DEFAULT_PET_ID,
+          unlockedPetIds: student.unlockedPetIds || [...STARTER_PET_IDS]
       });
       setShowEditVisuals(false); // default to closed
       setEditPassword("");
@@ -247,6 +251,16 @@ export default function RosterPage() {
       setEditForm(prev => ({
           ...prev,
           spaceship: { ...prev.spaceship!, id: shipId, modelId: shipId }
+      }));
+  };
+
+  const handleUpdatePet = (petId: string) => {
+      const unlockedPetIds = new Set([...(editForm.unlockedPetIds || []), ...STARTER_PET_IDS]);
+      if (!unlockedPetIds.has(petId)) return;
+      setEditForm(prev => ({
+          ...prev,
+          selectedPetId: petId,
+          unlockedPetIds: [...unlockedPetIds]
       }));
   };
 
@@ -446,6 +460,29 @@ export default function RosterPage() {
                                     ))}
                                 </div>
                             </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Pet</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {PET_OPTIONS.map((pet) => (
+                                        <button
+                                            key={pet.id}
+                                            type="button"
+                                            onClick={() => setSelectedPetId(pet.id)}
+                                            className={`relative p-2 rounded-lg border-2 flex flex-col items-center gap-1 bg-black/50 transition-all ${selectedPetId === pet.id ? 'border-cyan-400 ring-2 ring-cyan-500/20 bg-cyan-900/10' : 'border-white/10 hover:border-white/30'}`}
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-black/60 border border-cyan-700/40 flex items-center justify-center text-xl overflow-hidden">
+                                                {pet.imageSrc ? (
+                                                    <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <>{pet.emoji}</>
+                                                )}
+                                            </div>
+                                            <div className="text-[9px] uppercase font-bold text-center leading-tight text-gray-300">{pet.name}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
                         {creationError && <div className="mt-4 p-2 bg-red-900/20 border border-red-500/30 text-red-400 text-xs rounded uppercase tracking-wider">{creationError}</div>}
@@ -515,14 +552,14 @@ export default function RosterPage() {
                                              onClick={() => setShowEditVisuals(!showEditVisuals)}
                                              className="text-[10px] text-cyan-400 uppercase font-bold tracking-wider hover:text-white text-left px-1"
                                          >
-                                             {showEditVisuals ? "- Close Visuals" : "+ Change Avatar / Ship"}
+                                             {showEditVisuals ? "- Close Visuals" : "+ Change Avatar / Ship / Pet"}
                                          </button>
                                     </div>
 
                                     {/* Visual Editor Expanded Area */}
                                     {showEditVisuals && (
                                         <div className="col-span-12 bg-black/60 border border-cyan-500/30 rounded-xl p-4 mb-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <div>
                                                     <h4 className="text-xs text-white uppercase font-bold mb-2">Avatar</h4>
                                                     <div className="grid grid-cols-5 gap-2">
@@ -552,6 +589,27 @@ export default function RosterPage() {
                                                                  <img src={getAssetPath(ship.src)} className="w-8 h-8 object-contain" />
                                                                  <span className="text-[8px] uppercase mt-1 text-center">{ship.name}</span>
                                                              </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs text-white uppercase font-bold mb-2">Pet</h4>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {PET_OPTIONS.filter((pet) => new Set([...(editForm.unlockedPetIds || []), ...STARTER_PET_IDS]).has(pet.id)).map((pet) => (
+                                                            <button
+                                                                key={pet.id}
+                                                                onClick={() => handleUpdatePet(pet.id)}
+                                                                className={`p-2 rounded border flex items-center gap-2 ${editForm.selectedPetId === pet.id ? 'border-cyan-400 bg-cyan-900/20' : 'border-white/10 opacity-70 hover:opacity-100'}`}
+                                                            >
+                                                                <div className="w-8 h-8 rounded-full bg-black/60 border border-cyan-700/40 flex items-center justify-center text-lg overflow-hidden">
+                                                                    {pet.imageSrc ? (
+                                                                        <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                                    ) : (
+                                                                        <>{pet.emoji}</>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[9px] uppercase text-left font-bold leading-tight">{pet.name}</span>
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 </div>
