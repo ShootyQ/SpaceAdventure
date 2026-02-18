@@ -481,7 +481,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
             flag: data.flag,
             visitedPlanets: data.visitedPlanets || [],
             planetXP: data.planetXP || {},
-            unlockedPetIds: data.unlockedPetIds || []
+            unlockedPetIds: data.unlockedPetIds || [],
+            selectedPetId: data.selectedPetId
         };
     };
 
@@ -695,7 +696,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     lastXpReason: data.lastXpReason,
                     flag: data.flag,
                     visitedPlanets: data.visitedPlanets || [],
-                    planetXP: data.planetXP || {}
+                    planetXP: data.planetXP || {},
+                    selectedPetId: data.selectedPetId
                 } as Ship;
             });
             setPlanetVisitors(visitors);
@@ -1367,10 +1369,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                             alt="Traveling Ship"
                                                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
-                                      {/* Avatar Window */}
-                                      <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                            <UserAvatar userData={ship} transparentBg className="w-full h-full scale-[1.35] translate-y-1" />
-                                      </div>
                                   </div>
                               </div>
                           )}
@@ -1539,9 +1537,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
-                                                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                                    <UserAvatar userData={ship} transparentBg className="w-full h-full scale-[1.35] translate-y-1" />
-                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1943,7 +1938,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-[calc(100vh-2rem)] overflow-y-auto cursor-default"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {awardQueue.map((award, index) => (
+                    {awardQueue.map((award, index) => {
+                        const isCompactAward = awardQueue.length > 1;
+                        const selectedPet = getPetById(award.ship.selectedPetId);
+                        return (
                         <motion.div
                             key={award.id}
                             initial={{ scale: 0, rotate: -10, y: 50 }}
@@ -1956,7 +1954,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 delay: index * 0.1 // Stagger effect
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${awardQueue.length > 1 ? 'w-[300px] aspect-auto' : 'w-[500px] aspect-square p-8'}
+                                ${isCompactAward ? 'w-[300px] aspect-auto' : 'w-[500px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -1968,9 +1966,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             {/* Background Shine */}
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
 
-                            <h2 className={`${awardQueue.length > 1 ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest mb-4 uppercase relative z-10`}>Training Milestone</h2>
+                            <h2 className={`${isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest mb-4 uppercase relative z-10`}>Training Milestone</h2>
 
-                            {/* The Ship */}
+                            {/* Avatar + Ship + Pet */}
                             <motion.div
                                 animate={{
                                     y: [0, -10, 0],
@@ -1981,31 +1979,47 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     duration: 4,
                                     ease: "easeInOut"
                                 }}
-                                className={`relative z-10 ${awardQueue.length > 1 ? 'mb-2' : 'mb-6'}`}
+                                className={`relative z-10 ${isCompactAward ? 'mb-2' : 'mb-6'}`}
                             >
-                                <div className={`relative ${awardQueue.length > 1 ? 'w-24 h-24' : 'w-40 h-40'}`}>
-                                    <img 
-                                        src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
-                                        alt="Award Ship"
-                                        className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] relative z-20"
-                                    />
-                                    {/* Avatar Window - Using simple color fallback because getting full user avatar data here might be complex without looking up ship again, 
-                                        but we have 'ship' object in award.
-                                     */}
-                                    <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                        {award.ship.avatar && (
-                                            <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full scale-[1.35] translate-y-1" />
+                                <div className={`relative flex items-center justify-center ${isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
+                                    {award.ship.flag && (
+                                        <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : '-top-3 right-[38%] scale-95'}`}>
+                                            <TinyFlag config={award.ship.flag} />
+                                        </div>
+                                    )}
+
+                                    <div className={`absolute left-1 z-30 rounded-full border border-cyan-400/40 bg-black/60 p-1 shadow-[0_0_20px_rgba(34,211,238,0.25)] ${isCompactAward ? 'w-11 h-11 top-[60%] -translate-y-1/2' : 'w-16 h-16 top-[58%] -translate-y-1/2'}`}>
+                                        <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full rounded-full" />
+                                    </div>
+
+                                    <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
+                                        <img 
+                                            src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
+                                            alt="Award Ship"
+                                            className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
+                                        />
+                                    </div>
+
+                                    <div className={`absolute right-1 z-30 rounded-full border border-cyan-400/30 bg-black/60 p-1 shadow-[0_0_18px_rgba(34,211,238,0.2)] flex items-center justify-center ${isCompactAward ? 'w-11 h-11 top-[60%] -translate-y-1/2' : 'w-16 h-16 top-[58%] -translate-y-1/2'}`}>
+                                        {selectedPet.imageSrc ? (
+                                            <img
+                                                src={getAssetPath(selectedPet.imageSrc)}
+                                                alt={selectedPet.name}
+                                                className="w-full h-full object-contain"
+                                            />
+                                        ) : (
+                                            <span className={`${isCompactAward ? 'text-xl' : 'text-2xl'} leading-none`}>{selectedPet.emoji}</span>
                                         )}
                                     </div>
                                 </div>
                             </motion.div>
 
-                            <div className={`${awardQueue.length > 1 ? 'text-2xl' : 'text-4xl'} font-bold text-white mb-2 font-sans relative z-10 truncate w-full`}>
+                            <div className={`${isCompactAward ? 'text-2xl' : 'text-4xl'} font-bold text-white mb-2 font-sans relative z-10 truncate w-full`}>
                                 {award.ship.cadetName}
                             </div>
                             
                             {award.reason && (
-                                <div className={`text-cyan-400/80 ${awardQueue.length > 1 ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
+                                <div className={`text-cyan-400/80 ${isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
                                     {award.reason}
                                 </div>
                             )}
@@ -2044,7 +2058,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 )}
                             </div>
                         </motion.div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 <AnimatePresence>

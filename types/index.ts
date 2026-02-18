@@ -184,6 +184,7 @@ export interface Ship {
     visitedPlanets?: string[];
     planetXP?: Record<string, number>;
     unlockedPetIds?: string[];
+    selectedPetId?: string;
 }
   
 export interface AwardEvent {
