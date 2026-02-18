@@ -99,15 +99,15 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             </div>
 
             {/* Avatar + Ship + Pet */}
-            <div className="relative w-full h-32 mb-4 flex items-center justify-center">
+            <div className="relative w-full h-36 mb-4 flex items-center justify-center">
                 {student.flag && (
-                    <div className="absolute top-0 right-6 z-40 scale-95 drop-shadow-md">
+                    <div className="absolute top-6 right-2 z-40 scale-90 drop-shadow-md">
                         <TinyFlag config={student.flag} />
                     </div>
                 )}
 
-                <div className="absolute left-1 top-[58%] -translate-y-1/2 z-30 w-12 h-12 md:w-14 md:h-14 rounded-full border border-cyan-400/40 bg-black/50 p-1 shadow-[0_0_15px_rgba(34,211,238,0.25)]">
-                    <UserAvatar userData={student as any} transparentBg className="w-full h-full rounded-full" />
+                <div className="absolute left-0 top-[76%] -translate-y-1/2 z-30 w-[58px] h-[58px] md:w-[68px] md:h-[68px] flex items-end justify-center">
+                    <UserAvatar userData={student as any} transparentBg className="w-full h-full" />
                 </div>
 
                 <div className="relative z-20 w-24 h-24 md:w-28 md:h-28">
@@ -118,7 +118,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                     />
                 </div>
 
-                <div className="absolute right-1 top-[58%] -translate-y-1/2 z-30 w-12 h-12 md:w-14 md:h-14 rounded-full border border-cyan-400/30 bg-black/60 p-1 shadow-[0_0_15px_rgba(34,211,238,0.2)] flex items-center justify-center">
+                <div className="absolute right-0 top-[76%] -translate-y-1/2 z-30 w-[52px] h-[52px] md:w-[62px] md:h-[62px] flex items-end justify-center">
                     {selectedPet.imageSrc ? (
                         <img
                             src={getAssetPath(selectedPet.imageSrc)}
@@ -199,7 +199,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                          </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-7">
                         {visibleShips.map(student => (
                             <ShipCard 
                                 key={student.id}
@@ -231,6 +231,8 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                      <div className="relative group">
                                          <select 
                                             id="bulk-protocol"
+                                                          title="Select protocol"
+                                                          aria-label="Select protocol"
                                             onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 const xpInput = document.getElementById('bulk-xp') as HTMLInputElement;

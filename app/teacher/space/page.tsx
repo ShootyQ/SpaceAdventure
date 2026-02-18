@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer } from 'lucide-react';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer, Trophy } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getAssetPath } from '@/lib/utils';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
@@ -350,6 +350,16 @@ export default function TeacherConsole() {
                         href="/teacher/planets"
                         color="text-teal-400"
                         borderColor="border-teal-500/30"
+                    />
+                </div>
+                <div id="tile-achievements">
+                    <QuickAction
+                        title="Achievements"
+                        icon={<Trophy size={28} />}
+                        desc="Badges & Thresholds"
+                        href="/teacher/achievements"
+                        color="text-amber-300"
+                        borderColor="border-amber-500/30"
                     />
                 </div>
                 <div id="tile-asteroids">

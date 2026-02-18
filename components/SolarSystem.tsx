@@ -1988,8 +1988,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                         </div>
                                     )}
 
-                                    <div className={`absolute left-1 z-30 rounded-full border border-cyan-400/40 bg-black/60 p-1 shadow-[0_0_20px_rgba(34,211,238,0.25)] ${isCompactAward ? 'w-11 h-11 top-[60%] -translate-y-1/2' : 'w-16 h-16 top-[58%] -translate-y-1/2'}`}>
-                                        <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full rounded-full" />
+                                    <div className={`absolute left-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
+                                        <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full" />
                                     </div>
 
                                     <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
@@ -2000,7 +2000,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                         />
                                     </div>
 
-                                    <div className={`absolute right-1 z-30 rounded-full border border-cyan-400/30 bg-black/60 p-1 shadow-[0_0_18px_rgba(34,211,238,0.2)] flex items-center justify-center ${isCompactAward ? 'w-11 h-11 top-[60%] -translate-y-1/2' : 'w-16 h-16 top-[58%] -translate-y-1/2'}`}>
+                                    <div className={`absolute right-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
                                         {selectedPet.imageSrc ? (
                                             <img
                                                 src={getAssetPath(selectedPet.imageSrc)}
