@@ -34,9 +34,9 @@ export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[
     { id: 'p3', name: 'Forest Ranger', config: { hue: 120, skinHue: 100, bgHue: 120, bgSat: 50, bgLight: 60, activeHat: 'none', avatarId: 'raccoon' } },
     { id: 'p4', name: 'Solar Pilot', config: { hue: 45, skinHue: 60, bgHue: 40, bgSat: 90, bgLight: 70, activeHat: 'none', avatarId: 'otter' } },
     { id: 'p5', name: 'Void Walker', config: { hue: 270, skinHue: 260, bgHue: 280, bgSat: 40, bgLight: 20, activeHat: 'none', avatarId: 'pup' } },
-    { id: 'p6', name: 'Neon Scout', config: { hue: 180, skinHue: 300, bgHue: 320, bgSat: 100, bgLight: 50, activeHat: 'none', avatarId: 'cat' } },
-    { id: 'p7', name: 'Rusty Mechanic', config: { hue: 25, skinHue: 30, bgHue: 15, bgSat: 50, bgLight: 40, activeHat: 'none', avatarId: 'raccoon' } },
-    { id: 'p8', name: 'Ice Specialist', config: { hue: 190, skinHue: 180, bgHue: 200, bgSat: 70, bgLight: 90, activeHat: 'none', avatarId: 'bunny' } },
+    { id: 'p6', name: 'Neon Scout', config: { hue: 180, skinHue: 300, bgHue: 320, bgSat: 100, bgLight: 50, activeHat: 'none', avatarId: 'owl' } },
+    { id: 'p7', name: 'Rusty Mechanic', config: { hue: 25, skinHue: 30, bgHue: 15, bgSat: 50, bgLight: 40, activeHat: 'none', avatarId: 'turtle' } },
+    { id: 'p8', name: 'Ice Specialist', config: { hue: 190, skinHue: 180, bgHue: 200, bgSat: 70, bgLight: 90, activeHat: 'none', avatarId: 'penguin' } },
 ];
 
 export const HAT_OPTIONS = [

@@ -431,6 +431,11 @@ export default function StudentMissions() {
                         completedMissions: arrayUnion(activeMission.id),
                         xp: increment(activeMission.xpReward),
                         ...(planetXpKey ? { [planetXpKey]: increment(activeMission.xpReward) } : {}),
+                        lastAward: {
+                            reason: `Mission completed: ${activeMission.title}`,
+                            xpGained: activeMission.xpReward,
+                            timestamp: now,
+                        },
                         lastXpReason: `Mission completed: ${activeMission.title}`,
                         ...progressPayload,
                     });

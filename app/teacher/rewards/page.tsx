@@ -162,6 +162,11 @@ export default function RewardsPage() {
                             const userUpdates: Record<string, any> = {
                                 xp: increment(xpAmount),
                                 fuel: newFuel,
+                                lastAward: {
+                                    reason: behavior.label,
+                                    xpGained: xpAmount,
+                                    timestamp: Date.now(),
+                                },
                                 lastXpReason: behavior.label
                             };
 
