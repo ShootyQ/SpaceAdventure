@@ -243,6 +243,32 @@ export default function Home() {
           </div>
         </div>
 
+        <section className="py-16 border-t border-black/5" aria-labelledby="promo-video-heading">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="max-w-4xl mx-auto">
+              <h2 id="promo-video-heading" className="font-heading text-3xl md:text-4xl font-semibold text-slate-900 text-center">
+                See ClassCrave in 60 seconds
+              </h2>
+              <p className="text-slate-600 mt-3 text-center">
+                A quick walkthrough of the classroom features teachers and students use every day.
+              </p>
+              <div className="mt-8 overflow-hidden rounded-3xl border border-black/10 bg-black/5">
+                <div className="relative w-full pt-[56.25%]">
+                  <iframe
+                    src="https://www.youtube.com/embed/faoGKTKYJ98"
+                    title="ClassCrave promo video"
+                    className="absolute inset-0 h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
 
 
         <section className="py-20 border-t border-black/5" id="games">
@@ -342,6 +368,8 @@ export default function Home() {
                
                <button 
                   onClick={() => setShowCoupon(false)}
+                aria-label="Close launch offer"
+                title="Close launch offer"
                   className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-white/50 hover:bg-white rounded-full p-1 transition-colors"
                 >
                   <X className="w-4 h-4" />
