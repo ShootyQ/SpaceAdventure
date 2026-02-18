@@ -136,6 +136,8 @@ export interface UserData {
     unlockedHats?: string[];
     completedMissions?: string[];
     missionProgress?: Record<string, MissionProgress>;
+    selectedPetId?: string;
+    unlockedPetIds?: string[];
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)
@@ -144,6 +146,24 @@ export interface UserData {
     
     // Teaching Team
     coTeacherEmails?: string[];
+
+    createdAt?: any;
+    stripeSubscriptionId?: string;
+    stripeCustomerId?: string;
+    stripePriceId?: string;
+    stripeSubscriptionInterval?: "month" | "year";
+    stripeCancelAtPeriodEnd?: boolean;
+    subscriptionLifecycleStatus?: string;
+    subscriptionActivatedAt?: any;
+    stripeCurrentPeriodStart?: any;
+    stripeCurrentPeriodEnd?: any;
+    stripeLastPaymentAt?: any;
+    stripeLastPaymentAmount?: number;
+    stripeLastDiscountAmount?: number;
+    stripeLastPromoCode?: string | null;
+    stripeLastCouponId?: string | null;
+    stripeLastInvoiceId?: string | null;
+    stripeCurrency?: string;
 }
   
 export interface Ship {
@@ -163,6 +183,8 @@ export interface Ship {
     flag?: FlagConfig;
     visitedPlanets?: string[];
     planetXP?: Record<string, number>;
+    unlockedPetIds?: string[];
+    selectedPetId?: string;
 }
   
 export interface AwardEvent {
@@ -172,7 +194,7 @@ export interface AwardEvent {
       newRank?: string;
       startPos: { x: number, y: number }; // Screen coordinates to fly from
       reason?: string;
-    unlocks?: { ships?: string[]; avatars?: string[] };
+    unlocks?: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] };
 }
   
 export interface Behavior {

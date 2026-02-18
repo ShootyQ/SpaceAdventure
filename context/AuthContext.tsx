@@ -8,10 +8,11 @@ import {
     onAuthStateChanged, 
     User 
 } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, getDocs, query, limit } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, query, limit, serverTimestamp } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { generateClassCode, sanitizeName } from "@/lib/utils";
+import { DEFAULT_PET_ID, STARTER_PET_IDS } from "@/lib/pets";
 
 import { UserData, SpaceshipConfig, FlagConfig, Rank } from "@/types";
 
@@ -62,6 +63,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     updates.classCode = newCode;
                 }
 
+                if (!data.createdAt) {
+                  updates.createdAt = serverTimestamp() as any;
+                }
+
+                if (!Array.isArray(data.unlockedPetIds) || data.unlockedPetIds.length === 0) {
+                    data.unlockedPetIds = [...STARTER_PET_IDS];
+                    updates.unlockedPetIds = [...STARTER_PET_IDS];
+                }
+
+                if (!data.selectedPetId) {
+                    data.selectedPetId = DEFAULT_PET_ID;
+                    updates.selectedPetId = DEFAULT_PET_ID;
+                }
+
                 if (Object.keys(updates).length > 0) {
                      try {
                         await setDoc(userRef, updates, { merge: true });
@@ -88,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     classCode: generateClassCode(),
                     status: 'active', // Auto-activate new teachers
                     subscriptionStatus: 'trial', // Start on Trial
+                    createdAt: serverTimestamp() as any,
                     schoolName: '',
                     location: 'earth',
                     spaceship: {
@@ -95,7 +111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         color: 'text-blue-400',
                         type: 'scout',
                         speed: 1
-                    }
+                    },
+                    selectedPetId: DEFAULT_PET_ID,
+                    unlockedPetIds: [...STARTER_PET_IDS]
                 };
                 
                 await setDoc(userRef, newUserData);

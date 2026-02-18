@@ -409,9 +409,6 @@ export default function RewardsPage() {
                                                         className="w-full h-full object-contain relative z-20 scale-75"
                                                         alt="Rocket"
                                                     />
-                                                    <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20 scale-75 origin-center">
-                                                        <UserAvatar userData={student} className="w-full h-full scale-[1.35] translate-y-1" />
-                                                    </div>
                                                 </div>
 
                                                 {/* Name Display */}

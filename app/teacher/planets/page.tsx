@@ -75,7 +75,7 @@ export default function PlanetManagementPage() {
         setPlanets(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
-    const handleJoviUnlockChange = (planetId: string, value: string) => {
+    const handleAvatarUnlockChange = (planetId: string, avatarKey: string, value: string) => {
         const numeric = Number(value);
         setPlanets(prev => prev.map(p => {
             if (p.id !== planetId) return p;
@@ -83,7 +83,7 @@ export default function PlanetManagementPage() {
                 ships: { ...(p.unlocks?.ships || {}) },
                 avatars: { ...(p.unlocks?.avatars || {}) },
             };
-            unlocks.avatars.jovi = Number.isFinite(numeric) ? numeric : 0;
+            unlocks.avatars[avatarKey] = Number.isFinite(numeric) ? numeric : 0;
             return { ...p, unlocks };
         }));
     };
@@ -92,11 +92,12 @@ export default function PlanetManagementPage() {
         if (!user) return;
         setSaving(planet.id);
         try {
-            const isJupiter = planet.id === "jupiter";
-            const joviXP = Number(planet.unlocks?.avatars?.jovi || 0);
-            const unlocksToSave = isJupiter && joviXP > 0
-                ? { ships: {}, avatars: { jovi: joviXP } }
-                : { ships: {}, avatars: {} };
+            const avatarUnlocks: Record<string, number> = {};
+            Object.entries(planet.unlocks?.avatars || {}).forEach(([key, value]) => {
+                const threshold = Number(value || 0);
+                if (threshold > 0) avatarUnlocks[key] = threshold;
+            });
+            const unlocksToSave = { ships: {}, avatars: avatarUnlocks };
 
             // Save to subcollection
             await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
@@ -205,23 +206,65 @@ export default function PlanetManagementPage() {
                                          <label className="block text-xs uppercase tracking-wider text-purple-400 mb-2 flex items-center gap-2">
                                              <Star size={14} /> Cosmetic Unlocks
                                          </label>
-                                         {planet.id === "jupiter" ? (
+                                         {(planet.id === "jupiter" || planet.id === "mars") ? (
                                             <div className="bg-black/40 border border-white/10 rounded-lg p-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
-                                                        <UserAvatar avatarId="jovi" hat="none" className="w-full h-full" />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="text-xs text-white font-bold">Jovi Avatar</div>
-                                                        <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Jupiter</div>
-                                                    </div>
-                                                    <input
-                                                        type="number"
-                                                        value={planet.unlocks?.avatars?.jovi ?? ""}
-                                                        onChange={(e) => handleJoviUnlockChange(planet.id, e.target.value)}
-                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
-                                                        placeholder="0"
-                                                    />
+                                                <div className="space-y-3">
+                                                    {planet.id === "jupiter" && (
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
+                                                                <UserAvatar avatarId="jovi" hat="none" className="w-full h-full" />
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="text-xs text-white font-bold">Jovi Avatar</div>
+                                                                <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Jupiter</div>
+                                                            </div>
+                                                            <input
+                                                                type="number"
+                                                                value={planet.unlocks?.avatars?.jovi ?? ""}
+                                                                onChange={(e) => handleAvatarUnlockChange(planet.id, "jovi", e.target.value)}
+                                                                className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {planet.id === "mars" && (
+                                                        <>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
+                                                                    <UserAvatar avatarId="rusty" hat="none" className="w-full h-full" />
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="text-xs text-white font-bold">Rusty Avatar</div>
+                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Mars</div>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    value={planet.unlocks?.avatars?.rusty ?? ""}
+                                                                    onChange={(e) => handleAvatarUnlockChange(planet.id, "rusty", e.target.value)}
+                                                                    className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
+                                                                    <UserAvatar avatarId="vylaet" hat="none" className="w-full h-full" />
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="text-xs text-white font-bold">Vylaet (Secret)</div>
+                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Mars</div>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    value={planet.unlocks?.avatars?.vylaet ?? ""}
+                                                                    onChange={(e) => handleAvatarUnlockChange(planet.id, "vylaet", e.target.value)}
+                                                                    className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                          ) : (

@@ -1,18 +1,27 @@
 import * as admin from 'firebase-admin';
 
+let firebaseAdminInitError: string | null = null;
+
 // Initialize Firebase Admin only if the private key allows it
 if (!admin.apps.length) {
   // We check if the private key looks reasonably real to avoid "Too few bytes" parser errors
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
   
   if (privateKey && privateKey.length > 100) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
-      }),
-    });
+    try {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+      });
+    } catch (error: any) {
+      firebaseAdminInitError = error?.message || 'Unknown Firebase Admin init error';
+      console.error('[FIREBASE_ADMIN] initializeApp failed:', firebaseAdminInitError);
+    }
+  } else {
+    firebaseAdminInitError = 'Missing or invalid FIREBASE_PRIVATE_KEY';
   }
 }
 
@@ -36,3 +45,7 @@ export const adminDb = admin.apps.length
          get: () => Promise.resolve({ exists: false, data: () => ({}) }),
       }),
     } as unknown as admin.firestore.Firestore;
+
+export const adminAuth = admin.apps.length ? admin.auth() : null;
+export const adminInitialized = admin.apps.length > 0;
+export const adminInitError = firebaseAdminInitError;

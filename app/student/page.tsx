@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Map, Settings, Power, Shield, Activity, Star } from 'lucide-react';
-import SolarSystem from '@/components/SolarSystem';
+import { Settings, Power, Star } from 'lucide-react';
 import { getAssetPath } from '@/lib/utils';
 import { Rank } from '@/types';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { AVATAR_OPTIONS } from '@/components/UserAvatar';
+import interiorZones from '@/data/interior-zones/defaultinterior.zones.json';
+import { getPetById, getResolvedSelectedPetId } from '@/lib/pets';
 
 const DEFAULT_RANKS: Rank[] = [
     { id: '1', name: "Space Cadet", minXP: 0, image: "/images/badges/cadet.png" },
@@ -37,6 +39,12 @@ export default function StudentConsole() {
   const { user, userData, logout } = useAuth();
   const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
 
+    const findZone = (zoneId: string) => interiorZones.zones.find((zone) => zone.id === zoneId);
+    const badgeZone = findZone('zone_currentBadge');
+    const avatarZone = findZone('zone_playerAvatar');
+    const shipZone = findZone('zone_player_currentShip');
+    const petZone = findZone('zone_playerPet');
+
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "game-config", "ranks"), (doc) => {
         if (doc.exists() && doc.data().list) {
@@ -60,6 +68,23 @@ export default function StudentConsole() {
     const xpProgressPercent = nextRank
             ? Math.min(100, Math.max(0, (xpEarnedInRank / rankSpan) * 100))
             : 100;
+
+    const selectedShipId = userData?.spaceship?.modelId || userData?.spaceship?.id || 'finalship';
+    const selectedAvatarId = userData?.avatar?.avatarId || 'bunny';
+    const selectedAvatar = AVATAR_OPTIONS.find((avatar) => avatar.id === selectedAvatarId) || AVATAR_OPTIONS[0];
+    const selectedPetId = getResolvedSelectedPetId(userData);
+    const selectedPet = getPetById(selectedPetId);
+
+    const zoneStyle = (zone?: { x: number; y: number; w: number; h: number; z?: number }) => {
+        if (!zone) return undefined;
+        return {
+            left: `${zone.x * 100}%`,
+            top: `${zone.y * 100}%`,
+            width: `${zone.w * 100}%`,
+            height: `${zone.h * 100}%`,
+            zIndex: zone.z || 10,
+        } as React.CSSProperties;
+    };
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono bg-black">
@@ -96,20 +121,80 @@ export default function StudentConsole() {
           </div>
        </header>
 
-       {/* Main Viewport */}
-         <main className="flex-1 relative z-0 min-h-0">
-             {/* We show the map directly as the main view for students */}
-             <div className="absolute inset-0">
-                <SolarSystem studentView />
-             </div>
-          
-          {/* Overlay Controls for Student */}
-          <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-              <Link href="/student/settings" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
-                  <Settings size={20} />
-                  <span className="hidden md:inline font-bold">Cockpit</span>
-              </Link>
-          </div>
+             {/* Main Viewport */}
+                 <main className="flex-1 relative z-0 min-h-0 p-4">
+                    <div className="h-full w-full flex items-center justify-center">
+                        <div className="relative w-full max-w-6xl aspect-[1536/864] rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 shadow-[0_30px_90px_rgba(8,145,178,0.2)]">
+                            <img
+                                src={getAssetPath(interiorZones.image)}
+                                alt="Spaceship Interior"
+                                className="absolute inset-0 w-full h-full object-cover"
+                            />
+
+                            {badgeZone && (
+                                <div className="absolute p-1" style={zoneStyle(badgeZone)}>
+                                    {currentRank.image ? (
+                                        <img
+                                            src={getAssetPath(currentRank.image)}
+                                            alt={currentRank.name}
+                                            className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(250,204,21,0.35)]"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full rounded-md bg-black/30 border border-yellow-500/30 flex items-center justify-center text-yellow-400">
+                                            <Star size={18} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {avatarZone && (
+                                <div className="absolute p-1" style={zoneStyle(avatarZone)}>
+                                    <img
+                                        src={getAssetPath(selectedAvatar.src)}
+                                        alt={selectedAvatar.name}
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                            )}
+
+                            {shipZone && (
+                                <div className="absolute p-1" style={zoneStyle(shipZone)}>
+                                    <img
+                                        src={getAssetPath(`/images/ships/${selectedShipId}.png`)}
+                                        alt="Current Ship"
+                                        className="w-full h-full object-contain drop-shadow-[0_0_16px_rgba(34,211,238,0.35)]"
+                                    />
+                                </div>
+                            )}
+
+                            {petZone && (
+                                <div className="absolute p-1" style={zoneStyle(petZone)}>
+                                    {selectedPet.imageSrc ? (
+                                        <img
+                                            src={getAssetPath(selectedPet.imageSrc)}
+                                            alt={selectedPet.name}
+                                            className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(167,139,250,0.35)]"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full rounded-xl bg-black/35 border border-purple-400/40 flex flex-col items-center justify-center">
+                                            <div className="text-3xl md:text-4xl leading-none">{selectedPet.emoji}</div>
+                                            <div className="mt-1 text-[10px] md:text-xs uppercase tracking-widest text-purple-200 text-center px-1">
+                                                {selectedPet.name}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Overlay Controls for Student */}
+                    <div className="absolute top-6 left-6 z-30">
+                        <Link href="/student/settings" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
+                            <Settings size={20} />
+                            <span className="hidden md:inline font-bold">Back to Cockpit</span>
+                        </Link>
+                    </div>
        </main>
 
        {/* Bottom HUD - Stats */}

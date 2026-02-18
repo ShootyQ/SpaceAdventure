@@ -10,12 +10,13 @@ import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Check, Trash2, LogOut, Edit2,
     Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, AlertTriangle, CreditCard, Users
 } from "lucide-react";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import RankEditor from "@/components/RankEditor";
 import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { getTeacherStudentLimit, isSubscriptionActive, isTeacherAccessRestricted } from "@/lib/subscription";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
@@ -579,7 +580,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     </h3>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {AVATAR_OPTIONS.map(opt => (
+                        {PUBLIC_AVATAR_OPTIONS.map(opt => (
                             <button
                                 key={opt.id}
                                 onClick={() => handleSelectAvatar(opt.id)}
@@ -973,13 +974,161 @@ function FlagDesigner() {
 
 function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
     const { userData } = useAuth();
+
+    type PlanPricing = {
+        amountCents: number;
+        compareAtCents: number | null;
+        discountPercent: number;
+        savingsCents: number;
+    };
+
+    const fallbackPricing: Record<"monthly" | "yearly", PlanPricing> = {
+        monthly: { amountCents: 1000, compareAtCents: null, discountPercent: 0, savingsCents: 0 },
+        yearly: { amountCents: 8000, compareAtCents: null, discountPercent: 0, savingsCents: 0 },
+    };
+
     const [loading, setLoading] = useState(false);
+    const [syncingSubscription, setSyncingSubscription] = useState(false);
+    const [pricing, setPricing] = useState<Record<"monthly" | "yearly", PlanPricing>>(fallbackPricing);
     const [cycle, setCycle] = useState<"monthly" | "yearly">("yearly");
+
+    const formatBillingDate = (value: any) => {
+        if (!value) return "Not available";
+        const asDate = value?.toDate ? value.toDate() : new Date(value);
+        if (!(asDate instanceof Date) || Number.isNaN(asDate.getTime())) return "Not available";
+        return asDate.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    };
+
+    const isActivePlan = isSubscriptionActive(userData);
+    const isRestricted = isTeacherAccessRestricted(userData);
+    const studentCap = getTeacherStudentLimit(userData);
+    const renewalOrEndLabel = userData?.stripeCancelAtPeriodEnd ? "Access ends" : "Auto-renew date";
+    const renewalOrEndValue = formatBillingDate(userData?.stripeCurrentPeriodEnd);
 
     const PRICE_IDS = {
         monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || "", 
         yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || "" 
     };
+
+    const formatCurrency = (amountCents: number) => {
+        return new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 0,
+        }).format(amountCents / 100);
+    };
+
+    const activePlanPricing = pricing[cycle] || fallbackPricing[cycle];
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadLivePricing = async () => {
+            try {
+                const response = await fetch("/api/stripe/pricing", { method: "GET" });
+                if (!response.ok) return;
+
+                const payload = await response.json();
+                if (cancelled) return;
+
+                const nextPricing: Record<"monthly" | "yearly", PlanPricing> = {
+                    monthly: {
+                        amountCents: Number(payload?.monthly?.amountCents) || fallbackPricing.monthly.amountCents,
+                        compareAtCents: typeof payload?.monthly?.compareAtCents === "number" ? payload.monthly.compareAtCents : null,
+                        discountPercent: Number(payload?.monthly?.discountPercent) || 0,
+                        savingsCents: Number(payload?.monthly?.savingsCents) || 0,
+                    },
+                    yearly: {
+                        amountCents: Number(payload?.yearly?.amountCents) || fallbackPricing.yearly.amountCents,
+                        compareAtCents: typeof payload?.yearly?.compareAtCents === "number" ? payload.yearly.compareAtCents : null,
+                        discountPercent: Number(payload?.yearly?.discountPercent) || 0,
+                        savingsCents: Number(payload?.yearly?.savingsCents) || 0,
+                    },
+                };
+
+                setPricing(nextPricing);
+            } catch {
+                // Keep fallback pricing if live lookup fails.
+            }
+        };
+
+        loadLivePricing();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!userData?.uid || !userData?.email) return;
+        if (userData.subscriptionStatus === "active") return;
+
+        const checkoutReturnedSuccess =
+            typeof window !== "undefined" && new URLSearchParams(window.location.search).has("success");
+
+        let cancelled = false;
+
+        const syncFromStripe = async () => {
+            setSyncingSubscription(true);
+
+            try {
+                const maxAttempts = checkoutReturnedSuccess ? 4 : 1;
+
+                for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                    const response = await fetch("/api/stripe/checkout", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            userId: userData.uid,
+                            email: userData.email,
+                            syncOnly: true,
+                        }),
+                    });
+
+                    const responseText = await response.text();
+                    const payload = responseText ? JSON.parse(responseText) : {};
+
+                    if (!response.ok || cancelled) return;
+
+                    if (payload?.alreadySubscribed && payload?.subscription) {
+                        if (!payload?.synced) {
+                            await updateDoc(doc(db, "users", userData.uid), {
+                                subscriptionStatus: (payload.subscription.status === "active" || payload.subscription.status === "trialing") ? "active" : "trial",
+                                subscriptionLifecycleStatus: payload.subscription.status,
+                                stripeSubscriptionId: payload.subscription.id,
+                                stripeCustomerId: payload.subscription.customerId || null,
+                                stripePriceId: payload.subscription.priceId || null,
+                                stripeSubscriptionInterval: payload.subscription.interval || null,
+                                stripeCancelAtPeriodEnd: Boolean(payload.subscription.cancelAtPeriodEnd),
+                                stripeCurrentPeriodStart: payload.subscription.currentPeriodStart ? new Date(payload.subscription.currentPeriodStart) : null,
+                                stripeCurrentPeriodEnd: payload.subscription.currentPeriodEnd ? new Date(payload.subscription.currentPeriodEnd) : null,
+                                stripeLastPaymentAt: new Date(),
+                            });
+                        }
+
+                        if (!cancelled) {
+                            window.location.reload();
+                        }
+                        return;
+                    }
+
+                    if (checkoutReturnedSuccess && attempt < maxAttempts - 1) {
+                        await new Promise((resolve) => setTimeout(resolve, 1500));
+                    }
+                }
+            } catch (error) {
+                console.warn("Billing auto-sync skipped:", error);
+            } finally {
+                if (!cancelled) setSyncingSubscription(false);
+            }
+        };
+
+        syncFromStripe();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [userData?.uid, userData?.email, userData?.subscriptionStatus]);
 
     const handleSubscribe = async () => {
         if (!userData?.uid) return;
@@ -998,9 +1147,49 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                 })
             });
 
-            if (!response.ok) throw new Error("Network response was not ok");
+            if (!response.ok) {
+                let apiError = `Checkout failed (${response.status})`;
+                try {
+                    const errorText = await response.text();
+                    const errorBody = errorText ? JSON.parse(errorText) : null;
+                    if (errorBody?.error) {
+                        apiError = errorBody.error;
+                    } else if (errorBody?.message) {
+                        apiError = errorBody.message;
+                    } else if (errorText?.trim()) {
+                        apiError = `${apiError}: ${errorText.trim()}`;
+                    }
+                } catch {
+                    // keep fallback
+                }
+                throw new Error(apiError);
+            }
             
-            const { url } = await response.json();
+            const { url, alreadySubscribed, message, synced, syncError, subscription } = await response.json();
+            if (alreadySubscribed) {
+                if (!synced && userData?.uid && subscription) {
+                    try {
+                        await updateDoc(doc(db, "users", userData.uid), {
+                            subscriptionStatus: (subscription.status === "active" || subscription.status === "trialing") ? "active" : "trial",
+                            subscriptionLifecycleStatus: subscription.status,
+                            stripeSubscriptionId: subscription.id,
+                            stripeCustomerId: subscription.customerId || null,
+                            stripePriceId: subscription.priceId || null,
+                            stripeSubscriptionInterval: subscription.interval || null,
+                            stripeCancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+                            stripeCurrentPeriodStart: subscription.currentPeriodStart ? new Date(subscription.currentPeriodStart) : null,
+                            stripeCurrentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
+                            stripeLastPaymentAt: new Date(),
+                        });
+                    } catch (clientSyncErr) {
+                        console.error("Client-side subscription sync failed", clientSyncErr, syncError);
+                    }
+                }
+                alert(message || "You already have an active subscription.");
+                window.location.reload();
+                return;
+            }
+
             if (url) {
                 window.location.href = url;
             } else {
@@ -1008,7 +1197,8 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
             }
         } catch (e) {
             console.error(e);
-            alert("Checkout initialization failed. Check console.");
+            const errorMessage = e instanceof Error ? e.message : "Checkout initialization failed.";
+            alert(errorMessage);
         }
         setLoading(false);
     };
@@ -1068,7 +1258,12 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recommended</div>
 
                         <div className="flex-1">
-                            <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full inline-block">Full access</div>
+                            <div className="flex items-center justify-between">
+                                <div className="text-xs uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full inline-block">Full access</div>
+                                <div className="animate-pulse text-[10px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-pink-500 to-rose-500 px-2 py-1 rounded-lg transform rotate-2">
+                                    Code: LAUNCHSALE
+                                </div>
+                            </div>
 
                             {/* Toggle */}
                             <div className="mt-5 flex bg-slate-100/80 p-1 rounded-xl border border-black/10 w-fit">
@@ -1088,15 +1283,30 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                                 </button>
                             </div>
 
-                            <div className="mt-6 flex items-baseline gap-2">
-                                <span className="text-5xl font-bold text-slate-900">{cycle === "yearly" ? "$80" : "$10"}</span>
+                            <div className="mt-6 flex flex-col gap-1">
+                                <div className="flex items-baseline gap-2">
+                                <span className="text-5xl font-bold text-slate-900">{formatCurrency(activePlanPricing.amountCents)}</span>
                                 <span className="text-slate-600 font-medium">/{cycle === "yearly" ? "year" : "month"}</span>
-                                {cycle === "yearly" && (
+                                {activePlanPricing.discountPercent > 0 && (
                                     <span className="ml-2 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        Save $40
+                                        {activePlanPricing.discountPercent}% Off
                                     </span>
                                 )}
+                                </div>
+                                <div className="text-xs font-bold text-rose-500 uppercase tracking-widest">
+                                    Use code <span className="underline decoration-2 underline-offset-2">LAUNCHSALE</span> for 50% off
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                    Prices are shown in USD. Final charge may include applicable taxes.
+                                </p>
                             </div>
+
+                            {activePlanPricing.compareAtCents && activePlanPricing.compareAtCents > activePlanPricing.amountCents && (
+                                <div className="mt-2 text-sm text-slate-500">
+                                    <span className="line-through">{formatCurrency(activePlanPricing.compareAtCents)}</span>
+                                    <span className="ml-2 font-semibold text-emerald-700">Save {formatCurrency(activePlanPricing.savingsCents)}</span>
+                                </div>
+                            )}
 
                             <ul className="space-y-3 text-sm text-slate-700 mt-6">
                                 <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Up to 30 students</li>
@@ -1121,7 +1331,7 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                                 }`}
                             >
                                 <CreditCard size={18} />
-                                {loading ? "Initializing..." : `Upgrade (${cycle})`}
+                                {loading ? "Initializing..." : syncingSubscription ? "Checking billing..." : `Upgrade (${cycle})`}
                             </button>
                         )}
                     </div>
@@ -1134,6 +1344,46 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         <p className="text-slate-600 text-sm leading-relaxed">If you don’t see an increase in student engagement within the first 30 days, we’ll refund your subscription in full.</p>
                     </div>
                 </div>
+
+                <div className="p-5 bg-white/80 border border-black/10 rounded-2xl text-xs text-slate-600 space-y-2">
+                    <p>Subscriptions renew automatically until canceled. You can cancel anytime from Billing settings.</p>
+                    <p>If canceled, paid access remains active through the current billing period and then returns to trial limits.</p>
+                    <p>Promo codes apply only to eligible plans and billing cycles, and may be limited to one redemption per customer.</p>
+                </div>
+
+                <div className="p-5 bg-white/80 border border-black/10 rounded-2xl grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Status</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900 uppercase">{userData?.subscriptionStatus || "trial"}</div>
+                        {userData?.subscriptionLifecycleStatus && (
+                            <div className="text-xs text-slate-500 mt-1 uppercase">Stripe: {userData.subscriptionLifecycleStatus}</div>
+                        )}
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">{renewalOrEndLabel}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{renewalOrEndValue}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Auto renew</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{userData?.stripeCancelAtPeriodEnd ? "Off" : "On"}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Student cap</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">Up to {studentCap} students</div>
+                    </div>
+                </div>
+
+                {isRestricted && (
+                    <div className="p-5 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-start gap-4">
+                        <AlertTriangle className="text-amber-700 shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="text-slate-900 font-bold text-sm uppercase tracking-wider mb-1">Account Access Paused</h4>
+                            <p className="text-slate-700 text-sm leading-relaxed">
+                                Your paid subscription ended. Existing class data is preserved, but teacher gameplay tools and student gameplay are paused until billing is reactivated.
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1439,11 +1689,18 @@ function SettingsContent() {
     
     type SettingsView = "cockpit" | "ship" | "inventory" | "avatar" | "avatar-config" | "flag" | "asteroids" | "billing" | "team";
     const [view, setView] = useState<SettingsView>("cockpit");
+    const restricted = isTeacherAccessRestricted(userData);
 
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [isRankEditorOpen, setIsRankEditorOpen] = useState(false);
 
     useEffect(() => {
+        if (restricted) {
+            setView("billing");
+            setIsRankEditorOpen(false);
+            return;
+        }
+
         const mode = searchParams.get("mode");
         const success = searchParams.get("success");
         const canceled = searchParams.get("canceled");
@@ -1469,7 +1726,7 @@ function SettingsContent() {
             // Small timeout to allow render if needed, or just set it
              setTimeout(() => setIsRankEditorOpen(true), 100);
         }
-    }, [searchParams]);
+    }, [searchParams, restricted]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "ranks"), (d) => {
@@ -1489,24 +1746,42 @@ function SettingsContent() {
             case "avatar-config": return "DNA Sequencer";
             case "flag": return "Flag Fabricator";
             case "asteroids": return "Defense Systems";
+            case "billing": return "Subscription Control";
             default: return "Main Cockpit";
         }
     };
 
-    const { logout } = useAuth(); // Add logout logic
+    const { logout } = useAuth();
+    const isBilling = view === "billing" || restricted;
 
     return (
-        <div className="min-h-screen bg-space-950 p-6 font-mono pb-20 overflow-x-hidden">
-            {/* Background Grid Animation */}
-            <div className="fixed inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+        <div className={`min-h-screen ${isBilling ? "bg-[#f7f4ef] font-sans" : "bg-space-950 font-mono"} p-6 pb-20 overflow-x-hidden transition-colors duration-500`}>
+            {/* Background Grid Animation - Only for Space/Dark Modes */}
+            {!isBilling && (
+                <div className="fixed inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+            )}
+            
+            {/* Background Orbs - Only for Billing/Light Mode */}
+            {isBilling && (
+                <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute -top-32 -right-20 w-[520px] h-[520px] bg-emerald-200/40 blur-[140px] rounded-full" />
+                    <div className="absolute bottom-0 -left-20 w-[560px] h-[560px] bg-amber-200/40 blur-[160px] rounded-full" />
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto relative z-10">
 
                 {/* Header Navigation */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                         {/* Direct Link to Dashboard for Top-Level Modes */}
-                        {["asteroids", "billing", "team", "cockpit"].includes(view) ? (
-                            <Link href="/teacher/space" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                        { restricted ? (
+                            <Link href="/" className="p-3 rounded-xl border border-black/10 hover:bg-black/5 text-slate-500 hover:text-slate-900 transition-all">
+                                <ArrowLeft size={20} />
+                                <span className="sr-only">Return to Home</span>
+                            </Link>
+                        ) : ["asteroids", "billing", "team", "cockpit"].includes(view) ? (
+                            <Link href="/teacher/space" className={`p-3 rounded-xl border transition-all ${isBilling ? "border-black/10 hover:bg-black/5 text-slate-500 hover:text-slate-900" : "border-white/10 hover:bg-white/5 text-white/50 hover:text-white"}`}>
                                 <ArrowLeft size={20} />
                                 <span className="sr-only">Return to Dashboard</span>
                             </Link>
@@ -1519,12 +1794,12 @@ function SettingsContent() {
                         )}
                         
                         <div>
-                            <h1 className="text-3xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
-                                <Crosshair className="text-cyan-500 animate-spin-slow" />
+                            <h1 className={`text-3xl font-bold uppercase tracking-widest flex items-center gap-3 ${isBilling ? "font-heading text-slate-900 tracking-normal" : "text-white"}`}>
+                                {!isBilling && <Crosshair className="text-cyan-500 animate-spin-slow" />}
                                 {getTitle()}
                             </h1>
-                            <div className="text-xs text-cyan-500/50 uppercase tracking-[0.3em]">
-                                System Status: Normal
+                            <div className={`text-xs uppercase tracking-[0.3em] ${isBilling ? "text-slate-500 mt-1" : "text-cyan-500/50"}`}>
+                                {isBilling ? "Manage your plan" : `System Status: ${restricted ? "Restricted / Billing Only" : "Normal"}`}
                             </div>
                         </div>
                     </div>
@@ -1541,25 +1816,31 @@ function SettingsContent() {
                 {/* Main Content Area */}
                 <AnimatePresence mode="wait">
                     <motion.div
-                        key={view}
+                        key={restricted ? "billing" : view}
                         initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
                         animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                         exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
                         transition={{ duration: 0.3 }}
                     >
-                        {view === "cockpit" && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
-                        {view === "ship" && <ShipSettings userData={userData} user={user} />}
-                        {view === "inventory" && <InventoryView />}
-                        {view === "avatar" && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
-                        {view === "avatar-config" && <AvatarConfigView onBack={() => setView("avatar")} />}
-                        {view === "flag" && <FlagDesigner />}
-                        {view === "asteroids" && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
-                        {view === "billing" && <BillingView onNavigate={(v) => setView(v as any)} />}
-                        {view === "team" && <TeamView onNavigate={(v) => setView(v as any)} />}
+                        {restricted ? (
+                            <BillingView onNavigate={() => {}} />
+                        ) : (
+                            <>
+                                {view === "cockpit" && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} onOpenRankEditor={() => setIsRankEditorOpen(true)} />}
+                                {view === "ship" && <ShipSettings userData={userData} user={user} />}
+                                {view === "inventory" && <InventoryView />}
+                                {view === "avatar" && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
+                                {view === "avatar-config" && <AvatarConfigView onBack={() => setView("avatar")} />}
+                                {view === "flag" && <FlagDesigner />}
+                                {view === "asteroids" && <AsteroidControlView onNavigate={(v) => setView(v as any)} />}
+                                {view === "billing" && <BillingView onNavigate={(v) => setView(v as any)} />}
+                                {view === "team" && <TeamView onNavigate={(v) => setView(v as any)} />}
+                            </>
+                        )}
                     </motion.div>
                 </AnimatePresence>
                 
-                <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />
+                {!restricted && <RankEditor isOpen={isRankEditorOpen} onClose={() => setIsRankEditorOpen(false)} />}
 
             </div>
         </div>

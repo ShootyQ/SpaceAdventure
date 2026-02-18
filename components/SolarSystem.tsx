@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft } from "lucide-react";
 import Link from 'next/link';
 import MapTutorial from "@/app/teacher/map/MapTutorial";
@@ -12,6 +13,13 @@ import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
+import {
+    DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
+    getPetById,
+    normalizePetUnlockChanceConfig,
+    PetUnlockChanceConfig,
+    rollPetUnlocksForXpEvent,
+} from "@/lib/pets";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -88,6 +96,13 @@ interface SolarSystemProps {
         studentView?: boolean;
 }
 
+type PlanetDiscoveredUnlocks = {
+    pets?: string[];
+    avatars?: string[];
+    ships?: string[];
+    objects?: string[];
+};
+
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
     const isStudentPersonalView = studentView && userData?.role === 'student';
@@ -108,12 +123,18 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
   const [currentAward, setCurrentAward] = useState<AwardEvent | null>(null);
+    const [unlockRevealQueue, setUnlockRevealQueue] = useState<AwardEvent[]>([]);
+    const [activeUnlockReveal, setActiveUnlockReveal] = useState<AwardEvent | null>(null);
+    const scheduledUnlockRevealAwardIdsRef = useRef<Set<string>>(new Set());
+    const unlockRevealTimerMapRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
     const previousPlanetXPRef = useRef<Map<string, Record<string, number>>>(new Map());
+        const previousUnlockedPetsRef = useRef<Map<string, Set<string>>>(new Map());
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
+    const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
@@ -142,6 +163,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
     return () => unsub();
   }, [userData]);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
+            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+        });
+
+        return () => unsub();
+    }, []);
 
   // Trigger Bonus Victory
   useEffect(() => {
@@ -178,15 +208,17 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       setIsSoundOn(newState);
       if (newState) {
           // Unlock audio context
-          const audio = document.getElementById('map-notification-audio') as HTMLAudioElement;
-          if (audio) {
+          const notificationAudio = document.getElementById('map-notification-audio') as HTMLAudioElement;
+          const revealAudio = document.getElementById('map-reveal-audio') as HTMLAudioElement;
+          [notificationAudio, revealAudio].forEach((audio) => {
+              if (!audio) return;
               audio.volume = 0;
               audio.play().then(() => {
                   audio.pause();
                   audio.currentTime = 0;
                   audio.volume = 0.5;
               }).catch(e => console.error("Audio unlock failed", e));
-          }
+          });
       }
   };
 
@@ -320,22 +352,111 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [pan]);
 
   // Award Queue Processor
-  const prevQueueLength = useRef(0);
   const awardTimer = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-      // If new awards come in, reset timer
-      if (awardQueue.length > prevQueueLength.current) {
-          if (awardTimer.current) clearTimeout(awardTimer.current);
+      if (awardTimer.current) clearTimeout(awardTimer.current);
+
+      if (awardQueue.length > 0) {
           awardTimer.current = setTimeout(() => {
               setAwardQueue([]);
-          }, awardQueue.length >= 10 ? 30000 : 20000);
+          }, 7000);
       }
-      prevQueueLength.current = awardQueue.length;
+
       return () => {
           if (awardTimer.current) clearTimeout(awardTimer.current);
       }
   }, [awardQueue]);
+
+  useEffect(() => {
+      if (awardQueue.length === 0) {
+          scheduledUnlockRevealAwardIdsRef.current.clear();
+          unlockRevealTimerMapRef.current.forEach((timerId) => clearTimeout(timerId));
+          unlockRevealTimerMapRef.current.clear();
+          setUnlockRevealQueue([]);
+          setActiveUnlockReveal(null);
+      }
+  }, [awardQueue.length]);
+
+  useEffect(() => {
+      if (awardQueue.length === 0) return;
+
+      const activeAwardIds = new Set(awardQueue.map((award) => award.id));
+      const scheduledAwardIds = Array.from(scheduledUnlockRevealAwardIdsRef.current);
+
+      scheduledAwardIds.forEach((awardId) => {
+          if (!activeAwardIds.has(awardId)) {
+              scheduledUnlockRevealAwardIdsRef.current.delete(awardId);
+              const timerId = unlockRevealTimerMapRef.current.get(awardId);
+              if (timerId) {
+                  clearTimeout(timerId);
+                  unlockRevealTimerMapRef.current.delete(awardId);
+              }
+          }
+      });
+
+      awardQueue.forEach((award) => {
+          const hasUnlocks = Boolean(
+              award.unlocks?.ships?.length ||
+              award.unlocks?.avatars?.length ||
+              award.unlocks?.pets?.length ||
+              award.unlocks?.objects?.length
+          );
+
+          if (!hasUnlocks || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
+
+          scheduledUnlockRevealAwardIdsRef.current.add(award.id);
+
+          const timerId = setTimeout(() => {
+              unlockRevealTimerMapRef.current.delete(award.id);
+              setUnlockRevealQueue((prev) => (prev.some((queuedAward) => queuedAward.id === award.id) ? prev : [...prev, award]));
+          }, 5000);
+
+          unlockRevealTimerMapRef.current.set(award.id, timerId);
+      });
+  }, [awardQueue]);
+
+  useEffect(() => {
+      if (activeUnlockReveal || unlockRevealQueue.length === 0) return;
+      setActiveUnlockReveal(unlockRevealQueue[0]);
+      setUnlockRevealQueue((prev) => prev.slice(1));
+  }, [activeUnlockReveal, unlockRevealQueue]);
+
+  useEffect(() => {
+      if (!activeUnlockReveal) return;
+
+      try {
+          confetti({ particleCount: 180, spread: 100, startVelocity: 55, origin: { y: 0.62 } });
+          setTimeout(() => {
+              confetti({ particleCount: 120, spread: 75, startVelocity: 45, origin: { x: 0.2, y: 0.62 } });
+              confetti({ particleCount: 120, spread: 75, startVelocity: 45, origin: { x: 0.8, y: 0.62 } });
+          }, 300);
+      } catch {
+          // no-op
+      }
+
+      if (isSoundOnRef.current) {
+          const revealAudio = document.getElementById('map-reveal-audio') as HTMLAudioElement;
+          if (revealAudio) {
+              revealAudio.currentTime = 0;
+              revealAudio.volume = 0.75;
+              revealAudio.play().catch(() => {});
+          }
+      }
+
+      const dismissTimer = setTimeout(() => {
+          setActiveUnlockReveal(null);
+      }, 7000);
+
+      return () => clearTimeout(dismissTimer);
+  }, [activeUnlockReveal]);
+
+  useEffect(() => {
+      return () => {
+          unlockRevealTimerMapRef.current.forEach((timerId) => clearTimeout(timerId));
+          unlockRevealTimerMapRef.current.clear();
+      };
+  }, []);
 
   // Real-time subscription to all star travelers
   useEffect(() => {
@@ -359,7 +480,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
             lastXpReason: data.lastXpReason,
             flag: data.flag,
             visitedPlanets: data.visitedPlanets || [],
-            planetXP: data.planetXP || {}
+            planetXP: data.planetXP || {},
+            unlockedPetIds: data.unlockedPetIds || [],
+            selectedPetId: data.selectedPetId
         };
     };
 
@@ -367,6 +490,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         setShips(fleet);
 
         fleet.forEach(shipData => {
+               let unlockedPetIdsThisPass: string[] = [];
              if (!isFirstLoad.current && !isStudentPersonalView) {
                 const oldXP = previousXPRef.current.get(shipData.id);
                 if (oldXP !== undefined && shipData.xp > oldXP) {
@@ -378,8 +502,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
                     const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
                     const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
+                    const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
+                    const previousUnlockedPets = previousUnlockedPetsRef.current.get(shipData.id) || new Set<string>();
+                    const effectiveUnlockedPets = new Set<string>([
+                        ...Array.from(currentUnlockedPets),
+                        ...Array.from(previousUnlockedPets)
+                    ]);
+                    const canRollPetUnlocks = userData.role === 'teacher' || userData.role === 'admin';
 
-                    let unlocks: { ships?: string[]; avatars?: string[] } | undefined;
+                    let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
                     if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
                         const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
                         const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
@@ -387,6 +518,28 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         if (joviUnlockedNow) {
                             unlocks = {
                                 avatars: ['jovi'],
+                            };
+                        }
+                    }
+
+                    if (canRollPetUnlocks && Boolean(planetId)) {
+                        const unlockedPetIds = rollPetUnlocksForXpEvent({
+                            planetId,
+                            currentlyUnlockedPetIds: effectiveUnlockedPets,
+                            chanceConfig: petUnlockChanceConfig,
+                        });
+
+                        if (unlockedPetIds.length > 0) {
+                            unlockedPetIdsThisPass = unlockedPetIds;
+                            updateDoc(doc(db, "users", shipData.id), {
+                                unlockedPetIds: arrayUnion(...unlockedPetIds)
+                            }).catch((err) => {
+                                console.error("Failed to persist pet unlocks:", err);
+                            });
+
+                            unlocks = {
+                                ...unlocks,
+                                pets: [...(unlocks?.pets || []), ...unlockedPetIds]
                             };
                         }
                     }
@@ -401,6 +554,23 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         unlocks
                     };
 
+                    if (canRollPetUnlocks && unlocks && userData.uid) {
+                        const discoveredUpdates: Record<string, any> = {};
+                        if (unlocks.pets?.length) discoveredUpdates["discoveredUnlocks.pets"] = arrayUnion(...unlocks.pets);
+                        if (unlocks.avatars?.length) discoveredUpdates["discoveredUnlocks.avatars"] = arrayUnion(...unlocks.avatars);
+                        if (unlocks.ships?.length) discoveredUpdates["discoveredUnlocks.ships"] = arrayUnion(...unlocks.ships);
+                        if (unlocks.objects?.length) discoveredUpdates["discoveredUnlocks.objects"] = arrayUnion(...unlocks.objects);
+
+                        if (Object.keys(discoveredUpdates).length > 0) {
+                            const ownerId = userData.role === 'student' ? userData.teacherId : userData.uid;
+                            if (ownerId) {
+                                updateDoc(doc(db, `users/${ownerId}/planets`, planetId), discoveredUpdates).catch((err) => {
+                                    console.error("Failed to persist discovered planet unlocks:", err);
+                                });
+                            }
+                        }
+                    }
+
                     const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
                     if (audioElement && isSoundOnRef.current) {
                         audioElement.currentTime = 0;
@@ -408,12 +578,23 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         audioElement.play().catch(() => {});
                     }
 
-                    setAwardQueue(prev => [...prev, event]);
+                    setAwardQueue((prev) => {
+                        const existingIndex = prev.findIndex((queuedAward) => queuedAward.ship.id === event.ship.id);
+                        if (existingIndex === -1) return [...prev, event];
+
+                        const next = [...prev];
+                        next[existingIndex] = event;
+                        return next;
+                    });
                 }
              }
 
-             previousXPRef.current.set(shipData.id, shipData.xp);
-             previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
+                         previousXPRef.current.set(shipData.id, shipData.xp);
+                         previousPlanetXPRef.current.set(shipData.id, (shipData as any).planetXP || {});
+
+                         const cachedUnlocked = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
+                         unlockedPetIdsThisPass.forEach((petId) => cachedUnlocked.add(String(petId)));
+                         previousUnlockedPetsRef.current.set(shipData.id, cachedUnlocked);
         });
 
         isFirstLoad.current = false;
@@ -479,7 +660,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, isStudentPersonalView]);
+    }, [userData, isStudentPersonalView, petUnlockChanceConfig]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -515,7 +696,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     lastXpReason: data.lastXpReason,
                     flag: data.flag,
                     visitedPlanets: data.visitedPlanets || [],
-                    planetXP: data.planetXP || {}
+                    planetXP: data.planetXP || {},
+                    selectedPetId: data.selectedPetId
                 } as Ship;
             });
             setPlanetVisitors(visitors);
@@ -527,7 +709,13 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [isStudentPersonalView, selectedPlanet, userData]);
 
 
-    const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, { currentXP: number, xpGoal: number, rewardName?: string, rewardDescription?: string }>>(new Map());
+    const [dynamicPlanets, setDynamicPlanets] = useState<Map<string, {
+        currentXP: number,
+        xpGoal: number,
+        rewardName?: string,
+        rewardDescription?: string,
+        discoveredUnlocks?: PlanetDiscoveredUnlocks
+    }>>(new Map());
     const dynamicPlanetsRef = useRef<Map<string, any>>(new Map());
 
     useEffect(() => {
@@ -576,6 +764,124 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       return {
           x: r * Math.sin(angleRad),
           y: -r * Math.cos(angleRad)
+      };
+  };
+
+  const normalizeVector = (point: { x: number; y: number }, fallback = { x: 0, y: -1 }) => {
+      const len = Math.hypot(point.x, point.y);
+      if (len < 0.0001) return fallback;
+      return { x: point.x / len, y: point.y / len };
+  };
+
+  const getOrbitEdgePadding = (planetPixelSize: number) => {
+      if (planetPixelSize >= 90) return 36;
+      if (planetPixelSize >= 70) return 30;
+      if (planetPixelSize >= 50) return 26;
+      return 22;
+  };
+
+  const getPlanetOrbitEdgePosition = (planetId: string, timestamp: number, padding?: number) => {
+      const center = getPlanetPosition(planetId, timestamp);
+      const planet = PLANETS.find((p) => p.id === planetId);
+      if (!planet) return center;
+
+      const outward = normalizeVector(center);
+      const resolvedPadding = padding ?? getOrbitEdgePadding(planet.pixelSize);
+      const offset = (planet.pixelSize / 2) + resolvedPadding;
+      return {
+          x: center.x + (outward.x * offset),
+          y: center.y + (outward.y * offset),
+      };
+  };
+
+  const distancePointToSegment = (
+      point: { x: number; y: number },
+      start: { x: number; y: number },
+      end: { x: number; y: number }
+  ) => {
+      const segment = { x: end.x - start.x, y: end.y - start.y };
+      const lengthSq = (segment.x * segment.x) + (segment.y * segment.y);
+      if (lengthSq <= 0.0001) return Math.hypot(point.x - start.x, point.y - start.y);
+
+      const t = Math.max(0, Math.min(1, (((point.x - start.x) * segment.x) + ((point.y - start.y) * segment.y)) / lengthSq));
+      const projection = {
+          x: start.x + (segment.x * t),
+          y: start.y + (segment.y * t),
+      };
+      return Math.hypot(point.x - projection.x, point.y - projection.y);
+  };
+
+  const getTravelCurve = (ship: Ship) => {
+      const start = getPlanetOrbitEdgePosition(ship.locationId, ship.travelStart || now);
+      const end = getPlanetOrbitEdgePosition(ship.destinationId || ship.locationId, ship.travelEnd || now);
+
+      const midpoint = {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+      };
+
+      const sun = PLANETS.find((planet) => planet.id === 'sun');
+      const sunAvoidRadius = ((sun?.pixelSize || 128) / 2) + 120;
+      const straightClearance = distancePointToSegment({ x: 0, y: 0 }, start, end);
+
+      let control = midpoint;
+
+      if (straightClearance < sunAvoidRadius) {
+          const segment = { x: end.x - start.x, y: end.y - start.y };
+          const segmentLen = Math.hypot(segment.x, segment.y) || 1;
+          const perpendicular = { x: -segment.y / segmentLen, y: segment.x / segmentLen };
+          const lift = (sunAvoidRadius - straightClearance) + 180;
+
+          const candidateA = {
+              x: midpoint.x + (perpendicular.x * lift),
+              y: midpoint.y + (perpendicular.y * lift),
+          };
+          const candidateB = {
+              x: midpoint.x - (perpendicular.x * lift),
+              y: midpoint.y - (perpendicular.y * lift),
+          };
+
+          const distA = Math.hypot(candidateA.x, candidateA.y);
+          const distB = Math.hypot(candidateB.x, candidateB.y);
+          control = distA >= distB ? candidateA : candidateB;
+      }
+
+      const minControlDist = sunAvoidRadius + 80;
+      const controlDist = Math.hypot(control.x, control.y);
+      if (controlDist < minControlDist) {
+          const push = normalizeVector(control, normalizeVector(midpoint));
+          const needed = minControlDist - controlDist;
+          control = {
+              x: control.x + (push.x * needed),
+              y: control.y + (push.y * needed),
+          };
+      }
+
+      return { start, control, end };
+  };
+
+  const getQuadraticBezierPoint = (
+      start: { x: number; y: number },
+      control: { x: number; y: number },
+      end: { x: number; y: number },
+      t: number
+  ) => {
+      const oneMinusT = 1 - t;
+      return {
+          x: (oneMinusT * oneMinusT * start.x) + (2 * oneMinusT * t * control.x) + (t * t * end.x),
+          y: (oneMinusT * oneMinusT * start.y) + (2 * oneMinusT * t * control.y) + (t * t * end.y),
+      };
+  };
+
+  const getQuadraticBezierTangent = (
+      start: { x: number; y: number },
+      control: { x: number; y: number },
+      end: { x: number; y: number },
+      t: number
+  ) => {
+      return {
+          x: 2 * (1 - t) * (control.x - start.x) + 2 * t * (end.x - control.x),
+          y: 2 * (1 - t) * (control.y - start.y) + 2 * t * (end.y - control.y),
       };
   };
 
@@ -728,14 +1034,19 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                  const arrive = async () => {
                      try {
-                          const userRef = doc(db, "users", ship.id); 
-                          await updateDoc(userRef, {
+                          const userRef = doc(db, "users", ship.id);
+                          const destinationId = (ship.destinationId || 'earth').toLowerCase();
+
+                          const landingUpdates: Record<string, any> = {
                               travelStatus: 'idle',
-                              location: ship.destinationId || 'earth',
+                              location: destinationId,
                               destinationId: null,
                               travelStart: null,
-                              travelEnd: null
-                          });
+                              travelEnd: null,
+                              visitedPlanets: arrayUnion(destinationId),
+                          };
+
+                          await updateDoc(userRef, landingUpdates);
                      } catch (e) {
                          console.error(`Landing failed for ${ship.cadetName}:`, e);
                          landingProcessing.current.delete(ship.id); // Unlock to retry
@@ -962,6 +1273,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     >
        {/* Hidden Audio Element */}
        <audio id="map-notification-audio" src={getAssetPath("/sounds/notification.m4a?v=2")} preload="auto" />
+    <audio id="map-reveal-audio" src={getAssetPath("/sounds/newnormalreveal.mp3")} preload="auto" />
 
        {/* Class Name HUD */}
     <div className={`absolute ${userData?.role === 'teacher' ? 'top-6 left-44' : (isStudentPersonalView ? 'top-20 left-6' : 'top-6 left-6')} z-40 pointer-events-none`}>
@@ -1004,31 +1316,29 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
           {/* Traveling Ships Layer - Render BEHIND planets but atop orbits */}
           {ships.map(ship => {
               if (ship.status !== 'traveling' || !ship.destinationId || !ship.travelStart || !ship.travelEnd) return null;
-              
-              const startPos = getPlanetPosition(ship.locationId, now);
-              const endPos = getPlanetPosition(ship.destinationId, now);
-              
+
+                            const travelCurve = getTravelCurve(ship);
               const totalDuration = ship.travelEnd - ship.travelStart;
+                            if (totalDuration <= 0) return null;
+
               const elapsed = now - ship.travelStart;
               const progress = Math.min(Math.max(elapsed / totalDuration, 0), 1);
               
               if (progress >= 1 || progress <= 0) return null; // Or render at destination?
 
-              // Simple Lerp
-              const currentX = startPos.x + (endPos.x - startPos.x) * progress;
-              const currentY = startPos.y + (endPos.y - startPos.y) * progress;
-              
-              // Angle for the rocket to point towards destination
-              const dx = endPos.x - startPos.x;
-              const dy = endPos.y - startPos.y;
-              const rotationData = (Math.atan2(dy, dx) * 180 / Math.PI) + 45; // +45 because icon is tilted
+                            const currentPoint = getQuadraticBezierPoint(travelCurve.start, travelCurve.control, travelCurve.end, progress);
+                            const tangent = getQuadraticBezierTangent(travelCurve.start, travelCurve.control, travelCurve.end, progress);
+                            const toEndX = travelCurve.end.x - currentPoint.x;
+                            const toEndY = travelCurve.end.y - currentPoint.y;
+
+                            const rotationData = (Math.atan2(tangent.y, tangent.x) * 180 / Math.PI) + 45;
 
               return (
                   <div 
                     key={`travel-${ship.id}`}
                     className="absolute z-10 flex flex-col items-center justify-center transition-opacity"
                     style={{
-                        transform: `translate(${currentX}px, ${currentY}px)`
+                                                transform: `translate(${currentPoint.x}px, ${currentPoint.y}px)`
                     }}
                   >
                        {/* Trajectory Line (Optional - from start to end? No, from current to end looks better?) */}
@@ -1036,8 +1346,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                        <div 
                          className="absolute top-1/2 left-1/2 h-0.5 bg-dashed from-transparent to-cyan-500/50 origin-left opacity-30 pointer-events-none"
                          style={{
-                             width: Math.sqrt(dx*dx + dy*dy) * (1-progress),
-                             transform: `rotate(${Math.atan2(dy, dx)}rad)`
+                                                         width: Math.hypot(toEndX, toEndY),
+                                                         transform: `rotate(${Math.atan2(toEndY, toEndX)}rad)`
                          }}
                        />
 
@@ -1059,10 +1369,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                             alt="Traveling Ship"
                                                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
-                                      {/* Avatar Window */}
-                                      <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                            <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
-                                      </div>
                                   </div>
                               </div>
                           )}
@@ -1231,9 +1537,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
-                                                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                                    <UserAvatar userData={ship} className="w-full h-full scale-[1.35] translate-y-1" />
-                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1370,6 +1673,18 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                    const current = stats?.currentXP || 0;
                    const goal = stats?.xpGoal || 1000;
                    const progress = Math.min((current/goal)*100, 100);
+                   const discoveredUnlocks = (stats?.discoveredUnlocks || {}) as PlanetDiscoveredUnlocks;
+                   const discoveredCount =
+                       (discoveredUnlocks.pets?.length || 0) +
+                       (discoveredUnlocks.avatars?.length || 0) +
+                       (discoveredUnlocks.ships?.length || 0) +
+                       (discoveredUnlocks.objects?.length || 0);
+
+                   const renderKnownUnlock = (id: string, label: string) => (
+                        <div key={`${label}-${id}`} className="text-[10px] text-emerald-200/90 uppercase tracking-widest bg-emerald-500/10 border border-emerald-400/20 rounded px-2 py-1">
+                            {label}: {id}
+                        </div>
+                   );
                    
                    return (
                        <div className="mb-6 p-4 bg-cyan-950/20 rounded-lg border border-cyan-900/50">
@@ -1395,6 +1710,22 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                    {stats.rewardDescription && <div className="text-gray-400 text-xs italic mt-1">{stats.rewardDescription}</div>}
                                </div>
                            )}
+
+                           <div className="border-t border-cyan-800/30 pt-3 mt-3">
+                               <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold mb-2">
+                                   Known Discoveries
+                               </div>
+                               {discoveredCount > 0 ? (
+                                   <div className="flex flex-wrap gap-2">
+                                       {(discoveredUnlocks.pets || []).map((id) => renderKnownUnlock(id, "Pet"))}
+                                       {(discoveredUnlocks.avatars || []).map((id) => renderKnownUnlock(id, "Avatar"))}
+                                       {(discoveredUnlocks.ships || []).map((id) => renderKnownUnlock(id, "Ship"))}
+                                       {(discoveredUnlocks.objects || []).map((id) => renderKnownUnlock(id, "Object"))}
+                                   </div>
+                               ) : (
+                                   <div className="text-[11px] text-gray-400 italic">Mystery… first discovery will reveal what this planet can drop.</div>
+                               )}
+                           </div>
                        </div>
                    );
                })()}
@@ -1607,7 +1938,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-[calc(100vh-2rem)] overflow-y-auto cursor-default"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {awardQueue.map((award, index) => (
+                    {awardQueue.map((award, index) => {
+                        const isCompactAward = awardQueue.length > 1;
+                        const selectedPet = getPetById(award.ship.selectedPetId);
+                        return (
                         <motion.div
                             key={award.id}
                             initial={{ scale: 0, rotate: -10, y: 50 }}
@@ -1620,7 +1954,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 delay: index * 0.1 // Stagger effect
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${awardQueue.length > 1 ? 'w-[300px] aspect-auto' : 'w-[500px] aspect-square p-8'}
+                                ${isCompactAward ? 'w-[300px] aspect-auto' : 'w-[500px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -1632,9 +1966,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             {/* Background Shine */}
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
 
-                            <h2 className={`${awardQueue.length > 1 ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest mb-4 uppercase relative z-10`}>Training Milestone</h2>
+                            <h2 className={`${isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest mb-4 uppercase relative z-10`}>Training Milestone</h2>
 
-                            {/* The Ship */}
+                            {/* Avatar + Ship + Pet */}
                             <motion.div
                                 animate={{
                                     y: [0, -10, 0],
@@ -1645,31 +1979,47 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     duration: 4,
                                     ease: "easeInOut"
                                 }}
-                                className={`relative z-10 ${awardQueue.length > 1 ? 'mb-2' : 'mb-6'}`}
+                                className={`relative z-10 ${isCompactAward ? 'mb-2' : 'mb-6'}`}
                             >
-                                <div className={`relative ${awardQueue.length > 1 ? 'w-24 h-24' : 'w-40 h-40'}`}>
-                                    <img 
-                                        src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
-                                        alt="Award Ship"
-                                        className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] relative z-20"
-                                    />
-                                    {/* Avatar Window - Using simple color fallback because getting full user avatar data here might be complex without looking up ship again, 
-                                        but we have 'ship' object in award.
-                                     */}
-                                    <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                                        {award.ship.avatar && (
-                                            <UserAvatar userData={award.ship as any} className="w-full h-full scale-[1.35] translate-y-1" />
+                                <div className={`relative flex items-center justify-center ${isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
+                                    {award.ship.flag && (
+                                        <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : '-top-3 right-[38%] scale-95'}`}>
+                                            <TinyFlag config={award.ship.flag} />
+                                        </div>
+                                    )}
+
+                                    <div className={`absolute left-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
+                                        <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full" />
+                                    </div>
+
+                                    <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
+                                        <img 
+                                            src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
+                                            alt="Award Ship"
+                                            className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
+                                        />
+                                    </div>
+
+                                    <div className={`absolute right-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
+                                        {selectedPet.imageSrc ? (
+                                            <img
+                                                src={getAssetPath(selectedPet.imageSrc)}
+                                                alt={selectedPet.name}
+                                                className="w-full h-full object-contain"
+                                            />
+                                        ) : (
+                                            <span className={`${isCompactAward ? 'text-xl' : 'text-2xl'} leading-none`}>{selectedPet.emoji}</span>
                                         )}
                                     </div>
                                 </div>
                             </motion.div>
 
-                            <div className={`${awardQueue.length > 1 ? 'text-2xl' : 'text-4xl'} font-bold text-white mb-2 font-sans relative z-10 truncate w-full`}>
+                            <div className={`${isCompactAward ? 'text-2xl' : 'text-4xl'} font-bold text-white mb-2 font-sans relative z-10 truncate w-full`}>
                                 {award.ship.cadetName}
                             </div>
                             
                             {award.reason && (
-                                <div className={`text-cyan-400/80 ${awardQueue.length > 1 ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
+                                <div className={`text-cyan-400/80 ${isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
                                     {award.reason}
                                 </div>
                             )}
@@ -1707,40 +2057,82 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 </motion.div>
                                 )}
                             </div>
+                        </motion.div>
+                        );
+                    })}
+                </div>
 
-                            {(award.unlocks?.ships?.length || award.unlocks?.avatars?.length) && (
+                <AnimatePresence>
+                    {activeUnlockReveal && (
+                        <motion.div
+                            key={`unlock-reveal-${activeUnlockReveal.id}`}
+                            initial={{ opacity: 0, scale: 0.8, y: 30 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                            transition={{ type: "spring", stiffness: 220, damping: 18 }}
+                            className="absolute inset-0 z-[380] flex items-center justify-center pointer-events-none"
+                        >
+                            <div className="relative w-[760px] max-w-[92vw] bg-black/95 border-2 border-fuchsia-400 rounded-3xl shadow-[0_0_80px_rgba(217,70,239,0.7)] p-8 overflow-hidden">
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-fuchsia-700/40 via-purple-800/10 to-transparent" />
                                 <motion.div
-                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    initial={{ scale: 0.95, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
-                                    className="mt-6 w-full bg-purple-500/10 border border-purple-400/40 rounded-2xl p-4 relative overflow-hidden"
+                                    className="relative z-10"
                                 >
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-700/30 via-transparent to-transparent" />
-                                    <div className="relative z-10">
-                                        <div className="text-[10px] uppercase tracking-[0.25em] font-black text-purple-200 text-center mb-3">
-                                            NEW UNLOCK!
+                                    <div className="text-center mb-6">
+                                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/20 border border-fuchsia-300/40 text-fuchsia-100 text-xs font-black uppercase tracking-[0.25em]">
+                                            <Award size={14} />
+                                            New Discovery
                                         </div>
-                                        <div className="flex flex-wrap gap-3 items-center justify-center">
-                                            {(award.unlocks.ships || []).map((id) => (
-                                                <div key={`ship-${id}`} className="flex flex-col items-center gap-1">
-                                                    <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-12 h-12 object-contain drop-shadow-md" />
-                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Ship</div>
-                                                </div>
-                                            ))}
-                                            {(award.unlocks.avatars || []).map((id) => (
-                                                <div key={`avatar-${id}`} className="flex flex-col items-center gap-1">
-                                                    <div className="w-12 h-12 rounded-full border border-purple-400/40 overflow-hidden">
-                                                        <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
-                                                    </div>
-                                                    <div className="text-[9px] text-purple-200/80 uppercase font-bold tracking-widest">Avatar</div>
-                                                </div>
-                                            ))}
+                                        <div className="mt-3 text-2xl md:text-3xl font-black text-white uppercase tracking-wider">
+                                            {activeUnlockReveal.ship.cadetName}
                                         </div>
                                     </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start justify-items-center">
+                                        {(activeUnlockReveal.unlocks?.ships || []).map((id) => (
+                                            <div key={`reveal-ship-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-16 h-16 object-contain drop-shadow-md" />
+                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Ship</div>
+                                            </div>
+                                        ))}
+                                        {(activeUnlockReveal.unlocks?.avatars || []).map((id) => (
+                                            <div key={`reveal-avatar-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                <div className="w-16 h-16 rounded-full border border-fuchsia-300/40 overflow-hidden">
+                                                    <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
+                                                </div>
+                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Avatar</div>
+                                            </div>
+                                        ))}
+                                        {(activeUnlockReveal.unlocks?.pets || []).map((id) => {
+                                            const pet = getPetById(id);
+                                            return (
+                                                <div key={`reveal-pet-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                    <div className="w-16 h-16 rounded-full border border-fuchsia-300/40 overflow-hidden bg-black/40 flex items-center justify-center text-3xl">
+                                                        {pet.imageSrc ? (
+                                                            <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                        ) : (
+                                                            <>{pet.emoji}</>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Pet</div>
+                                                </div>
+                                            );
+                                        })}
+                                        {(activeUnlockReveal.unlocks?.objects || []).map((id) => (
+                                            <div key={`reveal-object-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
+                                                <div className="w-16 h-16 rounded-xl border border-fuchsia-300/40 bg-black/40 flex items-center justify-center text-xs text-fuchsia-100 font-bold px-2 text-center leading-tight">
+                                                    {id}
+                                                </div>
+                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Object</div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </motion.div>
-                            )}
+                            </div>
                         </motion.div>
-                    ))}
-                </div>
+                    )}
+                </AnimatePresence>
             </div>
          )}
        </AnimatePresence>

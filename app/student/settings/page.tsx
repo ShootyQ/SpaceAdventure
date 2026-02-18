@@ -7,11 +7,12 @@ import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/fire
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
-    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity
+    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, Lock
 } from "lucide-react";
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, HAT_OPTIONS, AVATAR_PRESETS, AVATAR_OPTIONS, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { DEFAULT_PET_UNLOCK_CHANCE_CONFIG, getEffectiveUnlockedPetIds, getPetUnlockHint, normalizePetUnlockChanceConfig, PET_OPTIONS, PetUnlockChanceConfig, getResolvedSelectedPetId } from "@/lib/pets";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -108,6 +109,9 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
         { id: 'inventory', title: 'Cargo Hold', icon: Box, color: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/30' },
         { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30' },
         { id: 'flag', title: 'Flag Designer', icon: Flag, color: 'text-red-400', border: 'border-red-500', bg: 'bg-red-950/30' },
+        { id: 'missions', title: 'Mission Log', icon: Activity, color: 'text-green-400', border: 'border-green-500', bg: 'bg-green-950/20', href: '/student/missions' },
+        { id: 'interior', title: 'Spaceship Interior', icon: LayoutDashboard, color: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-950/30', href: '/student' },
+        { id: 'solar', title: 'Solar System', icon: Map, color: 'text-cyan-400', border: 'border-cyan-500', bg: 'bg-cyan-950/20', href: '/student/map' },
     ];
 
     // Determine Rank
@@ -145,7 +149,13 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                     {MENU_ITEMS.map((item, index) => (
                         <motion.button
                             key={item.id}
-                            onClick={() => onNavigate(item.id)}
+                            onClick={() => {
+                                if ((item as any).href) {
+                                    window.location.href = (item as any).href;
+                                } else {
+                                    onNavigate(item.id);
+                                }
+                            }}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
@@ -171,45 +181,15 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                                 <h3 className={`text-xl font-bold uppercase tracking-wider ${item.color} drop-shadow-md`}>
                                     {item.title}
                                 </h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">Access System</p>
+                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">
+                                    {item.id === 'missions' ? 'View Active Assignments' : item.id === 'interior' ? 'Enter Cabin View' : item.id === 'solar' ? 'Open Star Map' : 'Access System'}
+                                </p>
                             </div>
                             
                             {/* Decorative Corner */}
                             <div className={`absolute top-0 right-0 w-8 h-8 ${item.color.replace('text', 'bg').replace('400', '500')}/10 rounded-bl-3xl`} />
                         </motion.button>
                     ))}
-                    
-                    {/* Mission Log Link */}
-                    <Link href="/student/missions" className="md:col-span-2">
-                        <motion.div
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-green-500/30 bg-green-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-green-900/10 transition-colors group cursor-pointer"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-green-500 text-green-400">
-                                <Activity size={32} />
-                             </div>
-                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-green-400">Mission Log</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">View Active Assignments</p>
-                             </div>
-                        </motion.div>
-                    </Link>
-
-                    {/* Placeholder for future Solar Map Link */}
-                    <Link href="/student" className="md:col-span-2">
-                        <motion.div
-                             whileHover={{ scale: 1.01 }}
-                             className="border border-cyan-500/30 bg-cyan-950/20 rounded-2xl p-6 flex items-center gap-6 hover:bg-cyan-900/10 transition-colors group cursor-pointer"
-                        >
-                             <div className="p-4 rounded-xl bg-black/50 border border-cyan-500 text-cyan-400">
-                                <Crosshair size={32} className="animate-spin-slow" />
-                             </div>
-                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-wider text-cyan-400">Launch Solar Map</h3>
-                                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Initiate Flight Sequence</p>
-                             </div>
-                        </motion.div>
-                    </Link>
                 </div>
             </div>
 
@@ -501,9 +481,17 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [bgLight, setBgLight] = useState(userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20);
     const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
     const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
+    const [petId, setPetId] = useState(getResolvedSelectedPetId(userData));
 
     const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
-    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(["bunny"]));
+    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(PUBLIC_AVATAR_OPTIONS.map(a => a.id)));
+    const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+
+    const secretUnlockRules: Record<string, { planetId: string; unlockKey: string }> = {
+        jovi: { planetId: "jupiter", unlockKey: "jovi" },
+        rusty: { planetId: "mars", unlockKey: "rusty" },
+        vylaet: { planetId: "mars", unlockKey: "vylaet" },
+    };
 
     useEffect(() => {
         const teacherId = userData?.teacherId;
@@ -513,10 +501,13 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
             const map: Record<string, Record<string, number>> = {};
             snap.forEach((d) => {
                 const data = d.data() as any;
-                if (d.id === "jupiter") {
-                    const joviThreshold = Number(data?.unlocks?.avatars?.jovi || 0);
-                    map[d.id] = joviThreshold > 0 ? { jovi: joviThreshold } : {};
-                }
+                const rawUnlocks = data?.unlocks?.avatars || {};
+                const normalized: Record<string, number> = {};
+                Object.keys(rawUnlocks).forEach((key) => {
+                    const threshold = Number(rawUnlocks[key] || 0);
+                    if (threshold > 0) normalized[key] = threshold;
+                });
+                map[d.id] = normalized;
             });
             setPlanetAvatarUnlocks(map);
         });
@@ -525,18 +516,33 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     }, [userData?.teacherId]);
 
     useEffect(() => {
-        const currentAvatar = userData?.avatar?.avatarId || "bunny";
-        const unlocked = new Set<string>(["bunny", currentAvatar]);
+        const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
+            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+        });
 
-        const jupiterXP = Number((userData?.planetXP || {})?.jupiter || 0);
-        const joviThreshold = Number(planetAvatarUnlocks?.jupiter?.jovi || 0);
-        if (joviThreshold > 0 && jupiterXP >= joviThreshold) {
-            unlocked.add("jovi");
-        }
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        const currentAvatar = userData?.avatar?.avatarId || "bunny";
+        const unlocked = new Set<string>([...PUBLIC_AVATAR_OPTIONS.map(a => a.id), currentAvatar]);
+
+        Object.entries(secretUnlockRules).forEach(([avatarId, rule]) => {
+            const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
+            const requiredXP = Number(planetAvatarUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
+            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+                unlocked.add(avatarId);
+            }
+        });
 
         setUnlockedAvatarIds(unlocked);
         if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
     }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, avatarId]);
+
+    useEffect(() => {
+        setPetId(getResolvedSelectedPetId(userData));
+    }, [userData?.selectedPetId, userData?.unlockedPetIds]);
 
     const handleSelectPreset = (presetId: string) => {
         const preset = AVATAR_PRESETS.find(p => p.id === presetId);
@@ -552,11 +558,14 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     };
 
     const visiblePresets = AVATAR_PRESETS.filter(p => unlockedAvatarIds.has(p.config.avatarId));
+    const unlockedPetIds = getEffectiveUnlockedPetIds(userData);
 
     const handleSave = async () => {
         if (!user) return;
         setLoading(true);
         try {
+            const safeAvatarId = unlockedAvatarIds.has(avatarId) ? avatarId : (userData?.avatar?.avatarId || "bunny");
+            const safePetId = unlockedPetIds.has(petId) ? petId : getResolvedSelectedPetId(userData);
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
                 "avatar.hue": hue,
@@ -565,7 +574,9 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                 "avatar.bgSat": bgSat,
                 "avatar.bgLight": bgLight,
                 "avatar.activeHat": activeHat,
-                "avatar.avatarId": avatarId
+                "avatar.avatarId": safeAvatarId,
+                "selectedPetId": safePetId,
+                "unlockedPetIds": Array.from(unlockedPetIds)
             });
             onBack();
         } catch (e) {
@@ -651,6 +662,53 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                                 <span className={`text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${avatarId === opt.id ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>{opt.name}</span>
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Sparkles size={20} className="text-purple-400" />
+                        <span className="uppercase tracking-wider">Companion Selection</span>
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        {PET_OPTIONS.map((pet) => {
+                            const isUnlocked = unlockedPetIds.has(pet.id);
+                            return (
+                                <button
+                                    key={pet.id}
+                                    type="button"
+                                    disabled={!isUnlocked}
+                                    onClick={() => isUnlocked && setPetId(pet.id)}
+                                    className={`group relative p-3 rounded-xl border transition-all flex items-center gap-3 ${!isUnlocked
+                                        ? 'border-white/10 bg-black/30 opacity-60 cursor-not-allowed'
+                                        : petId === pet.id
+                                            ? 'bg-purple-900/40 border-purple-400'
+                                            : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'
+                                        }`}
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-2xl overflow-hidden">
+                                        {pet.imageSrc ? (
+                                            <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <>{pet.emoji}</>
+                                        )}
+                                    </div>
+                                    <div className="text-left min-w-0">
+                                        <div className={`text-xs font-bold uppercase tracking-wider truncate ${petId === pet.id && isUnlocked ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>
+                                            {pet.name}
+                                        </div>
+                                        {!isUnlocked ? (
+                                            <div className="mt-1 text-[10px] text-purple-300/80 uppercase tracking-widest flex items-center gap-1">
+                                                <Lock size={10} />
+                                                {getPetUnlockHint(pet, petUnlockChanceConfig) || (pet.unlockPlanetId ? `Land on ${pet.unlockPlanetId}` : 'Locked')}
+                                            </div>
+                                        ) : (
+                                            <div className="mt-1 text-[10px] text-green-300/80 uppercase tracking-widest">Unlocked</div>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

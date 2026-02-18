@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "image": "/images/ships/interiors/defaultinterior.png",
+  "canvas": {
+    "width": 1536,
+    "height": 864
+  },
+  "notes": "Imported from Photoshop CSV. x/y/w/h are normalized 0-1 values from x_pct/y_pct/w_pct/h_pct.",
+  "zones": [
+    {
+      "id": "zone_itemchoice_07",
+      "label": "Item Choice 07",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.910156,
+      "y": 0.571759,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1398,
+        "y_px": 494,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_itemchoice_06",
+      "label": "Item Choice 06",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.835938,
+      "y": 0.570602,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1284,
+        "y_px": 493,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_itemchoice_05",
+      "label": "Item Choice 05",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.055339,
+      "y": 0.420139,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 85,
+        "y_px": 363,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_itemchoice_04",
+      "label": "Item Choice 04",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.035156,
+      "y": 0.576389,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 54,
+        "y_px": 498,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_itemchoice_03",
+      "label": "Item Choice 03",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.872396,
+      "y": 0.420139,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1340,
+        "y_px": 363,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_itemchoice_02",
+      "label": "Item Choice 02",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.795573,
+      "y": 0.420139,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1222,
+        "y_px": 363,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_itemchoice_01",
+      "label": "Item Choice 01",
+      "kind": "item-choice",
+      "shape": "rect",
+      "x": 0.872396,
+      "y": 0.099537,
+      "w": 0.066406,
+      "h": 0.118056,
+      "z": 10,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1340,
+        "y_px": 86,
+        "w_px": 102,
+        "h_px": 102,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_player_currentShip",
+      "label": "Player Current Ship",
+      "kind": "player-ship",
+      "shape": "rect",
+      "x": 0.744141,
+      "y": 0.555556,
+      "w": 0.084635,
+      "h": 0.150463,
+      "z": 24,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1143,
+        "y_px": 480,
+        "w_px": 130,
+        "h_px": 130,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_playerPet",
+      "label": "Player Pet",
+      "kind": "pet",
+      "shape": "rect",
+      "x": 0.419922,
+      "y": 0.814815,
+      "w": 0.113281,
+      "h": 0.216435,
+      "z": 23,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 645,
+        "y_px": 704,
+        "w_px": 174,
+        "h_px": 187,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_playerAvatar",
+      "label": "Player Avatar",
+      "kind": "avatar",
+      "shape": "rect",
+      "x": 0.146543,
+      "y": 0.537222,
+      "w": 0.263027,
+      "h": 0.595764,
+      "z": 25,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 225.09,
+        "y_px": 464.16,
+        "w_px": 404.01,
+        "h_px": 514.74,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_achievement_04",
+      "label": "Achievement 04",
+      "kind": "achievement",
+      "shape": "rect",
+      "x": 0.729818,
+      "y": 0.100694,
+      "w": 0.097656,
+      "h": 0.08912,
+      "z": 15,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 1121,
+        "y_px": 87,
+        "w_px": 150,
+        "h_px": 77,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_achievement_03",
+      "label": "Achievement 03",
+      "kind": "achievement",
+      "shape": "rect",
+      "x": 0.617839,
+      "y": 0.100694,
+      "w": 0.102214,
+      "h": 0.091435,
+      "z": 15,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 949,
+        "y_px": 87,
+        "w_px": 157,
+        "h_px": 79,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_explorerBadge",
+      "label": "Explorer Badge",
+      "kind": "badge",
+      "shape": "rect",
+      "x": 0.505208,
+      "y": 0.099537,
+      "w": 0.102214,
+      "h": 0.090278,
+      "z": 16,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 776,
+        "y_px": 86,
+        "w_px": 157,
+        "h_px": 78,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_currentBadge",
+      "label": "Current Badge",
+      "kind": "badge",
+      "shape": "rect",
+      "x": 0.391276,
+      "y": 0.099537,
+      "w": 0.102214,
+      "h": 0.090278,
+      "z": 16,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 601,
+        "y_px": 86,
+        "w_px": 157,
+        "h_px": 78,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_achievement_02",
+      "label": "Achievement 02",
+      "kind": "achievement",
+      "shape": "rect",
+      "x": 0.279948,
+      "y": 0.09838,
+      "w": 0.101562,
+      "h": 0.092593,
+      "z": 15,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 430,
+        "y_px": 85,
+        "w_px": 156,
+        "h_px": 80,
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "zone_achievement_01",
+      "label": "Achievement 01",
+      "kind": "achievement",
+      "shape": "rect",
+      "x": 0.171875,
+      "y": 0.099537,
+      "w": 0.098307,
+      "h": 0.091435,
+      "z": 15,
+      "anchor": "top-left",
+      "visible": true,
+      "meta": {
+        "x_px": 264,
+        "y_px": 86,
+        "w_px": 151,
+        "h_px": 79,
+        "maxItems": 1
+      }
+    }
+  ],
+  "noGoZones": [
+    {
+      "id": "nogozone_ui_overlay",
+      "shape": "rect",
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 0.08
+    }
+  ]
+}

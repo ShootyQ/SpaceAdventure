@@ -8,6 +8,7 @@ import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
+import { getPetById } from "@/lib/pets";
 
 // Reuse TinyFlag - We should probably export this too, but for now I'll duplicate quickly or check if I can export it from SolarSystem (not easy).
 // I will define it locally here or better yet make a shared component later. For now, local is fine to avoid circular deps.
@@ -74,6 +75,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
     // Memoize rank reset per card to avoid array operations
     const rank = React.useMemo(() => ranks.find(r => student.xp >= r.minXP), [ranks, student.xp]);
     const shipModelId = (student as any)?.spaceship?.id || (student as any)?.spaceship?.modelId || (student as any)?.shipId || 'finalship';
+    const selectedPet = React.useMemo(() => getPetById(student.selectedPetId), [student.selectedPetId]);
 
     return (
         <div 
@@ -96,24 +98,37 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                 </div>
             </div>
 
-            {/* Avatar */}
-            <div className="relative w-32 h-32 mb-4">
-                <img
-                    src={getAssetPath(`/images/ships/${shipModelId}.png`)}
-                    alt="Ship"
-                    className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] relative z-20"
-                />
-                <div className="absolute top-[22%] left-[26%] w-[48%] h-[30%] z-30 rounded-full overflow-hidden bg-cyan-900/20">
-                    <UserAvatar 
-                        userData={student as any} 
-                        className="w-full h-full scale-[1.35] translate-y-1" 
-                    />
-                </div>
+            {/* Avatar + Ship + Pet */}
+            <div className="relative w-full h-36 mb-4 flex items-center justify-center">
                 {student.flag && (
-                    <div className="absolute -top-2 -left-2 z-40 transform -rotate-12 scale-110 drop-shadow-md">
+                    <div className="absolute top-6 right-2 z-40 scale-90 drop-shadow-md">
                         <TinyFlag config={student.flag} />
                     </div>
                 )}
+
+                <div className="absolute left-0 top-[76%] -translate-y-1/2 z-30 w-[58px] h-[58px] md:w-[68px] md:h-[68px] flex items-end justify-center">
+                    <UserAvatar userData={student as any} transparentBg className="w-full h-full" />
+                </div>
+
+                <div className="relative z-20 w-24 h-24 md:w-28 md:h-28">
+                    <img
+                        src={getAssetPath(`/images/ships/${shipModelId}.png`)}
+                        alt="Ship"
+                        className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.25)]"
+                    />
+                </div>
+
+                <div className="absolute right-0 top-[76%] -translate-y-1/2 z-30 w-[52px] h-[52px] md:w-[62px] md:h-[62px] flex items-end justify-center">
+                    {selectedPet.imageSrc ? (
+                        <img
+                            src={getAssetPath(selectedPet.imageSrc)}
+                            alt={selectedPet.name}
+                            className="w-full h-full object-contain"
+                        />
+                    ) : (
+                        <span className="text-xl leading-none">{selectedPet.emoji}</span>
+                    )}
+                </div>
             </div>
 
             {/* Name */}
@@ -184,7 +199,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                          </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-7">
                         {visibleShips.map(student => (
                             <ShipCard 
                                 key={student.id}
@@ -216,6 +231,8 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                      <div className="relative group">
                                          <select 
                                             id="bulk-protocol"
+                                                          title="Select protocol"
+                                                          aria-label="Select protocol"
                                             onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 const xpInput = document.getElementById('bulk-xp') as HTMLInputElement;

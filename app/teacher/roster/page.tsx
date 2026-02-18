@@ -10,8 +10,10 @@ import { UserData, PLANETS, SpaceshipConfig, STUDENT_GRADES, StudentGrade } from
 
 import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
-import { UserAvatar, AVATAR_PRESETS, AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
+import { getTeacherStudentLimit, isSubscriptionActive } from "@/lib/subscription";
+import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
 
 const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
     { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
@@ -30,8 +32,9 @@ export default function RosterPage() {
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
     const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
-  const [selectedAvatarId, setSelectedAvatarId] = useState(AVATAR_OPTIONS[0].id);
+    const [selectedAvatarId, setSelectedAvatarId] = useState(PUBLIC_AVATAR_OPTIONS[0].id);
   const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
+    const [selectedPetId, setSelectedPetId] = useState(DEFAULT_PET_ID);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
 
@@ -39,6 +42,13 @@ export default function RosterPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<UserData>>({});
   const [showEditVisuals, setShowEditVisuals] = useState(false); // Toggle for full editor within row
+    const [editPassword, setEditPassword] = useState("");
+    const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+
+    const hasActiveSubscription = isSubscriptionActive(userData);
+    const studentLimit = getTeacherStudentLimit(userData);
+    const isOverStudentLimit = students.length > studentLimit;
+    const isAtStudentLimit = students.length >= studentLimit;
 
 
   const fetchRoster = async () => {
@@ -70,10 +80,8 @@ export default function RosterPage() {
   const handleAddStudent = async (e: React.FormEvent) => {
       e.preventDefault();
 
-      // Check Subscription Limit
-      const isTrial = (userData?.subscriptionStatus || 'trial') === 'trial';
-      if (isTrial && students.length >= 5) {
-          alert("TRIAL LIMIT REACHED: Upgrade clearance to recruit more cadets.");
+      if (isAtStudentLimit) {
+          alert(`ROSTER LIMIT REACHED: Your current plan allows up to ${studentLimit} students.`);
           return;
       }
 
@@ -131,6 +139,8 @@ export default function RosterPage() {
                  bgLight: 20,
                  activeHat: 'none'
               },
+                  selectedPetId,
+                  unlockedPetIds: [...STARTER_PET_IDS],
               // Storing credentials for classroom management features (Print Cards)
               username: newStudentData.username,
               password: newStudentData.password
@@ -141,8 +151,9 @@ export default function RosterPage() {
           setStudents(prev => [...prev, newStudent]);
           setNewStudentData({ name: "", username: "", password: "" });
           setNewStudentGrade("3");
-          setSelectedAvatarId(AVATAR_OPTIONS[0].id);
+          setSelectedAvatarId(PUBLIC_AVATAR_OPTIONS[0].id);
           setSelectedShipId(SHIP_OPTIONS[0].id);
+          setSelectedPetId(DEFAULT_PET_ID);
           setIsAddingStudent(false);
       } catch (e: any) {
           console.error("Error creating student:", e);
@@ -166,9 +177,31 @@ export default function RosterPage() {
           gradeLevel: student.gradeLevel || '3',
           status: student.status,
           avatar: student.avatar,
-          spaceship: student.spaceship // Include spaceship
+          spaceship: student.spaceship,
+          selectedPetId: student.selectedPetId || DEFAULT_PET_ID,
+          unlockedPetIds: student.unlockedPetIds || [...STARTER_PET_IDS]
       });
       setShowEditVisuals(false); // default to closed
+      setEditPassword("");
+  };
+
+  const resetStudentPassword = async (studentUid: string, newPassword: string) => {
+      if (!user) throw new Error("You must be signed in.");
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/teacher/students/reset-password', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ studentUid, newPassword })
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+          throw new Error(result?.error || 'Failed to reset student password.');
+      }
   };
 
   const saveEdit = async () => {
@@ -185,13 +218,23 @@ export default function RosterPage() {
                   : editForm.spaceship
           };
 
+          if (editPassword.trim()) {
+              setPasswordResetLoading(true);
+              await resetStudentPassword(editingId, editPassword.trim());
+              normalizedEditForm.password = editPassword.trim();
+          }
+
           await updateDoc(doc(db, "users", editingId), normalizedEditForm);
           setStudents(prev => prev.map(s => s.uid === editingId ? { ...s, ...normalizedEditForm } : s));
           setEditingId(null);
           setShowEditVisuals(false);
+          setEditPassword("");
       } catch (e) {
           console.error("Error saving student:", e);
-          alert("Failed to save changes.");
+          const errorMessage = e instanceof Error ? e.message : "Failed to save changes.";
+          alert(errorMessage);
+      } finally {
+          setPasswordResetLoading(false);
       }
   };
 
@@ -208,6 +251,16 @@ export default function RosterPage() {
       setEditForm(prev => ({
           ...prev,
           spaceship: { ...prev.spaceship!, id: shipId, modelId: shipId }
+      }));
+  };
+
+  const handleUpdatePet = (petId: string) => {
+      const unlockedPetIds = new Set([...(editForm.unlockedPetIds || []), ...STARTER_PET_IDS]);
+      if (!unlockedPetIds.has(petId)) return;
+      setEditForm(prev => ({
+          ...prev,
+          selectedPetId: petId,
+          unlockedPetIds: Array.from(unlockedPetIds)
       }));
   };
 
@@ -266,12 +319,24 @@ export default function RosterPage() {
 
                      <button 
                         onClick={() => setIsAddingStudent(true)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded-lg transition-colors"
+                        disabled={isAtStudentLimit}
+                                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-cyan-600"
                      >
                         <UserPlus size={18} />
                         <span className="hidden md:inline">Add Student</span>
                      </button>
                  </div>
+            </div>
+
+            <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${isOverStudentLimit ? 'bg-amber-900/20 border-amber-500/50 text-amber-200' : 'bg-cyan-950/30 border-cyan-500/20 text-cyan-300'}`}>
+                {hasActiveSubscription ? (
+                    <span>Active subscription: {students.length}/{studentLimit} students used.</span>
+                ) : (
+                    <span>
+                        Trial/inactive plan: {students.length}/{studentLimit} students used.
+                        {isOverStudentLimit ? ' Existing students stay enrolled, but new students are disabled until billing is active again.' : ''}
+                    </span>
+                )}
             </div>
 
             {/* New Student Modal */}
@@ -339,7 +404,7 @@ export default function RosterPage() {
                             <div>
                                 <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Identity</label>
                                 <div className="grid grid-cols-4 gap-2">
-                                    {AVATAR_OPTIONS.map((opt) => (
+                                    {PUBLIC_AVATAR_OPTIONS.map((opt) => (
                                         <button
                                             key={opt.id}
                                             type="button" 
@@ -363,7 +428,7 @@ export default function RosterPage() {
                                     ))}
                                 </div>
                                 <div className="text-center mt-1 text-xs text-cyan-300 font-bold uppercase tracking-widest">
-                                    {AVATAR_OPTIONS.find(p => p.id === selectedAvatarId)?.name}
+                                    {PUBLIC_AVATAR_OPTIONS.find(p => p.id === selectedAvatarId)?.name}
                                 </div>
                             </div>
 
@@ -391,6 +456,29 @@ export default function RosterPage() {
                                             <div className="text-[10px] uppercase font-bold text-center leading-tight text-gray-300">
                                                 {ship.name}
                                             </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Pet</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {PET_OPTIONS.map((pet) => (
+                                        <button
+                                            key={pet.id}
+                                            type="button"
+                                            onClick={() => setSelectedPetId(pet.id)}
+                                            className={`relative p-2 rounded-lg border-2 flex flex-col items-center gap-1 bg-black/50 transition-all ${selectedPetId === pet.id ? 'border-cyan-400 ring-2 ring-cyan-500/20 bg-cyan-900/10' : 'border-white/10 hover:border-white/30'}`}
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-black/60 border border-cyan-700/40 flex items-center justify-center text-xl overflow-hidden">
+                                                {pet.imageSrc ? (
+                                                    <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <>{pet.emoji}</>
+                                                )}
+                                            </div>
+                                            <div className="text-[9px] uppercase font-bold text-center leading-tight text-gray-300">{pet.name}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -464,18 +552,18 @@ export default function RosterPage() {
                                              onClick={() => setShowEditVisuals(!showEditVisuals)}
                                              className="text-[10px] text-cyan-400 uppercase font-bold tracking-wider hover:text-white text-left px-1"
                                          >
-                                             {showEditVisuals ? "- Close Visuals" : "+ Change Avatar / Ship"}
+                                             {showEditVisuals ? "- Close Visuals" : "+ Change Avatar / Ship / Pet"}
                                          </button>
                                     </div>
 
                                     {/* Visual Editor Expanded Area */}
                                     {showEditVisuals && (
                                         <div className="col-span-12 bg-black/60 border border-cyan-500/30 rounded-xl p-4 mb-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <div>
                                                     <h4 className="text-xs text-white uppercase font-bold mb-2">Avatar</h4>
                                                     <div className="grid grid-cols-5 gap-2">
-                                                        {AVATAR_OPTIONS.map(opt => (
+                                                        {PUBLIC_AVATAR_OPTIONS.map(opt => (
                                                              <button
                                                                 key={opt.id}
                                                                 onClick={() => handleUpdateAvatar(opt.id)}
@@ -501,6 +589,27 @@ export default function RosterPage() {
                                                                  <img src={getAssetPath(ship.src)} className="w-8 h-8 object-contain" />
                                                                  <span className="text-[8px] uppercase mt-1 text-center">{ship.name}</span>
                                                              </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs text-white uppercase font-bold mb-2">Pet</h4>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {PET_OPTIONS.filter((pet) => new Set([...(editForm.unlockedPetIds || []), ...STARTER_PET_IDS]).has(pet.id)).map((pet) => (
+                                                            <button
+                                                                key={pet.id}
+                                                                onClick={() => handleUpdatePet(pet.id)}
+                                                                className={`p-2 rounded border flex items-center gap-2 ${editForm.selectedPetId === pet.id ? 'border-cyan-400 bg-cyan-900/20' : 'border-white/10 opacity-70 hover:opacity-100'}`}
+                                                            >
+                                                                <div className="w-8 h-8 rounded-full bg-black/60 border border-cyan-700/40 flex items-center justify-center text-lg overflow-hidden">
+                                                                    {pet.imageSrc ? (
+                                                                        <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
+                                                                    ) : (
+                                                                        <>{pet.emoji}</>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[9px] uppercase text-left font-bold leading-tight">{pet.name}</span>
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -564,14 +673,23 @@ export default function RosterPage() {
                                                             <option key={grade} value={grade}>Grade {grade}</option>
                                                         ))}
                                                     </select>
+                                                    <input
+                                                        type="text"
+                                                        value={editPassword}
+                                                        onChange={(e) => setEditPassword(e.target.value)}
+                                                        className="w-full bg-black border border-cyan-500 px-2 py-1 rounded text-white text-xs"
+                                                        placeholder="New password (optional)"
+                                                    />
                                                 </div>
                                             </div>
                                         </>
                                     )}
                                     
                                     <div className="col-span-12 md:col-span-1 flex justify-end gap-2">
-                                        <button onClick={saveEdit} className="p-2 bg-green-600 rounded text-white hover:bg-green-500"><Save size={16} /></button>
-                                        <button onClick={() => setEditingId(null)} className="p-2 bg-red-600 rounded text-white hover:bg-red-500"><X size={16} /></button>
+                                        <button disabled={passwordResetLoading} onClick={saveEdit} className="p-2 bg-green-600 rounded text-white hover:bg-green-500 disabled:opacity-60 disabled:cursor-not-allowed">
+                                            {passwordResetLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                        </button>
+                                        <button onClick={() => { setEditingId(null); setShowEditVisuals(false); setEditPassword(""); }} className="p-2 bg-red-600 rounded text-white hover:bg-red-500"><X size={16} /></button>
                                     </div>
                                 </div>
                             ) : (

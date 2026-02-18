@@ -1,32 +1,188 @@
-import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+
+const ACTIVE_STRIPE_STATUSES = new Set(['active', 'trialing']);
+
+const toAppSubscriptionStatus = (stripeStatus?: string) => {
+    return stripeStatus && ACTIVE_STRIPE_STATUSES.has(stripeStatus) ? 'active' : 'trial';
+};
+
+const findActiveSubscriptionByEmail = async (stripe: Stripe, email: string) => {
+    const customers = await stripe.customers.list({
+        email,
+        limit: 100,
+    });
+
+    for (const customer of customers.data) {
+        const subscriptions = await stripe.subscriptions.list({
+            customer: customer.id,
+            status: 'all',
+            limit: 100,
+        });
+
+        const activeSubscription = subscriptions.data.find(
+            (sub) => sub.status === 'active' || sub.status === 'trialing'
+        );
+
+        if (activeSubscription) {
+            return {
+                customerId: customer.id,
+                subscription: activeSubscription,
+            };
+        }
+    }
+
+    return {
+        customerId: customers.data[0]?.id || null,
+        subscription: null,
+    };
+};
 
 export async function GET() {
-    return NextResponse.json({ status: "Stripe Checkout API is online" });
+    try {
+        const stripeLib = await import('@/lib/stripe');
+
+    return NextResponse.json({
+        status: "Stripe Checkout API is online",
+        hasStripeSecret: Boolean(process.env.STRIPE_SECRET_KEY),
+            stripeInitialized: stripeLib.stripeInitialized,
+            stripeInitError: stripeLib.stripeInitErrorMessage || null,
+        hasMonthlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY),
+        hasYearlyPriceId: Boolean(process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY),
+            adminSyncInCheckout: false,
+    });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown checkout GET init error';
+        return NextResponse.json({ error: `Checkout diagnostics failed: ${message}` }, { status: 500 });
+    }
 }
 
 export async function POST(req: Request) {
     console.log("[STRIPE_CHECKOUT] POST request received");
     try {
+        const stripeLib = await import('@/lib/stripe');
+        const stripe = stripeLib.stripe;
+
+        const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+        if (!stripeKey || !stripeKey.startsWith("sk_")) {
+            console.error("[STRIPE_CHECKOUT] Missing STRIPE_SECRET_KEY in runtime environment");
+            return NextResponse.json({
+                error: "Stripe is not configured on the server (missing STRIPE_SECRET_KEY)."
+            }, { status: 500 });
+        }
+
+        if (!stripeLib.stripeInitialized) {
+            return NextResponse.json({
+                error: `Stripe initialization failed: ${stripeLib.stripeInitErrorMessage || 'Unknown Stripe init error'}`
+            }, { status: 500 });
+        }
+
         const body = await req.json();
-        const { priceId, cycle, userId, email } = body;
+        const { intent, priceId, cycle, userId, email, syncOnly, customerId, subscriptionId } = body;
+        const monthlyPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || '';
+        const yearlyPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || '';
+        const normalizedCycle = cycle === 'yearly' ? 'yearly' : 'monthly';
+
+        if (intent === 'portal') {
+            let targetCustomerId = customerId;
+
+            if (!targetCustomerId && subscriptionId) {
+                try {
+                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                    targetCustomerId = typeof subscription.customer === 'string'
+                        ? subscription.customer
+                        : subscription.customer?.id;
+                } catch (subscriptionLookupError) {
+                    console.warn('[STRIPE_CHECKOUT] Portal subscription lookup failed', subscriptionLookupError);
+                }
+            }
+
+            if (!targetCustomerId && email) {
+                const customers = await stripe.customers.list({
+                    email,
+                    limit: 1,
+                });
+                if (customers.data.length > 0) {
+                    targetCustomerId = customers.data[0].id;
+                }
+            }
+
+            if (!targetCustomerId) {
+                return NextResponse.json({
+                    error: 'No Stripe billing profile found yet. Open Subscriptions to start or sync billing first.'
+                }, { status: 400 });
+            }
+
+            const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.classcrave.com';
+
+            const portalSession = await stripe.billingPortal.sessions.create({
+                customer: targetCustomerId,
+                return_url: `${origin}/teacher#billing`,
+            });
+
+            return NextResponse.json({ url: portalSession.url });
+        }
         
-        console.log("[STRIPE_CHECKOUT] Body:", { priceId, cycle, userId, email });
+        console.log("[STRIPE_CHECKOUT] Body:", { priceId, cycle, userId, email, syncOnly: Boolean(syncOnly) });
 
         if (!userId || !email) {
             console.log("[STRIPE_CHECKOUT] Missing fields");
-            return new NextResponse("Missing required fields", { status: 400 });
+            return NextResponse.json({
+                error: "Missing required fields: userId and email are required."
+            }, { status: 400 });
         }
+
+        // Check for existing customers/subscriptions by email to prevent double-subscription.
+        // Scan all matching customers because some accounts have duplicates over time.
+        const existingStripeState = await findActiveSubscriptionByEmail(stripe, email);
+        const existingCustomerId = existingStripeState.customerId;
+
+        if (existingStripeState.subscription) {
+                const activeSubscription = existingStripeState.subscription;
+                const firstItem = activeSubscription.items.data[0];
+
+                return NextResponse.json({
+                    alreadySubscribed: true,
+                    message: 'You already have an active subscription.',
+                    synced: false,
+                    syncError: 'Checkout route does not perform server-side Firebase sync.',
+                    subscription: {
+                        status: activeSubscription.status,
+                        id: activeSubscription.id,
+                        customerId: typeof activeSubscription.customer === 'string' ? activeSubscription.customer : activeSubscription.customer?.id,
+                        priceId: firstItem?.price?.id || null,
+                        interval: firstItem?.price?.recurring?.interval || null,
+                        cancelAtPeriodEnd: (activeSubscription as any).cancel_at_period_end || false,
+                        currentPeriodStart: (activeSubscription as any).current_period_start
+                            ? new Date((activeSubscription as any).current_period_start * 1000).toISOString()
+                            : null,
+                        currentPeriodEnd: (activeSubscription as any).current_period_end
+                            ? new Date((activeSubscription as any).current_period_end * 1000).toISOString()
+                            : null,
+                    },
+                });
+        }
+
+        if (syncOnly) {
+            return NextResponse.json({
+                alreadySubscribed: false,
+                synced: false,
+                message: 'No active subscription found for this email.',
+            });
+        }
+
+        const resolvedPriceId = typeof priceId === 'string' && priceId.trim().length > 0
+            ? priceId.trim()
+            : (normalizedCycle === 'yearly' ? yearlyPriceId : monthlyPriceId);
 
         const line_items: any = [];
 
-        if (priceId) {
+        if (resolvedPriceId) {
             line_items.push({
-                price: priceId,
+                price: resolvedPriceId,
                 quantity: 1,
             });
         } else {
-            const normalizedCycle = cycle === 'yearly' ? 'yearly' : 'monthly';
             const isYearly = normalizedCycle === 'yearly';
 
             // Fallback for Sandbox/Demo Mode if no Price ID is configured.
@@ -47,20 +203,42 @@ export async function POST(req: Request) {
             });
         }
 
-        const session = await stripe.checkout.sessions.create({
-            customer_email: email,
+        const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.classcrave.com';
+
+        const checkoutSessionPayload: Stripe.Checkout.SessionCreateParams = {
             line_items: line_items,
             mode: 'subscription',
-            success_url: `${req.headers.get('origin')}/teacher/settings?success=true`,
-            cancel_url: `${req.headers.get('origin')}/teacher/settings?canceled=true`,
+            allow_promotion_codes: true,
+            success_url: `${origin}/teacher/settings?mode=billing&success=true`,
+            cancel_url: `${origin}/teacher/settings?mode=billing&canceled=true`,
             metadata: {
                 userId: userId,
             },
-        });
+        };
+
+        if (existingCustomerId) {
+            checkoutSessionPayload.customer = existingCustomerId;
+        } else {
+            checkoutSessionPayload.customer_email = email;
+        }
+
+        const session = await stripe.checkout.sessions.create(checkoutSessionPayload);
 
         return NextResponse.json({ url: session.url });
     } catch (error) {
         console.error("[STRIPE_CHECKOUT]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+
+        if (error instanceof Stripe.errors.StripeError) {
+            return NextResponse.json({
+                error: error.message,
+                code: error.code || null,
+                type: error.type || null,
+            }, { status: 500 });
+        }
+
+        const fallbackMessage = error instanceof Error ? error.message : "Unknown server error";
+        return NextResponse.json({
+            error: `Internal Error: ${fallbackMessage}`,
+        }, { status: 500 });
     }
 }
