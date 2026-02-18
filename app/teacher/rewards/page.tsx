@@ -42,7 +42,7 @@ export default function RewardsPage() {
     
     // Forms
     const [newLabel, setNewLabel] = useState("");
-    const [newXp, setNewXp] = useState(50);
+    const [newXpInput, setNewXpInput] = useState("50");
     const { user } = useAuth();
 
     // Helper for Multi-Select
@@ -227,16 +227,21 @@ export default function RewardsPage() {
     const handleAddBehavior = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
+        const parsedXp = Number(newXpInput);
+        if (!Number.isInteger(parsedXp) || parsedXp < -1000 || parsedXp > 1000) {
+            alert("XP must be an integer between -1000 and 1000.");
+            return;
+        }
         try {
             // Add to subcollection
             await addDoc(collection(db, `users/${user.uid}/behaviors`), {
                 label: newLabel,
-                xp: Number(newXp),
-                color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600",
+                xp: parsedXp,
+                color: parsedXp > 0 ? "bg-green-600" : "bg-red-600",
                 teacherId: user.uid
             });
             setNewLabel("");
-            setNewXp(50);
+            setNewXpInput("50");
         } catch (error) {
             console.error("Error adding behavior:", error);
             alert("Failed to add protocol. ensure you have permission.");
@@ -310,9 +315,16 @@ export default function RewardsPage() {
                                             <label className="text-xs text-cyan-500 uppercase">XP Amount</label>
                                             <div className="flex gap-2">
                                                 <input 
-                                                    type="number"
-                                                    value={newXp}
-                                                    onChange={e => setNewXp(Number(e.target.value))}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={newXpInput}
+                                                    onChange={(e) => {
+                                                        const next = e.target.value.trim();
+                                                        if (/^-?\d*$/.test(next)) {
+                                                            setNewXpInput(next);
+                                                        }
+                                                    }}
+                                                    placeholder="-1000 to 1000"
                                                     className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none"
                                                     required
                                                 />

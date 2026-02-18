@@ -112,7 +112,8 @@ export default function AdminAnalyticsPage() {
         xpTotal += student.xp || 0;
 
         const lastAwardAt = toTimestamp(student.lastAward?.timestamp);
-        if (lastAwardAt !== null && lastAwardAt >= day7Start) {
+        const lastAwardXp = Number(student.lastAward?.xpGained || 0);
+        if (lastAwardXp > 0 && lastAwardAt !== null && lastAwardAt >= day7Start) {
           hasRecentXpAward = true;
         }
 

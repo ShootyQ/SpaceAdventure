@@ -51,6 +51,7 @@ export default function CreateMissionPage() {
         denominatorMax: 12,
         decimalPlaces: 2,
         attemptPolicy: 'once',
+        maxCompletions: 3,
     });
     const [gradeFilter, setGradeFilter] = useState<GradeLevel | 'all'>('all');
     const allPracticeTemplates = useMemo(() => getPracticeTemplatesForGrade('all'), []);
@@ -234,6 +235,7 @@ export default function CreateMissionPage() {
                         ...prev,
                         ...data.practiceConfig,
                         templateId: legacyTemplate,
+                        maxCompletions: Math.min(Math.max(Number(data.practiceConfig.maxCompletions || prev.maxCompletions || 3), 1), 50),
                     }));
                     const configGrade = Number(data.practiceConfig.gradeLevel || 0);
                     if (configGrade >= 1 && configGrade <= 8) {
@@ -331,6 +333,7 @@ export default function CreateMissionPage() {
                         ...practiceConfig,
                         gradeLevel: getEffectivePracticeGradeLevel(),
                         questionCount: Math.min(Math.max(Number(practiceConfig.questionCount || 24), 1), 50),
+                        maxCompletions: Math.min(Math.max(Number(practiceConfig.maxCompletions || 3), 1), 50),
                     } : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
@@ -348,6 +351,7 @@ export default function CreateMissionPage() {
                         ...practiceConfig,
                         gradeLevel: getEffectivePracticeGradeLevel(),
                         questionCount: Math.min(Math.max(Number(practiceConfig.questionCount || 24), 1), 50),
+                        maxCompletions: Math.min(Math.max(Number(practiceConfig.maxCompletions || 3), 1), 50),
                     } : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
@@ -684,16 +688,52 @@ export default function CreateMissionPage() {
                                     )}
 
                                     <div>
-                                        <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Attempt Limit</label>
+                                        <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Completion Access</label>
                                         <select
                                             value={practiceConfig.attemptPolicy}
-                                            onChange={(e) => setPracticeConfig({ ...practiceConfig, attemptPolicy: e.target.value as 'once' | 'unlimited' })}
+                                            onChange={(e) => {
+                                                const nextPolicy = e.target.value as 'once' | 'limited' | 'unlimited';
+                                                setPracticeConfig({
+                                                    ...practiceConfig,
+                                                    attemptPolicy: nextPolicy,
+                                                    maxCompletions: nextPolicy === 'limited'
+                                                        ? Math.min(Math.max(Number(practiceConfig.maxCompletions || 3), 1), 50)
+                                                        : practiceConfig.maxCompletions,
+                                                });
+                                            }}
                                             className="w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
                                         >
-                                            <option value="once">One Attempt</option>
-                                            <option value="unlimited">Unlimited Attempts</option>
+                                            <option value="once">One Time Completion</option>
+                                            <option value="limited">Set Number of Completions</option>
+                                            <option value="unlimited">Unlimited Completions</option>
                                         </select>
-                                        <p className="text-xs text-cyan-600 mt-2">If you reassign this same lesson later, students will still get different problem versions.</p>
+
+                                        {practiceConfig.attemptPolicy === 'limited' && (
+                                            <div className="mt-3">
+                                                <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Completions Per Student</label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={50}
+                                                    value={practiceConfig.maxCompletions ?? 3}
+                                                    onChange={(e) => setPracticeConfig({
+                                                        ...practiceConfig,
+                                                        maxCompletions: Math.min(Math.max(Number(e.target.value || 3), 1), 50),
+                                                    })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <p className="text-xs text-cyan-600 mt-2">
+                                            {practiceConfig.attemptPolicy === 'once'
+                                                ? 'Students can complete this assignment one time for XP.'
+                                                : practiceConfig.attemptPolicy === 'limited'
+                                                    ? `Students can complete this assignment up to ${Math.min(Math.max(Number(practiceConfig.maxCompletions || 3), 1), 50)} times for XP.`
+                                                    : 'Students can practice and complete this assignment as many times as they want for XP.'}
+                                        </p>
+                                        <p className="text-xs text-cyan-600 mt-1">If you reassign this same lesson later, students still get different problem versions.</p>
                                     </div>
                                 </div>
                             )}

@@ -87,7 +87,8 @@ export interface PracticeAssignmentConfig {
     denominatorMin?: number;
     denominatorMax?: number;
     decimalPlaces?: 0 | 1 | 2 | 3;
-    attemptPolicy: "once" | "unlimited";
+    attemptPolicy: "once" | "limited" | "unlimited";
+    maxCompletions?: number;
 }
 
 export interface AvatarConfig {
