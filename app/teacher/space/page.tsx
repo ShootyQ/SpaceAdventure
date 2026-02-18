@@ -333,7 +333,7 @@ export default function TeacherConsole() {
 
                 <div id="tile-lessons">
                     <QuickAction 
-                        title="Lesson Plans" 
+                        title="Assign Lessons for Students" 
                         icon={<Target size={28} />} 
                         desc="Assign Missions"
                         href="/teacher/missions"
@@ -401,6 +401,16 @@ export default function TeacherConsole() {
                         href="/teacher/rewards"
                         color="text-yellow-400"
                         borderColor="border-yellow-500/30"
+                    />
+                </div>
+                <div id="tile-instructions">
+                    <QuickAction 
+                        title="Instructions & Setup" 
+                        icon={<FileText size={28} />} 
+                        desc="Video + How-To"
+                        href="/teacher/instructions"
+                        color="text-cyan-300"
+                        borderColor="border-cyan-500/30"
                     />
                 </div>
              </div>
