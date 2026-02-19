@@ -51,25 +51,25 @@
     },
     {
       "id": "earth-xp-earn",
-      "name": "Earth XP Earn",
+      "name": "Terra Vanguard",
       "planetId": "earth",
       "unlockKey": "earth-xp-earn"
     },
     {
       "id": "mars-xp-earn",
-      "name": "Mars XP Earn",
+      "name": "Crimson Striker",
       "planetId": "mars",
       "unlockKey": "mars-xp-earn"
     },
     {
       "id": "mercury-xp-earn",
-      "name": "Mercury XP Earn",
+      "name": "Solar Needle",
       "planetId": "mercury",
       "unlockKey": "mercury-xp-earn"
     },
     {
       "id": "venus-xp-earn",
-      "name": "Venus XP Earn",
+      "name": "Aurora Lance",
       "planetId": "venus",
       "unlockKey": "venus-xp-earn"
     }
