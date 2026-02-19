@@ -7,6 +7,16 @@ This folder is the source of truth for collectible content and unlock behavior.
 - `catalog.json`: All collectible item definitions.
 - `unlock-rules.json`: Event-driven unlock rules.
 - `pools.json`: Weighted loot pools.
+- `xp-unlocks.json`: Teacher-configurable XP unlock definitions for avatars/ships.
+
+## Unlock channels
+
+Use one of these channels for each collectible:
+
+- `starter`: Available immediately.
+- `chance`: Drop-based unlocks (configured in `unlock-rules.json` / `pools.json`).
+- `xp`: Teacher-set XP thresholds (configured per planet).
+- `shop`: Reserved for future currency-based unlocks.
 
 ## Item IDs
 
@@ -45,3 +55,6 @@ Use public-relative paths, for example:
 ## Notes
 
 The current runtime still supports legacy paths while this content system is being phased in.
+
+For now, legacy ship assets under `/images/ships/*` are still supported in UI components.
+New collectible assets should be added under `/images/collectibles/<type>/<bucket>/...`.

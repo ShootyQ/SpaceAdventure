@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getTeacherStudentLimit, isSubscriptionActive, isTeacherAccessRestricted } from "@/lib/subscription";
+import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
@@ -25,7 +26,11 @@ const Rocket = ({ size = 24, className = "" }: { size?: number, className?: stri
     
     return (
         <img
-            src={getAssetPath(`/images/ships/${shipId}.png`)}
+            src={getAssetPath(resolveShipAssetPath(shipId))}
+            onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+            }}
             alt="Rocket"
             className={`object-contain ${className}`}
             style={{ width: size, height: size }}
@@ -309,14 +314,6 @@ function CockpitView({ onNavigate, ranks, onOpenRankEditor }: { onNavigate: (vie
     );
 }
 
-const SHIP_OPTIONS = [
-    { id: "finalship", name: "Standard Interceptor" },
-    { id: "alienship", name: "Alien Scout" },
-    { id: "jellyalienship", name: "Bio-Cruiser" },
-    { id: "coconutship", name: "Tropical Drifter" },
-    { id: "dragoneggship", name: "Dragon Scale Pod" },
-];
-
 function ShipSettings({ userData, user }: { userData: any, user: any }) {
     const [loading, setLoading] = useState(false);
     const [shipName, setShipName] = useState("");
@@ -370,7 +367,11 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src={getAssetPath(`/images/ships/${selectedShipId}.png`)}
+                        src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                        onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                        }}
                         alt="Ship"
                         className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />
@@ -433,7 +434,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                                 onClick={() => setSelectedShipId(opt.id)}
                                 className={`p-2 rounded border flex flex-col items-center gap-2 transition-all ${selectedShipId === opt.id ? "bg-cyan-500/20 border-cyan-400" : "bg-black/40 border-cyan-900 hover:border-cyan-700"}`}
                             >
-                                <img src={getAssetPath(`/images/ships/${opt.id}.png`)} alt={opt.name} className="w-12 h-12 object-contain" />
+                                <img src={getAssetPath(resolveShipAssetPath(opt.id))} alt={opt.name} className="w-12 h-12 object-contain" />
                                 <span className={`text-[10px] uppercase font-bold text-center ${selectedShipId === opt.id ? "text-white" : "text-gray-500"}`}>{opt.name}</span>
                             </button>
                         ))}

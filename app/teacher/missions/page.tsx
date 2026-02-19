@@ -24,6 +24,7 @@ export interface Mission {
     contentText?: string; // For reading
     questions: Question[];
     xpReward: number;
+    creditsReward?: number;
     createdAt: any;
 }
 
@@ -198,7 +199,10 @@ export default function MissionsPage() {
                                         <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : mission.type === 'practice' ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
                                             {mission.type === 'watch' ? <Video size={24} /> : mission.type === 'practice' ? <Brain size={24} /> : <BookOpen size={24} />}
                                         </div>
-                                        <span className="text-xs font-bold bg-cyan-950/50 text-cyan-300 px-2 py-1 rounded border border-cyan-900">{mission.xpReward} XP</span>
+                                        <div className="flex flex-col gap-1 items-end">
+                                            <span className="text-xs font-bold bg-cyan-950/50 text-cyan-300 px-2 py-1 rounded border border-cyan-900">{mission.xpReward} XP</span>
+                                            <span className="text-xs font-bold bg-yellow-950/50 text-yellow-300 px-2 py-1 rounded border border-yellow-900">{Math.max(0, Number(mission.creditsReward || 0))} GC</span>
+                                        </div>
                                     </div>
                                     
                                     <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{mission.title}</h3>

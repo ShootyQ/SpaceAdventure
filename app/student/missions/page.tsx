@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
+import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy, Coins } from "lucide-react";
 import Link from "next/link";
 import confetti from 'canvas-confetti';
 import { createPracticeQuestions, PracticeAssignmentConfig, PracticeQuestion, getPracticeTemplatesForGrade } from "@/lib/practice";
@@ -29,6 +29,7 @@ interface Mission {
     targetGrades?: Array<StudentGrade | 'all'>;
     practiceConfig?: PracticeAssignmentConfig;
     xpReward: number;
+    creditsReward?: number;
 }
 
 interface MissionProgress {
@@ -54,7 +55,7 @@ export default function StudentMissions() {
     const [completedMissions, setCompletedMissions] = useState<string[]>([]);
     const [missionProgress, setMissionProgress] = useState<Record<string, MissionProgress>>({});
     const [submitting, setSubmitting] = useState(false);
-    const [feedback, setFeedback] = useState<{correct: boolean, score: number, awardedXp: number, newRank?: string} | null>(null);
+    const [feedback, setFeedback] = useState<{correct: boolean, score: number, awardedXp: number, awardedCredits: number, newRank?: string} | null>(null);
     const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[]>([]);
     const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
     const [practiceGraphPoints, setPracticeGraphPoints] = useState<Record<string, GraphPoint[]>>({});
@@ -424,6 +425,7 @@ export default function StudentMissions() {
 
             let newRankName: string | undefined;
             let awardedXp = 0;
+            let awardedCredits = 0;
             const userRef = doc(db, "users", user.uid);
             const currentProgress = missionProgress[activeMission.id] || { attempts: 0, lastScore: 0, passedEver: false };
             const nextAttempts = (currentProgress.attempts || 0) + 1;
@@ -448,6 +450,7 @@ export default function StudentMissions() {
                     const previousXP = Number(userData?.xp || 0);
                     const nextXP = previousXP + Number(activeMission.xpReward || 0);
                     const xpReward = Number(activeMission.xpReward || 0);
+                    const creditsReward = Math.max(0, Number(activeMission.creditsReward || 0));
                     const sortedRanks = [...DEFAULT_RANKS].sort((a, b) => b.minXP - a.minXP);
                     const oldRank = sortedRanks.find((rank) => previousXP >= rank.minXP);
                     const newRank = sortedRanks.find((rank) => nextXP >= rank.minXP);
@@ -456,10 +459,12 @@ export default function StudentMissions() {
                         newRankName = newRank?.name;
                     }
                     awardedXp = xpReward;
+                    awardedCredits = creditsReward;
 
                     await updateDoc(userRef, {
                         completedMissions: arrayUnion(activeMission.id),
                         xp: increment(xpReward),
+                        ...(creditsReward > 0 ? { galacticCredits: increment(creditsReward) } : {}),
                         ...(planetXpKey && xpReward > 0 ? { [planetXpKey]: increment(xpReward) } : {}),
                         lastAward: {
                             reason: `Mission completed: ${activeMission.title}`,
@@ -539,9 +544,9 @@ export default function StudentMissions() {
             }
 
             if (passed) {
-                setFeedback({ correct: true, score, awardedXp, newRank: newRankName });
+                setFeedback({ correct: true, score, awardedXp, awardedCredits, newRank: newRankName });
             } else {
-                setFeedback({ correct: false, score, awardedXp: 0 });
+                setFeedback({ correct: false, score, awardedXp: 0, awardedCredits: 0 });
             }
 
         } catch (e) {
@@ -620,9 +625,14 @@ export default function StudentMissions() {
                                             Completion Limit Reached
                                         </span>
                                     ) : (
-                                        <span className="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-500/30 text-xs uppercase">
-                                            <Trophy size={14} /> {mission.xpReward} XP
-                                        </span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-500/30 text-xs uppercase">
+                                                <Trophy size={14} /> {mission.xpReward} XP
+                                            </span>
+                                            <span className="flex items-center gap-1 text-amber-300 font-bold bg-amber-900/20 px-3 py-1 rounded-full border border-amber-500/30 text-xs uppercase">
+                                                <Coins size={14} /> {Math.max(0, Number(mission.creditsReward || 0))} GC
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
 
@@ -689,9 +699,15 @@ export default function StudentMissions() {
                                     {activeMission.type === 'watch' && !isPracticeMission ? <Video size={14} /> : isPracticeMission ? <Brain size={14} /> : <BookOpen size={14} />}
                                     {activeMission.type === 'watch' && !isPracticeMission ? 'Video Log' : isPracticeMission ? 'Math Practice' : 'Intel Report'}
                                 </span>
-                                <div className="flex items-center gap-2 text-yellow-400 font-bold">
-                                    <Trophy size={18} />
-                                    <span>{activeMission.xpReward} XP</span>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="flex items-center gap-2 text-yellow-400 font-bold">
+                                        <Trophy size={18} />
+                                        <span>{activeMission.xpReward} XP</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-amber-300 font-bold">
+                                        <Coins size={18} />
+                                        <span>{Math.max(0, Number(activeMission.creditsReward || 0))} GC</span>
+                                    </div>
                                 </div>
                             </div>
                             <h1 className="text-3xl font-bold text-white mb-2">{activeMission.title}</h1>
@@ -934,6 +950,7 @@ export default function StudentMissions() {
                                             <CheckCircle className="text-green-500 w-16 h-16 mb-2" />
                                             <h2 className="text-2xl font-bold text-white">Mission Accomplished!</h2>
                                             <p className="text-green-300">Score: {feedback.score}% - {feedback.awardedXp > 0 ? `You have earned ${feedback.awardedXp} XP.` : 'Completion recorded. No additional XP awarded.'}</p>
+                                            <p className="text-amber-300">{feedback.awardedCredits > 0 ? `You have earned ${feedback.awardedCredits} Galactic Credits.` : 'No Galactic Credits awarded for this mission.'}</p>
                                             {feedback.newRank && <p className="text-yellow-300 font-bold">Promotion Unlocked: {feedback.newRank}</p>}
                                             <button onClick={() => setActiveMission(null)} className="mt-4 px-6 py-2 bg-green-600 rounded-full font-bold text-white hover:bg-green-500">Return to Base</button>
                                         </div>

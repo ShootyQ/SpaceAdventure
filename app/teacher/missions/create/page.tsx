@@ -32,6 +32,7 @@ export default function CreateMissionPage() {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [xpReward, setXpReward] = useState(100);
+    const [creditsReward, setCreditsReward] = useState(1);
     const [type, setType] = useState<MissionContentType>('read');
     const [contentUrl, setContentUrl] = useState("");
     const [contentText, setContentText] = useState("");
@@ -219,6 +220,7 @@ export default function CreateMissionPage() {
                 setTitle(data.title || '');
                 setDescription(data.description || '');
                 setXpReward(Number(data.xpReward || 100));
+                setCreditsReward(Math.max(0, Number(data.creditsReward ?? 1)));
                 setType(data.type === 'watch' ? 'watch' : data.type === 'practice' ? 'practice' : 'read');
                 setContentUrl(data.contentUrl || '');
                 setContentText(data.contentText || '');
@@ -337,6 +339,7 @@ export default function CreateMissionPage() {
                     } : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
+                    creditsReward: Math.max(0, Number(creditsReward || 0)),
                     updatedAt: serverTimestamp()
                 });
             } else {
@@ -355,6 +358,7 @@ export default function CreateMissionPage() {
                     } : null,
                     questions: normalizedQuestions,
                     xpReward: Number(xpReward),
+                    creditsReward: Math.max(0, Number(creditsReward || 0)),
                     teacherId: user.uid,
                     createdAt: serverTimestamp()
                 });
@@ -412,7 +416,7 @@ export default function CreateMissionPage() {
                                     placeholder="Brief description of the learning objective..."
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">XP Reward</label>
                                     <input 
@@ -424,6 +428,17 @@ export default function CreateMissionPage() {
                                     />
                                 </div>
                                 <div>
+                                    <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Credits Reward</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={creditsReward}
+                                        onChange={(e) => setCreditsReward(Math.max(0, Number(e.target.value) || 0))}
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        className="no-number-spinner w-full bg-cyan-950/20 border border-cyan-800 rounded p-3 text-white focus:border-cyan-500 outline-none"
+                                    />
+                                </div>
+                                <div className="md:col-span-1">
                                     <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-2">Content Type</label>
                                     <div className="flex bg-cyan-950/30 rounded p-1 border border-cyan-800">
                                         <button 

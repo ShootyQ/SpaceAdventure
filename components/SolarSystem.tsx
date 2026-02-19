@@ -1,3 +1,4 @@
+import { resolveShipAssetPath } from "@/lib/ships";
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -227,6 +228,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
+    const [creditsPerAward, setCreditsPerAward] = useState(1);
   const previousXPRef = useRef<Map<string, number>>(new Map());
   const isFirstLoad = useRef(true);
 
@@ -279,6 +281,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     return () => unsub();
   }, [userData]);
+
+    useEffect(() => {
+        if (!userData) return;
+        const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        if (!teacherId) return;
+
+        const economyRef = doc(db, `users/${teacherId}/settings`, "economy");
+        const unsub = onSnapshot(economyRef, (snapshot) => {
+            const value = Number((snapshot.data() as any)?.creditsPerAward || 1);
+            setCreditsPerAward(Number.isFinite(value) ? Math.max(0, Math.round(value)) : 1);
+        });
+
+        return () => unsub();
+    }, [userData]);
 
   const zoomRef = useRef(zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1365,7 +1381,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                               >
                                   <div className="relative w-full h-full">
                                       <img 
-                                            src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
+                                            src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                            }}
                                             alt="Traveling Ship"
                                                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
@@ -1533,7 +1553,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
-                                                    src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
+                                                    src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                                    }}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
@@ -1914,6 +1938,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              selectedIds={selectedIds}
              setSelectedIds={setSelectedIds}
              behaviors={behaviors}
+             creditsPerAward={creditsPerAward}
          />
       )}
 
@@ -1994,7 +2019,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                                     <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
                                         <img 
-                                            src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
+                                            src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))} 
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                            }}
                                             alt="Award Ship"
                                             className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
                                         />
@@ -2092,7 +2121,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start justify-items-center">
                                         {(activeUnlockReveal.unlocks?.ships || []).map((id) => (
                                             <div key={`reveal-ship-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-16 h-16 object-contain drop-shadow-md" />
+                                                <img
+                                                    src={getAssetPath(resolveShipAssetPath(id))}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                                    }}
+                                                    alt={id}
+                                                    className="w-16 h-16 object-contain drop-shadow-md"
+                                                />
                                                 <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Ship</div>
                                             </div>
                                         ))}

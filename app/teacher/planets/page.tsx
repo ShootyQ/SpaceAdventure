@@ -9,6 +9,8 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
 import { UserAvatar } from "@/components/UserAvatar";
+import xpUnlockConfig from "@/data/collectibles/xp-unlocks.json";
+import { resolveShipAssetPath } from "@/lib/ships";
 
 // Interface for dynamic data stored in DB
 interface PlanetData {
@@ -28,6 +30,16 @@ interface PlanetState extends PlanetData {
     name: string;
     color: string;
 }
+
+interface XPUnlockRule {
+    id: string;
+    name: string;
+    planetId: string;
+    unlockKey: string;
+}
+
+const AVATAR_UNLOCK_RULES: XPUnlockRule[] = (xpUnlockConfig as any)?.avatars || [];
+const SHIP_UNLOCK_RULES: XPUnlockRule[] = (xpUnlockConfig as any)?.ships || [];
 
 export default function PlanetManagementPage() {
     const { user } = useAuth();
@@ -88,6 +100,19 @@ export default function PlanetManagementPage() {
         }));
     };
 
+    const handleShipUnlockChange = (planetId: string, shipKey: string, value: string) => {
+        const numeric = Number(value);
+        setPlanets(prev => prev.map(p => {
+            if (p.id !== planetId) return p;
+            const unlocks = {
+                ships: { ...(p.unlocks?.ships || {}) },
+                avatars: { ...(p.unlocks?.avatars || {}) },
+            };
+            unlocks.ships[shipKey] = Number.isFinite(numeric) ? numeric : 0;
+            return { ...p, unlocks };
+        }));
+    };
+
     const handleSave = async (planet: PlanetState) => {
         if (!user) return;
         setSaving(planet.id);
@@ -97,7 +122,12 @@ export default function PlanetManagementPage() {
                 const threshold = Number(value || 0);
                 if (threshold > 0) avatarUnlocks[key] = threshold;
             });
-            const unlocksToSave = { ships: {}, avatars: avatarUnlocks };
+            const shipUnlocks: Record<string, number> = {};
+            Object.entries(planet.unlocks?.ships || {}).forEach(([key, value]) => {
+                const threshold = Number(value || 0);
+                if (threshold > 0) shipUnlocks[key] = threshold;
+            });
+            const unlocksToSave = { ships: shipUnlocks, avatars: avatarUnlocks };
 
             // Save to subcollection
             await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
@@ -206,70 +236,59 @@ export default function PlanetManagementPage() {
                                          <label className="block text-xs uppercase tracking-wider text-purple-400 mb-2 flex items-center gap-2">
                                              <Star size={14} /> Cosmetic Unlocks
                                          </label>
-                                         {(planet.id === "jupiter" || planet.id === "mars") ? (
-                                            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
-                                                <div className="space-y-3">
-                                                    {planet.id === "jupiter" && (
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
-                                                                <UserAvatar avatarId="jovi" hat="none" className="w-full h-full" />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="text-xs text-white font-bold">Jovi Avatar</div>
-                                                                <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Jupiter</div>
-                                                            </div>
-                                                            <input
-                                                                type="number"
-                                                                value={planet.unlocks?.avatars?.jovi ?? ""}
-                                                                onChange={(e) => handleAvatarUnlockChange(planet.id, "jovi", e.target.value)}
-                                                                className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
-                                                                placeholder="0"
-                                                            />
-                                                        </div>
-                                                    )}
+                                         {(() => {
+                                            const avatarRules = AVATAR_UNLOCK_RULES.filter((rule) => rule.planetId === planet.id);
+                                            const shipRules = SHIP_UNLOCK_RULES.filter((rule) => rule.planetId === planet.id);
+                                            const hasUnlocks = avatarRules.length > 0 || shipRules.length > 0;
 
-                                                    {planet.id === "mars" && (
-                                                        <>
-                                                            <div className="flex items-center gap-3">
+                                            if (!hasUnlocks) {
+                                                return <p className="text-[10px] text-gray-500">No cosmetic unlock configured for this planet yet.</p>;
+                                            }
+
+                                            return (
+                                                <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                                                    <div className="space-y-3">
+                                                        {avatarRules.map((rule) => (
+                                                            <div key={`avatar-${rule.unlockKey}`} className="flex items-center gap-3">
                                                                 <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
-                                                                    <UserAvatar avatarId="rusty" hat="none" className="w-full h-full" />
+                                                                    <UserAvatar avatarId={rule.id} hat="none" className="w-full h-full" />
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <div className="text-xs text-white font-bold">Rusty Avatar</div>
-                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Mars</div>
+                                                                    <div className="text-xs text-white font-bold">{rule.name}</div>
+                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
                                                                 </div>
                                                                 <input
                                                                     type="number"
-                                                                    value={planet.unlocks?.avatars?.rusty ?? ""}
-                                                                    onChange={(e) => handleAvatarUnlockChange(planet.id, "rusty", e.target.value)}
+                                                                    value={planet.unlocks?.avatars?.[rule.unlockKey] ?? ""}
+                                                                    onChange={(e) => handleAvatarUnlockChange(planet.id, rule.unlockKey, e.target.value)}
                                                                     className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
                                                                     placeholder="0"
                                                                 />
                                                             </div>
+                                                        ))}
 
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
-                                                                    <UserAvatar avatarId="vylaet" hat="none" className="w-full h-full" />
+                                                        {shipRules.map((rule) => (
+                                                            <div key={`ship-${rule.unlockKey}`} className="flex items-center gap-3">
+                                                                <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-black/40 flex items-center justify-center">
+                                                                    <img src={getAssetPath(resolveShipAssetPath(rule.id))} alt={rule.name} className="w-10 h-10 object-contain" />
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <div className="text-xs text-white font-bold">Vylaet (Secret)</div>
-                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on Mars</div>
+                                                                    <div className="text-xs text-white font-bold">{rule.name}</div>
+                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
                                                                 </div>
                                                                 <input
                                                                     type="number"
-                                                                    value={planet.unlocks?.avatars?.vylaet ?? ""}
-                                                                    onChange={(e) => handleAvatarUnlockChange(planet.id, "vylaet", e.target.value)}
+                                                                    value={planet.unlocks?.ships?.[rule.unlockKey] ?? ""}
+                                                                    onChange={(e) => handleShipUnlockChange(planet.id, rule.unlockKey, e.target.value)}
                                                                     className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
                                                                     placeholder="0"
                                                                 />
                                                             </div>
-                                                        </>
-                                                    )}
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                         ) : (
-                                            <p className="text-[10px] text-gray-500">No cosmetic unlock configured for this planet yet.</p>
-                                         )}
+                                            );
+                                         })()}
                                      </div>
 
                                      <button 
