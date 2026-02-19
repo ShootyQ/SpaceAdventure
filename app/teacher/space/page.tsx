@@ -21,6 +21,7 @@ export default function TeacherConsole() {
     const { logout, user, userData, loading } = useAuth();
     const trialInfo = getTeacherTrialInfo(userData);
     const trialActive = isTeacherTrialActive(userData);
+    const trialDaysRemaining = trialInfo?.trialDaysRemaining;
   const pathname = usePathname();
     const router = useRouter();
 
@@ -126,8 +127,8 @@ export default function TeacherConsole() {
                         </span>
                     ) : (
                         <Link href="/teacher/settings?mode=billing" className="text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/50 px-2 py-0.5 rounded uppercase tracking-widest font-normal flex items-center gap-1 transition-colors">
-                            {trialActive && trialInfo?.trialDaysRemaining !== null
-                                ? `Trial: ${trialInfo.trialDaysRemaining}d left`
+                            {trialActive && trialDaysRemaining !== null && trialDaysRemaining !== undefined
+                                ? `Trial: ${trialDaysRemaining}d left`
                                 : "Access Paused - Billing"}
                         </Link>
                     )}
