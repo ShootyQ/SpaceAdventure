@@ -1,6 +1,6 @@
-import { resolveShipAssetPath } from "@/lib/ships";
 "use client";
 
+import { resolveShipAssetPath } from "@/lib/ships";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";

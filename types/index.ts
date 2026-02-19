@@ -150,6 +150,9 @@ export interface UserData {
     coTeacherEmails?: string[];
 
     createdAt?: any;
+    trialStartedAt?: any;
+    trialEndsAt?: any;
+    trialAccessLockedAt?: any;
     stripeSubscriptionId?: string;
     stripeCustomerId?: string;
     stripePriceId?: string;

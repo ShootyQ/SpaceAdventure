@@ -12,10 +12,12 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
   const roleParam = searchParams.get("role");
+  const errorParam = searchParams.get("error");
 
   const [loginMode, setLoginMode] = useState<"selection" | "student">("selection");
   const [studentCreds, setStudentCreds] = useState({ username: "", classCode: "", password: "" });
   const [error, setError] = useState("");
+  const [billingError, setBillingError] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
 
   useEffect(() => {
@@ -23,6 +25,21 @@ function LoginContent() {
       setLoginMode("student");
     }
   }, [roleParam]);
+
+  useEffect(() => {
+    const fromQuery = errorParam === "trial-expired";
+    const fromSession = typeof window !== "undefined" && sessionStorage.getItem("spaceadventure_login_error") === "trial-expired";
+
+    if (fromQuery || fromSession) {
+      setBillingError("Your 14-day trial has ended. Reactivate billing to continue teacher and student access.");
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("spaceadventure_login_error");
+      }
+      return;
+    }
+
+    setBillingError("");
+  }, [errorParam]);
 
   useEffect(() => {
     if (!loading && userData) {
@@ -77,6 +94,12 @@ function LoginContent() {
             </p>
 
             <div className="space-y-5">
+              {billingError && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm px-3 py-2">
+                  {billingError}
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                   <Trophy className="w-5 h-5" />
@@ -114,6 +137,12 @@ function LoginContent() {
               <div className="text-emerald-700 font-semibold">Signed in. Redirecting...</div>
             ) : loginMode === "selection" ? (
               <div className="space-y-5">
+                {billingError && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm px-3 py-2">
+                    {billingError}
+                  </div>
+                )}
+
                 <h2 className="text-2xl font-semibold text-slate-900">Choose sign in type</h2>
 
                 <button

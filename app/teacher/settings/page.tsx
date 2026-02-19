@@ -16,7 +16,7 @@ import { AsteroidEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { getTeacherStudentLimit, isSubscriptionActive, isTeacherAccessRestricted } from "@/lib/subscription";
+import { getTeacherStudentLimit, getTeacherTrialInfo, isSubscriptionActive, isTeacherAccessRestricted, isTeacherTrialActive } from "@/lib/subscription";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
 
 // Custom Icon for Ship
@@ -1001,6 +1001,9 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
     };
 
     const isActivePlan = isSubscriptionActive(userData);
+    const trialInfo = getTeacherTrialInfo(userData);
+    const isTrialActive = isTeacherTrialActive(userData);
+    const trialDaysRemaining = trialInfo?.trialDaysRemaining ?? null;
     const isRestricted = isTeacherAccessRestricted(userData);
     const studentCap = getTeacherStudentLimit(userData);
     const renewalOrEndLabel = userData?.stripeCancelAtPeriodEnd ? "Access ends" : "Auto-renew date";
@@ -1230,6 +1233,11 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                             >
                                 {userData?.subscriptionStatus || "TRIAL"}
                             </span>
+                            {isTrialActive && trialDaysRemaining !== null && (
+                                <span className="text-xs text-amber-700 font-semibold">
+                                    {trialDaysRemaining} day{trialDaysRemaining === 1 ? "" : "s"} left
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1238,14 +1246,20 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                     <div className="bg-white/80 border border-black/10 rounded-3xl p-6 shadow-[0_30px_80px_rgba(15,23,42,0.08)] flex flex-col">
                         <div className="flex-1">
                             <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Free Trial</div>
-                            <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-3">Try it with a small group</h3>
-                            <p className="text-slate-600 mt-2">Perfect for testing routines and getting the class bought in.</p>
+                            <h3 className="font-heading text-2xl font-semibold text-slate-900 mt-3">14 days of full access</h3>
+                            <p className="text-slate-600 mt-2">Launch your full classroom workflow now, then subscribe before trial end to avoid access pause.</p>
 
                             <ul className="space-y-3 text-sm text-slate-700 mt-6">
-                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Up to 5 students</li>
-                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Explore all core features</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Up to 30 students during trial</li>
+                                <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> Explore all premium features</li>
                                 <li className="flex items-center gap-2"><Check size={16} className="text-emerald-600" /> No long-term commitment</li>
                             </ul>
+
+                            {isTrialActive && trialInfo?.trialEndMs && (
+                                <p className="mt-4 text-xs font-semibold text-amber-700 uppercase tracking-wider">
+                                    Trial ends {new Date(trialInfo.trialEndMs).toLocaleDateString()}
+                                </p>
+                            )}
                         </div>
 
                         {userData?.subscriptionStatus !== "active" && (
@@ -1348,7 +1362,8 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
 
                 <div className="p-5 bg-white/80 border border-black/10 rounded-2xl text-xs text-slate-600 space-y-2">
                     <p>Subscriptions renew automatically until canceled. You can cancel anytime from Billing settings.</p>
-                    <p>If canceled, paid access remains active through the current billing period and then returns to trial limits.</p>
+                    <p>After the 14-day trial ends, login access pauses until billing is activated.</p>
+                    <p>If canceled, paid access remains active through the current billing period and then pauses until reactivated.</p>
                     <p>Promo codes apply only to eligible plans and billing cycles, and may be limited to one redemption per customer.</p>
                 </div>
 
@@ -1380,7 +1395,7 @@ function BillingView({ onNavigate }: { onNavigate: (view: string) => void }) {
                         <div>
                             <h4 className="text-slate-900 font-bold text-sm uppercase tracking-wider mb-1">Account Access Paused</h4>
                             <p className="text-slate-700 text-sm leading-relaxed">
-                                Your paid subscription ended. Existing class data is preserved, but teacher gameplay tools and student gameplay are paused until billing is reactivated.
+                                Your trial or paid subscription is inactive. Existing class data is preserved, but teacher tools and student gameplay are paused until billing is reactivated.
                             </p>
                         </div>
                     </div>

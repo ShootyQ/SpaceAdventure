@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
-import { getTeacherStudentLimit, isSubscriptionActive } from "@/lib/subscription";
+import { getTeacherStudentLimit, isSubscriptionActive, isTeacherTrialActive } from "@/lib/subscription";
 import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
 import xpUnlockConfig from "@/data/collectibles/xp-unlocks.json";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
@@ -48,6 +48,7 @@ export default function RosterPage() {
     const [teacherPlanetShipUnlocks, setTeacherPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
 
     const hasActiveSubscription = isSubscriptionActive(userData);
+    const hasTrialAccess = isTeacherTrialActive(userData);
     const studentLimit = getTeacherStudentLimit(userData);
     const isOverStudentLimit = students.length > studentLimit;
     const isAtStudentLimit = students.length >= studentLimit;
@@ -406,9 +407,11 @@ export default function RosterPage() {
             <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${isOverStudentLimit ? 'bg-amber-900/20 border-amber-500/50 text-amber-200' : 'bg-cyan-950/30 border-cyan-500/20 text-cyan-300'}`}>
                 {hasActiveSubscription ? (
                     <span>Active subscription: {students.length}/{studentLimit} students used.</span>
+                ) : hasTrialAccess ? (
+                    <span>Free trial (full access): {students.length}/{studentLimit} students used.</span>
                 ) : (
                     <span>
-                        Trial/inactive plan: {students.length}/{studentLimit} students used.
+                        Access paused: {students.length}/{studentLimit} students used.
                         {isOverStudentLimit ? ' Existing students stay enrolled, but new students are disabled until billing is active again.' : ''}
                     </span>
                 )}
