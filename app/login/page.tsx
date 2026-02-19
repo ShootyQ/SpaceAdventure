@@ -6,6 +6,27 @@ import { ArrowLeft, ArrowRight, GraduationCap, School, ShieldCheck, Trophy, User
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
+function buildStudentEmailCandidates(username: string, classCode: string) {
+  const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const trimmedCode = classCode.trim();
+  const classCodeVariants = Array.from(new Set([trimmedCode, trimmedCode.toUpperCase(), trimmedCode.toLowerCase()].filter(Boolean)));
+  const domains = ["spaceadventure.local", "classcrave.local"];
+  const candidates: string[] = [];
+
+  classCodeVariants.forEach((code) => {
+    domains.forEach((domain) => {
+      candidates.push(`${cleanUsername}.${code}@${domain}`);
+      candidates.push(`${cleanUsername}${code}@${domain}`);
+    });
+  });
+
+  domains.forEach((domain) => {
+    candidates.push(`${cleanUsername}@${domain}`);
+  });
+
+  return Array.from(new Set(candidates));
+}
+
 function LoginContent() {
   const { userData, signInWithGoogle, signInStudent, loading } = useAuth();
   const router = useRouter();
@@ -63,8 +84,24 @@ function LoginContent() {
     setStudentLoading(true);
 
     try {
-      const email = `${studentCreds.username}.${studentCreds.classCode}@spaceadventure.local`;
-      await signInStudent(email, studentCreds.password);
+      const emails = buildStudentEmailCandidates(studentCreds.username, studentCreds.classCode);
+      let lastError: any = null;
+
+      for (const email of emails) {
+        try {
+          await signInStudent(email, studentCreds.password);
+          return;
+        } catch (err: any) {
+          lastError = err;
+          const code = err?.code || "";
+          if (code !== "auth/invalid-credential" && code !== "auth/user-not-found") {
+            throw err;
+          }
+        }
+      }
+
+      if (lastError) throw lastError;
+      throw new Error("Student login failed");
     } catch (err) {
       console.error(err);
       setError("Invalid login credentials.");
