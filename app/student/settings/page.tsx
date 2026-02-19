@@ -1168,6 +1168,8 @@ export default function SettingsPage() {
     const { userData, user } = useAuth();
     const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
+    const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
+    const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
 
     useEffect(() => {
         if (!userData) return;
@@ -1188,6 +1190,49 @@ export default function SettingsPage() {
         });
         return () => unsub();
     }, [userData]);
+
+    useEffect(() => {
+        const teacherId = userData?.teacherId;
+        if (!teacherId) {
+            setPlanetShipUnlocks({});
+            return;
+        }
+
+        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
+            const shipMap: Record<string, Record<string, number>> = {};
+            snap.forEach((d) => {
+                const data = d.data() as any;
+                const rawShipUnlocks = data?.unlocks?.ships || {};
+                const normalizedShips: Record<string, number> = {};
+
+                Object.keys(rawShipUnlocks).forEach((key) => {
+                    const threshold = Number(rawShipUnlocks[key] || 0);
+                    if (threshold > 0) normalizedShips[key] = threshold;
+                });
+
+                shipMap[d.id] = normalizedShips;
+            });
+
+            setPlanetShipUnlocks(shipMap);
+        });
+
+        return () => unsub();
+    }, [userData?.teacherId]);
+
+    useEffect(() => {
+        const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
+        const unlocked = new Set<string>([...STARTER_SHIP_IDS, currentShip]);
+
+        SHIP_XP_UNLOCK_RULES.forEach((rule) => {
+            const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
+            const requiredXP = Number(planetShipUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
+            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+                unlocked.add(rule.id);
+            }
+        });
+
+        setUnlockedShipIds(unlocked);
+    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId]);
 
     // Breadcrumb / Title Logic
     const getTitle = () => {
