@@ -9,8 +9,8 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
 import { UserAvatar } from "@/components/UserAvatar";
-import xpUnlockConfig from "@/data/collectibles/xp-unlocks.json";
 import { resolveShipAssetPath } from "@/lib/ships";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, UnlockRule } from "@/lib/unlocks";
 
 // Interface for dynamic data stored in DB
 interface PlanetData {
@@ -31,21 +31,23 @@ interface PlanetState extends PlanetData {
     color: string;
 }
 
-interface XPUnlockRule {
-    id: string;
-    name: string;
-    planetId: string;
-    unlockKey: string;
-}
-
-const AVATAR_UNLOCK_RULES: XPUnlockRule[] = (xpUnlockConfig as any)?.avatars || [];
-const SHIP_UNLOCK_RULES: XPUnlockRule[] = (xpUnlockConfig as any)?.ships || [];
-
 export default function PlanetManagementPage() {
     const { user } = useAuth();
     const [planets, setPlanets] = useState<PlanetState[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+
+    const AVATAR_UNLOCK_RULES: UnlockRule[] = getXpUnlockRules(unlockConfig.avatars);
+    const SHIP_UNLOCK_RULES: UnlockRule[] = getXpUnlockRules(unlockConfig.ships);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
 
     // Initial Load & Subscription
     useEffect(() => {

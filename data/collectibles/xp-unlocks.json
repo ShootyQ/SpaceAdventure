@@ -2,7 +2,7 @@
   "version": 1,
   "channels": ["starter", "chance", "xp", "shop"],
   "starters": {
-    "ships": ["finalship"]
+    "ships": ["finalship", "alienship", "jellyalienship", "coconutship", "dragoneggship"]
   },
   "avatars": [
     {

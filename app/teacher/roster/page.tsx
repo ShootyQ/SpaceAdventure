@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy, Printer } from "lucide-react";
 import Link from "next/link";
@@ -14,27 +14,29 @@ import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { getTeacherStudentLimit, isSubscriptionActive, isTeacherTrialActive } from "@/lib/subscription";
 import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
-import xpUnlockConfig from "@/data/collectibles/xp-unlocks.json";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig } from "@/lib/unlocks";
 
-const STARTER_SHIP_IDS: string[] = (xpUnlockConfig as any)?.starters?.ships || ["finalship"];
-const STARTER_SHIP_OPTIONS = SHIP_OPTIONS.filter((ship) => STARTER_SHIP_IDS.includes(ship.id));
 const STARTER_PET_OPTIONS = PET_OPTIONS.filter((pet) => STARTER_PET_IDS.includes(pet.id));
-const DEFAULT_STARTER_SHIP = STARTER_SHIP_OPTIONS[0] || SHIP_OPTIONS[0];
 const DEFAULT_STARTER_PET = STARTER_PET_OPTIONS[0]?.id || DEFAULT_PET_ID;
-const SHIP_XP_UNLOCK_RULES: Array<{ id: string; planetId: string; unlockKey: string }> = (xpUnlockConfig as any)?.ships || [];
 
 export default function RosterPage() {
   const { user, userData } = useAuth();
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+
+    const STARTER_SHIP_IDS: string[] = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+    const STARTER_SHIP_OPTIONS = SHIP_OPTIONS.filter((ship) => STARTER_SHIP_IDS.includes(ship.id));
+    const DEFAULT_STARTER_SHIP = STARTER_SHIP_OPTIONS[0] || SHIP_OPTIONS[0];
+    const SHIP_XP_UNLOCK_RULES: Array<{ id: string; planetId: string; unlockKey: string }> = getXpUnlockRules(unlockConfig.ships);
   
   // Student Creation State
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
     const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
     const [selectedAvatarId, setSelectedAvatarId] = useState(PUBLIC_AVATAR_OPTIONS[0].id);
-    const [selectedShipId, setSelectedShipId] = useState(DEFAULT_STARTER_SHIP.id);
+    const [selectedShipId, setSelectedShipId] = useState("finalship");
         const [selectedPetId, setSelectedPetId] = useState(DEFAULT_STARTER_PET);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
@@ -79,6 +81,20 @@ export default function RosterPage() {
   useEffect(() => {
     fetchRoster();
   }, [user]);
+
+  useEffect(() => {
+      const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+          setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+      });
+
+      return () => unsub();
+  }, []);
+
+  useEffect(() => {
+      if (!STARTER_SHIP_IDS.includes(selectedShipId)) {
+          setSelectedShipId(DEFAULT_STARTER_SHIP.id);
+      }
+  }, [STARTER_SHIP_IDS, selectedShipId, DEFAULT_STARTER_SHIP.id]);
 
   useEffect(() => {
       if (!user) return;

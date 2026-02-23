@@ -14,7 +14,7 @@ import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib
 import { UserAvatar, HAT_OPTIONS, AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { DEFAULT_PET_UNLOCK_CHANCE_CONFIG, getEffectiveUnlockedPetIds, getPetUnlockHint, normalizePetUnlockChanceConfig, PET_OPTIONS, PetUnlockChanceConfig, getResolvedSelectedPetId } from "@/lib/pets";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
-import xpUnlockConfig from "@/data/collectibles/xp-unlocks.json";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig } from "@/lib/unlocks";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -37,17 +37,9 @@ const SHIP_COLORS = [
     { name: "Ice Cyan", class: "text-cyan-400", bg: "bg-cyan-400" },
 ];
 
-interface XPUnlockRule {
-    id: string;
-    name: string;
-    planetId: string;
-    unlockKey: string;
-}
-
-const AVATAR_XP_UNLOCK_RULES: XPUnlockRule[] = (xpUnlockConfig as any)?.avatars || [];
-const SHIP_XP_UNLOCK_RULES: XPUnlockRule[] = (xpUnlockConfig as any)?.ships || [];
-const STARTER_SHIP_IDS: string[] = (xpUnlockConfig as any)?.starters?.ships || ["finalship"];
-const STARTER_AVATAR_IDS: string[] = ["bunny"];
+const STARTER_AVATAR_IDS: string[] = AVATAR_OPTIONS
+    .filter((avatar) => String(avatar.src || "").includes("/collectibles/avatars/starter/"))
+    .map((avatar) => avatar.id);
 
 const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
     return (purchasedShopItemIds || [])
@@ -556,6 +548,10 @@ function InventoryView() {
 function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const { user, userData } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const AVATAR_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.avatars);
+    const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
+    const STARTER_SHIP_IDS = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
 
     // State for visual properties
     const [hue, setHue] = useState(userData?.avatar?.hue || 0);
@@ -572,6 +568,14 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(STARTER_AVATAR_IDS));
     const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
     const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         const teacherId = userData?.teacherId;
@@ -1176,8 +1180,19 @@ export default function SettingsPage() {
     const { userData, user } = useAuth();
     const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
+    const STARTER_SHIP_IDS = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
     const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
     const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         if (!userData) return;
