@@ -56,6 +56,12 @@
       "unlockKey": "earth-xp-earn"
     },
     {
+      "id": "jupiter-xp-earn",
+      "name": "Stormbelly Freighter",
+      "planetId": "jupiter",
+      "unlockKey": "jupiter-xp-earn"
+    },
+    {
       "id": "mars-xp-earn",
       "name": "Crimson Striker",
       "planetId": "mars",
@@ -66,6 +72,18 @@
       "name": "Solar Needle",
       "planetId": "mercury",
       "unlockKey": "mercury-xp-earn"
+    },
+    {
+      "id": "saturn-xp-earn",
+      "name": "Ringline Hauler",
+      "planetId": "saturn",
+      "unlockKey": "saturn-xp-earn"
+    },
+    {
+      "id": "uranus-xp-earn",
+      "name": "Cryo Bulkrunner",
+      "planetId": "uranus",
+      "unlockKey": "uranus-xp-earn"
     },
     {
       "id": "venus-xp-earn",

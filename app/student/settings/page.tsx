@@ -572,7 +572,11 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
     useEffect(() => {
         const currentAvatar = userData?.avatar?.avatarId || "bunny";
-        const unlocked = new Set<string>([...PUBLIC_AVATAR_OPTIONS.map(a => a.id), currentAvatar]);
+        const unlocked = new Set<string>([
+            ...PUBLIC_AVATAR_OPTIONS.map(a => a.id),
+            ...(userData?.shopUnlockedAvatarIds || []),
+            currentAvatar
+        ]);
 
         AVATAR_XP_UNLOCK_RULES.forEach((rule) => {
             const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
@@ -584,11 +588,11 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
         setUnlockedAvatarIds(unlocked);
         if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
-    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, avatarId]);
+    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, userData?.shopUnlockedAvatarIds, avatarId]);
 
     useEffect(() => {
         const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
-        const unlocked = new Set<string>([...STARTER_SHIP_IDS, currentShip]);
+        const unlocked = new Set<string>([...STARTER_SHIP_IDS, ...(userData?.shopUnlockedShipIds || []), currentShip]);
 
         SHIP_XP_UNLOCK_RULES.forEach((rule) => {
             const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
@@ -599,7 +603,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
         });
 
         setUnlockedShipIds(unlocked);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId]);
+    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds]);
 
     useEffect(() => {
         setPetId(getResolvedSelectedPetId(userData));
@@ -1221,7 +1225,7 @@ export default function SettingsPage() {
 
     useEffect(() => {
         const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
-        const unlocked = new Set<string>([...STARTER_SHIP_IDS, currentShip]);
+        const unlocked = new Set<string>([...STARTER_SHIP_IDS, ...(userData?.shopUnlockedShipIds || []), currentShip]);
 
         SHIP_XP_UNLOCK_RULES.forEach((rule) => {
             const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
@@ -1232,7 +1236,7 @@ export default function SettingsPage() {
         });
 
         setUnlockedShipIds(unlocked);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId]);
+    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds]);
 
     // Breadcrumb / Title Logic
     const getTitle = () => {

@@ -140,6 +140,9 @@ export interface UserData {
     missionProgress?: Record<string, MissionProgress>;
     selectedPetId?: string;
     unlockedPetIds?: string[];
+    purchasedShopItemIds?: string[];
+    shopUnlockedShipIds?: string[];
+    shopUnlockedAvatarIds?: string[];
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)
