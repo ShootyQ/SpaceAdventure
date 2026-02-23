@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
-import { adminDb } from "@/lib/firebase-admin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type ShopItem = {
   id: string;
@@ -11,7 +11,6 @@ type ShopItem = {
   price: number;
 };
 
-const SHOP_ASSET_ROOT = path.join(process.cwd(), "public", "images", "collectibles", "ships", "shop");
 const SHOP_CONFIG_PATH = "game-config/shop";
 const DEFAULT_PRICE = 100;
 
@@ -39,7 +38,23 @@ const normalizeItemIdFromRelativePath = (relativeFilePath: string) => {
 
 const isImage = (fileName: string) => /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName);
 
+async function resolveShopAssetRoot() {
+  const path = await import("node:path");
+  return path.join(process.cwd(), "public", "images", "collectibles", "ships", "shop");
+}
+
+async function getAdminDbSafe() {
+  try {
+    const firebaseAdmin = await import("@/lib/firebase-admin");
+    return firebaseAdmin.adminDb;
+  } catch (error) {
+    console.error("Failed to load admin DB module:", error);
+    return null;
+  }
+}
+
 async function walkFiles(dir: string): Promise<string[]> {
+  const fs = await import("node:fs/promises");
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
@@ -61,6 +76,9 @@ async function walkFiles(dir: string): Promise<string[]> {
 
 async function getConfiguredPrices(): Promise<Record<string, number>> {
   try {
+    const adminDb = await getAdminDbSafe();
+    if (!adminDb) return {};
+
     const snapshot = await adminDb.doc(SHOP_CONFIG_PATH).get();
     if (!snapshot.exists) return {};
 
@@ -82,15 +100,16 @@ async function getConfiguredPrices(): Promise<Record<string, number>> {
 }
 
 async function getDiscoveredShopItems(): Promise<ShopItem[]> {
-  const [files, configuredPrices] = await Promise.all([walkFiles(SHOP_ASSET_ROOT), getConfiguredPrices()]);
+  const [path, shopAssetRoot] = await Promise.all([import("node:path"), resolveShopAssetRoot()]);
+  const [files, configuredPrices] = await Promise.all([walkFiles(shopAssetRoot), getConfiguredPrices()]);
 
   const items = files.map((absolutePath) => {
-    const relativePath = path.relative(SHOP_ASSET_ROOT, absolutePath).replace(/\\/g, "/");
+    const relativePath = path.relative(shopAssetRoot, absolutePath).replace(/\\/g, "/");
     const pathParts = relativePath.split("/").filter(Boolean);
     const category = pathParts[0] || "misc";
     const imagePath = `/images/collectibles/ships/shop/${relativePath}`;
     const id = normalizeItemIdFromRelativePath(relativePath);
-    const name = normalizeNameFromFile(path.basename(relativePath));
+    const name = normalizeNameFromFile(relativePath.split("/").pop() || relativePath);
     const configuredPrice = configuredPrices[id];
 
     return {
@@ -121,6 +140,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const adminDb = await getAdminDbSafe();
+    if (!adminDb) {
+      return NextResponse.json({ error: "Shop pricing backend unavailable" }, { status: 503 });
+    }
+
     const body = await request.json();
     const rawPrices = (body as any)?.prices || {};
 
