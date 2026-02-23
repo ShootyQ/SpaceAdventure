@@ -55,6 +55,7 @@ async function getAdminDbSafe() {
 
 async function walkFiles(dir: string): Promise<string[]> {
   const fs = await import("node:fs/promises");
+  const path = await import("node:path");
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
