@@ -13,6 +13,7 @@ type ShopItem = {
 
 const SHOP_CONFIG_PATH = "game-config/shop";
 const DEFAULT_PRICE = 100;
+const SHOP_CATEGORIES = ["avatars", "objects", "pets", "ships"] as const;
 
 const toTitleCase = (value: string) =>
   value
@@ -41,6 +42,11 @@ const isImage = (fileName: string) => /\.(png|jpe?g|webp|gif|svg)$/i.test(fileNa
 async function resolveShopAssetRoot() {
   const path = await import("node:path");
   return path.join(process.cwd(), "public", "images", "collectibles", "ships", "shop");
+}
+
+async function resolveCategoryShopRoot(category: string) {
+  const path = await import("node:path");
+  return path.join(process.cwd(), "public", "images", "collectibles", category, "shop");
 }
 
 async function getAdminDbSafe() {
@@ -101,25 +107,73 @@ async function getConfiguredPrices(): Promise<Record<string, number>> {
 }
 
 async function getDiscoveredShopItems(): Promise<ShopItem[]> {
-  const [path, shopAssetRoot] = await Promise.all([import("node:path"), resolveShopAssetRoot()]);
-  const [files, configuredPrices] = await Promise.all([walkFiles(shopAssetRoot), getConfiguredPrices()]);
+  const path = await import("node:path");
+  const [configuredPrices, legacyRoot, categoryRoots] = await Promise.all([
+    getConfiguredPrices(),
+    resolveShopAssetRoot(),
+    Promise.all(SHOP_CATEGORIES.map((category) => resolveCategoryShopRoot(category))),
+  ]);
 
-  const items = files.map((absolutePath) => {
-    const relativePath = path.relative(shopAssetRoot, absolutePath).replace(/\\/g, "/");
-    const pathParts = relativePath.split("/").filter(Boolean);
-    const category = pathParts[0] || "misc";
+  const [legacyFiles, categoryFilesGrouped] = await Promise.all([
+    walkFiles(legacyRoot),
+    Promise.all(categoryRoots.map((root) => walkFiles(root))),
+  ]);
+
+  const dedupe = new Set<string>();
+  const items: ShopItem[] = [];
+
+  categoryFilesGrouped.forEach((files, index) => {
+    const category = SHOP_CATEGORIES[index];
+    const root = categoryRoots[index];
+
+    files.forEach((absolutePath) => {
+      const relativePath = path.relative(root, absolutePath).replace(/\\/g, "/");
+      if (!relativePath) return;
+
+      const id = normalizeItemIdFromRelativePath(`${category}/${relativePath}`);
+      if (dedupe.has(id)) return;
+      dedupe.add(id);
+
+      const imagePath = `/images/collectibles/${category}/shop/${relativePath}`;
+      const name = normalizeNameFromFile(relativePath.split("/").pop() || relativePath);
+      const configuredPrice = configuredPrices[id];
+
+      items.push({
+        id,
+        name,
+        category,
+        imagePath,
+        price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
+      });
+    });
+  });
+
+  legacyFiles.forEach((absolutePath) => {
+    const relativePath = path.relative(legacyRoot, absolutePath).replace(/\\/g, "/");
+    if (!relativePath) return;
+
+    const segments = relativePath.split("/").filter(Boolean);
+    const categoryCandidate = String(segments[0] || "").toLowerCase();
+    const category = SHOP_CATEGORIES.includes(categoryCandidate as (typeof SHOP_CATEGORIES)[number])
+      ? categoryCandidate
+      : "misc";
+
+    const normalizedRelative = category !== "misc" ? segments.slice(1).join("/") : relativePath;
+    const id = normalizeItemIdFromRelativePath(`${category}/${normalizedRelative}`);
+    if (dedupe.has(id)) return;
+    dedupe.add(id);
+
     const imagePath = `/images/collectibles/ships/shop/${relativePath}`;
-    const id = normalizeItemIdFromRelativePath(relativePath);
-    const name = normalizeNameFromFile(relativePath.split("/").pop() || relativePath);
+    const name = normalizeNameFromFile((normalizedRelative || relativePath).split("/").pop() || relativePath);
     const configuredPrice = configuredPrices[id];
 
-    return {
+    items.push({
       id,
       name,
       category,
       imagePath,
       price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
-    } as ShopItem;
+    });
   });
 
   return items.sort((a, b) => {

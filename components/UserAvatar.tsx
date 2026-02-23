@@ -11,18 +11,18 @@ export interface AvatarConfig {
 }
 
 export const AVATAR_OPTIONS = [
-    { id: 'bunny', name: 'Space Bunny', src: '/images/avatar/spacebunny.png' },
-    { id: 'cat', name: 'Cosmic Cat', src: '/images/avatar/spacecat.png' },
-    { id: 'raccoon', name: 'Rocket Raccoon', src: '/images/avatar/spaceraccoon.png' },
-    { id: 'otter', name: 'Orbit Otter', src: '/images/avatar/spaceotter.png' },
-    { id: 'pup', name: 'Pluto Pup', src: '/images/avatar/spacepup.png' },
-    { id: 'hamster', name: 'Hyper Hamster', src: '/images/avatar/spacehamster.png' },
-    { id: 'owl', name: 'Omega Owl', src: '/images/avatar/spaceowl.png' },
-    { id: 'penguin', name: 'Power Penguin', src: '/images/avatar/spacepenguin.png' },
-    { id: 'turtle', name: 'Turbo Turtle', src: '/images/avatar/spaceturtle.png' },
-    { id: 'jovi', name: 'Jovi', src: '/images/avatar/JUPITER/jovi.png' },
-    { id: 'rusty', name: 'Rusty', src: '/images/avatar/MARS/rusty.png' },
-    { id: 'vylaet', name: 'Vylaet', src: '/images/avatar/SECRET%20UNLOCKS/spacevylaet.png' },
+    { id: 'bunny', name: 'Space Bunny', src: '/images/collectibles/avatars/starter/spacebunny.png' },
+    { id: 'cat', name: 'Cosmic Cat', src: '/images/collectibles/avatars/starter/spacecat.png' },
+    { id: 'raccoon', name: 'Rocket Raccoon', src: '/images/collectibles/avatars/starter/spaceraccoon.png' },
+    { id: 'otter', name: 'Orbit Otter', src: '/images/collectibles/avatars/starter/spaceotter.png' },
+    { id: 'pup', name: 'Pluto Pup', src: '/images/collectibles/avatars/starter/spacepup.png' },
+    { id: 'hamster', name: 'Hyper Hamster', src: '/images/collectibles/avatars/starter/spacehamster.png' },
+    { id: 'owl', name: 'Omega Owl', src: '/images/collectibles/avatars/starter/spaceowl.png' },
+    { id: 'penguin', name: 'Power Penguin', src: '/images/collectibles/avatars/starter/spacepenguin.png' },
+    { id: 'turtle', name: 'Turbo Turtle', src: '/images/collectibles/avatars/starter/spaceturtle.png' },
+    { id: 'jovi', name: 'Jovi', src: '/images/collectibles/avatars/xp-unlocks/jovi.png' },
+    { id: 'rusty', name: 'Rusty', src: '/images/collectibles/avatars/uncommon/rusty.png' },
+    { id: 'vylaet', name: 'Vylaet', src: '/images/collectibles/avatars/rare/spacevylaet.png' },
 ];
 
 export const SECRET_AVATAR_IDS = new Set(['jovi', 'rusty', 'vylaet']);

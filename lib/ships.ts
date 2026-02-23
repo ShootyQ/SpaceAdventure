@@ -8,11 +8,11 @@ export interface ShipOption {
 }
 
 export const SHIP_OPTIONS: ShipOption[] = [
-    { id: "finalship", name: "Standard Interceptor", type: "fighter", assetPath: "/images/ships/finalship.png" },
-    { id: "alienship", name: "Alien Scout", type: "scout", assetPath: "/images/ships/alienship.png" },
-    { id: "jellyalienship", name: "Bio-Cruiser", type: "cruiser", assetPath: "/images/ships/jellyalienship.png" },
-    { id: "coconutship", name: "Tropical Drifter", type: "cruiser", assetPath: "/images/ships/coconutship.png" },
-    { id: "dragoneggship", name: "Dragon Scale Pod", type: "scout", assetPath: "/images/ships/dragoneggship.png" },
+    { id: "finalship", name: "Standard Interceptor", type: "fighter", assetPath: "/images/collectibles/ships/starter/finalship.png" },
+    { id: "alienship", name: "Alien Scout", type: "scout", assetPath: "/images/collectibles/ships/starter/alienship.png" },
+    { id: "jellyalienship", name: "Bio-Cruiser", type: "cruiser", assetPath: "/images/collectibles/ships/starter/jellyalienship.png" },
+    { id: "coconutship", name: "Tropical Drifter", type: "cruiser", assetPath: "/images/collectibles/ships/starter/coconutship.png" },
+    { id: "dragoneggship", name: "Dragon Scale Pod", type: "scout", assetPath: "/images/collectibles/ships/starter/dragoneggship.png" },
 
     { id: "earth-xp-earn", name: "Terra Vanguard", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/earth-xp earn.png" },
     { id: "jupiter-xp-earn", name: "Stormbelly Freighter", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/jupiter-xp earn.png" },
@@ -45,7 +45,7 @@ const SHIP_ASSET_PATHS = new Map<string, string>(
 
 export function resolveShipAssetPath(shipId?: string): string {
     const normalized = String(shipId || "finalship").trim();
-    if (!normalized) return "/images/ships/finalship.png";
+    if (!normalized) return "/images/collectibles/ships/starter/finalship.png";
 
     return SHIP_ASSET_PATHS.get(normalized) || `/images/collectibles/ships/shop/ships/${normalized}.png`;
 }

@@ -162,6 +162,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
 
     const shipColor = userData?.spaceship?.color || "text-cyan-400";
+    const selectedShipId = userData?.spaceship?.modelId || userData?.spaceship?.id || "finalship";
     // Extract tailwind color class prefix for glowing effects (e.g. text-blue-400 -> blue)
     const glowColor = shipColor.includes('-') ? shipColor.split('-')[1] : 'cyan';
 
@@ -247,7 +248,15 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                       {/* Ship Bubble */}
                       <div className="absolute right-0 w-24 h-24 rounded-full border-2 border-cyan-500/50 overflow-hidden bg-black flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.3)] z-20">
                            <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 6, repeat: Infinity }}>
-                                <Rocket size={56} className="drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
+                                <img
+                                    src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                                    alt="Selected ship"
+                                    className="w-14 h-14 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                                    onError={(event) => {
+                                        event.currentTarget.onerror = null;
+                                        event.currentTarget.src = getAssetPath("/images/collectibles/ships/starter/finalship.png");
+                                    }}
+                                />
                            </motion.div>
                       </div>
                  </div>
