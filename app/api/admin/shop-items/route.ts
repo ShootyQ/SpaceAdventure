@@ -37,6 +37,14 @@ const normalizeItemIdFromRelativePath = (relativeFilePath: string) => {
     .replace(/\/+$/g, "");
 };
 
+const normalizeCategoryRelativePath = (category: string, relativePath: string) => {
+  const segments = String(relativePath || "").split("/").filter(Boolean);
+  if (segments[0]?.toLowerCase() === category.toLowerCase()) {
+    return segments.slice(1).join("/");
+  }
+  return relativePath;
+};
+
 const isImage = (fileName: string) => /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName);
 
 async function resolveShopAssetRoot() {
@@ -130,13 +138,16 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       const relativePath = path.relative(root, absolutePath).replace(/\\/g, "/");
       if (!relativePath) return;
 
-      const id = normalizeItemIdFromRelativePath(`${category}/${relativePath}`);
+      const normalizedRelativePath = normalizeCategoryRelativePath(category, relativePath);
+
+      const id = normalizeItemIdFromRelativePath(`${category}/${normalizedRelativePath}`);
+      const legacyId = normalizeItemIdFromRelativePath(`${category}/${relativePath}`);
       if (dedupe.has(id)) return;
       dedupe.add(id);
 
       const imagePath = `/images/collectibles/${category}/shop/${relativePath}`;
-      const name = normalizeNameFromFile(relativePath.split("/").pop() || relativePath);
-      const configuredPrice = configuredPrices[id];
+      const name = normalizeNameFromFile((normalizedRelativePath || relativePath).split("/").pop() || relativePath);
+      const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
 
       items.push({
         id,
@@ -158,14 +169,17 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       ? categoryCandidate
       : "misc";
 
-    const normalizedRelative = category !== "misc" ? segments.slice(1).join("/") : relativePath;
+    const normalizedRelative = category !== "misc"
+      ? normalizeCategoryRelativePath(category, segments.slice(1).join("/"))
+      : relativePath;
     const id = normalizeItemIdFromRelativePath(`${category}/${normalizedRelative}`);
     if (dedupe.has(id)) return;
     dedupe.add(id);
 
     const imagePath = `/images/collectibles/ships/shop/${relativePath}`;
     const name = normalizeNameFromFile((normalizedRelative || relativePath).split("/").pop() || relativePath);
-    const configuredPrice = configuredPrices[id];
+    const legacyId = normalizeItemIdFromRelativePath(`${category}/${segments.slice(1).join("/")}`);
+    const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
 
     items.push({
       id,
