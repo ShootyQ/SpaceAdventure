@@ -60,20 +60,25 @@ async function walkFiles(dir: string): Promise<string[]> {
 }
 
 async function getConfiguredPrices(): Promise<Record<string, number>> {
-  const snapshot = await adminDb.doc(SHOP_CONFIG_PATH).get();
-  if (!snapshot.exists) return {};
+  try {
+    const snapshot = await adminDb.doc(SHOP_CONFIG_PATH).get();
+    if (!snapshot.exists) return {};
 
-  const raw = (snapshot.data() as any)?.prices || {};
-  const prices: Record<string, number> = {};
+    const raw = (snapshot.data() as any)?.prices || {};
+    const prices: Record<string, number> = {};
 
-  Object.entries(raw).forEach(([itemId, value]) => {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-      prices[itemId] = Math.max(0, Math.round(numeric));
-    }
-  });
+    Object.entries(raw).forEach(([itemId, value]) => {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        prices[itemId] = Math.max(0, Math.round(numeric));
+      }
+    });
 
-  return prices;
+    return prices;
+  } catch (error) {
+    console.error("Failed to read shop prices config; using defaults:", error);
+    return {};
+  }
 }
 
 async function getDiscoveredShopItems(): Promise<ShopItem[]> {
