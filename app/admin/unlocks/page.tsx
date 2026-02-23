@@ -69,7 +69,7 @@ export default function AdminUnlocksPage() {
 
       const sanitized: MigrationArtifact[] = parsed
         .map((entry: any) => ({
-          mode: entry?.mode === "migrate-save" ? "migrate-save" : "dry-run",
+          mode: (entry?.mode === "migrate-save" ? "migrate-save" : "dry-run") as MigrationArtifact["mode"],
           before: normalizeUnlockConfig(entry?.before || null),
           after: normalizeUnlockConfig(entry?.after || null),
           report: {
@@ -323,7 +323,7 @@ export default function AdminUnlocksPage() {
             Migrate IDs + Save
           </button>
           <button
-            onClick={downloadMigrationReport}
+            onClick={() => downloadMigrationReport()}
             disabled={!migrationArtifact || migrating || saving || dryRunning}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >

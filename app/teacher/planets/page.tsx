@@ -256,53 +256,49 @@ export default function PlanetManagementPage() {
                                             return (
                                                 <div className="bg-black/40 border border-white/10 rounded-lg p-3">
                                                     <div className="space-y-3">
-                                                        {avatarRules.map((rule) => (
-                                                            (() => {
-                                                                const runtimeAvatarId = resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, avatarCatalogIds);
-                                                                return (
-                                                            <div key={`avatar-${rule.unlockKey}`} className="flex items-center gap-3">
-                                                                <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
-                                                                    <UserAvatar avatarId={runtimeAvatarId} hat="none" className="w-full h-full" />
+                                                        {avatarRules.map((rule) => {
+                                                            const runtimeAvatarId = resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, avatarCatalogIds);
+                                                            return (
+                                                                <div key={`avatar-${rule.unlockKey}`} className="flex items-center gap-3">
+                                                                    <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
+                                                                        <UserAvatar avatarId={runtimeAvatarId} hat="none" className="w-full h-full" />
+                                                                    </div>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="text-xs text-white font-bold">{rule.name}</div>
+                                                                        <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
+                                                                    </div>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={planet.unlocks?.avatars?.[rule.unlockKey] ?? ""}
+                                                                        onChange={(e) => handleAvatarUnlockChange(planet.id, rule.unlockKey, e.target.value)}
+                                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                        placeholder="0"
+                                                                    />
                                                                 </div>
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="text-xs text-white font-bold">{rule.name}</div>
-                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
-                                                                </div>
-                                                                <input
-                                                                    type="number"
-                                                                    value={planet.unlocks?.avatars?.[rule.unlockKey] ?? ""}
-                                                                    onChange={(e) => handleAvatarUnlockChange(planet.id, rule.unlockKey, e.target.value)}
-                                                                    className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
-                                                                    placeholder="0"
-                                                                />
-                                                            </div>
-                                                                );
-                                                            })()
-                                                        )}
+                                                            );
+                                                        })}
 
-                                                        {shipRules.map((rule) => (
-                                                            (() => {
-                                                                const runtimeShipId = resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, shipCatalogIds);
-                                                                return (
-                                                            <div key={`ship-${rule.unlockKey}`} className="flex items-center gap-3">
-                                                                <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-black/40 flex items-center justify-center">
-                                                                    <img src={getAssetPath(resolveShipAssetPath(runtimeShipId))} alt={rule.name} className="w-10 h-10 object-contain" />
+                                                        {shipRules.map((rule) => {
+                                                            const runtimeShipId = resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, shipCatalogIds);
+                                                            return (
+                                                                <div key={`ship-${rule.unlockKey}`} className="flex items-center gap-3">
+                                                                    <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-black/40 flex items-center justify-center">
+                                                                        <img src={getAssetPath(resolveShipAssetPath(runtimeShipId))} alt={rule.name} className="w-10 h-10 object-contain" />
+                                                                    </div>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="text-xs text-white font-bold">{rule.name}</div>
+                                                                        <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
+                                                                    </div>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={planet.unlocks?.ships?.[rule.unlockKey] ?? ""}
+                                                                        onChange={(e) => handleShipUnlockChange(planet.id, rule.unlockKey, e.target.value)}
+                                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
+                                                                        placeholder="0"
+                                                                    />
                                                                 </div>
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="text-xs text-white font-bold">{rule.name}</div>
-                                                                    <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
-                                                                </div>
-                                                                <input
-                                                                    type="number"
-                                                                    value={planet.unlocks?.ships?.[rule.unlockKey] ?? ""}
-                                                                    onChange={(e) => handleShipUnlockChange(planet.id, rule.unlockKey, e.target.value)}
-                                                                    className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
-                                                                    placeholder="0"
-                                                                />
-                                                            </div>
-                                                                );
-                                                            })()
-                                                        )}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             );
