@@ -43,6 +43,7 @@ export default function StudentShopPage() {
     const [localShipId, setLocalShipId] = useState("finalship");
     const [localAvatarId, setLocalAvatarId] = useState("bunny");
     const [localPetId, setLocalPetId] = useState("");
+    const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
 
     useEffect(() => {
         setLocalCredits(Number(userData?.galacticCredits || 0));
@@ -117,9 +118,39 @@ export default function StudentShopPage() {
         return () => unsub();
     }, [userData?.teacherId]);
 
+    useEffect(() => {
+        if (!user) return;
+
+        const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
+            const raw = (snapshot.data() as any)?.prices || {};
+            const normalized: Record<string, number> = {};
+
+            Object.entries(raw).forEach(([itemId, value]) => {
+                const numeric = Number(value);
+                if (Number.isFinite(numeric)) {
+                    normalized[String(itemId)] = Math.max(0, Math.round(numeric));
+                }
+            });
+
+            setPriceOverrides(normalized);
+        });
+
+        return () => unsub();
+    }, [user]);
+
+    const resolvedItems = useMemo(() => {
+        return shopItems.map((item) => {
+            const override = priceOverrides[item.id];
+            return {
+                ...item,
+                price: Number.isFinite(override) ? override : item.price,
+            };
+        });
+    }, [shopItems, priceOverrides]);
+
     const groupedItems = useMemo(() => {
         const map: Record<string, ShopItem[]> = {};
-        shopItems.forEach((item) => {
+        resolvedItems.forEach((item) => {
             const category = String(item.category || "misc").toLowerCase();
             if (!map[category]) map[category] = [];
             map[category].push(item);
@@ -135,7 +166,7 @@ export default function StudentShopPage() {
         ];
 
         return orderedEntries;
-    }, [shopItems]);
+    }, [resolvedItems]);
 
     const handlePurchase = async (item: ShopItem) => {
         if (!user) {

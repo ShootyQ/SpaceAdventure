@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, Save, ShoppingCart } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 type ShopItem = {
   id: string;
@@ -20,6 +22,7 @@ const getAssetPath = (asset: string) => asset;
 
 export default function AdminShopPage() {
   const [items, setItems] = useState<ShopItem[]>([]);
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({});
   const [defaultPrice, setDefaultPrice] = useState(100);
   const [loading, setLoading] = useState(true);
@@ -58,25 +61,61 @@ export default function AdminShopPage() {
     loadShopItems();
   }, []);
 
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
+      const raw = (snapshot.data() as any)?.prices || {};
+      const normalized: Record<string, number> = {};
+
+      Object.entries(raw).forEach(([itemId, value]) => {
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) {
+          normalized[String(itemId)] = Math.max(0, Math.round(numeric));
+        }
+      });
+
+      setPriceOverrides(normalized);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const resolvedItems = useMemo(() => {
+    return items.map((item) => {
+      const override = priceOverrides[item.id];
+      return {
+        ...item,
+        price: Number.isFinite(override) ? override : item.price,
+      };
+    });
+  }, [items, priceOverrides]);
+
+  useEffect(() => {
+    const nextDraft: Record<string, number> = {};
+    resolvedItems.forEach((item) => {
+      nextDraft[item.id] = item.price;
+    });
+    setDraftPrices(nextDraft);
+  }, [resolvedItems]);
+
   const categorySummary = useMemo(() => {
-    return items.reduce<Record<string, number>>((acc, item) => {
+    return resolvedItems.reduce<Record<string, number>>((acc, item) => {
       acc[item.category] = (acc[item.category] || 0) + 1;
       return acc;
     }, {});
-  }, [items]);
+  }, [resolvedItems]);
 
   const savePrices = async () => {
     try {
       setSaving(true);
-      const response = await fetch("/api/admin/shop-items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prices: draftPrices }),
-      });
-
-      if (!response.ok) throw new Error("Failed to save prices");
+      await setDoc(
+        doc(db, "game-config", "shop"),
+        {
+          prices: draftPrices,
+          updatedAt: Date.now(),
+        },
+        { merge: true }
+      );
       alert("Shop prices saved.");
-      await loadShopItems();
     } catch (error) {
       console.error(error);
       alert("Failed to save shop prices.");
@@ -127,7 +166,7 @@ export default function AdminShopPage() {
       ) : (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 md:p-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <StatCard label="Total Items" value={items.length} />
+            <StatCard label="Total Items" value={resolvedItems.length} />
             {Object.entries(categorySummary).map(([category, count]) => (
               <StatCard key={category} label={category} value={count} />
             ))}
@@ -150,7 +189,7 @@ export default function AdminShopPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {resolvedItems.map((item) => (
                     <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
                       <td className="px-3 py-2">
                         <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-50">
