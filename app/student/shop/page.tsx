@@ -44,6 +44,7 @@ export default function StudentShopPage() {
     const [localAvatarId, setLocalAvatarId] = useState("bunny");
     const [localPetId, setLocalPetId] = useState("");
     const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
+    const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
     useEffect(() => {
         setLocalCredits(Number(userData?.galacticCredits || 0));
@@ -167,6 +168,27 @@ export default function StudentShopPage() {
 
         return orderedEntries;
     }, [resolvedItems]);
+
+    const categoryFilters = useMemo(() => {
+        return [
+            { id: "all", label: "All" },
+            ...groupedItems.map(([category]) => ({
+                id: category,
+                label: CATEGORY_TITLES[category] || category,
+            })),
+        ];
+    }, [groupedItems]);
+
+    const filteredGroupedItems = useMemo(() => {
+        if (selectedCategory === "all") return groupedItems;
+        return groupedItems.filter(([category]) => category === selectedCategory);
+    }, [groupedItems, selectedCategory]);
+
+    useEffect(() => {
+        if (selectedCategory === "all") return;
+        const stillExists = groupedItems.some(([category]) => category === selectedCategory);
+        if (!stillExists) setSelectedCategory("all");
+    }, [groupedItems, selectedCategory]);
 
     const handlePurchase = async (item: ShopItem) => {
         if (!user) {
@@ -361,17 +383,38 @@ export default function StudentShopPage() {
                     {notice ? <p className="mt-2 text-xs text-amber-200">{notice}</p> : null}
                 </div>
 
+                {!shopLoading && groupedItems.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                        {categoryFilters.map((filter) => {
+                            const active = selectedCategory === filter.id;
+                            return (
+                                <button
+                                    key={filter.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(filter.id)}
+                                    className={`px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors ${active
+                                        ? "border-cyan-400 text-cyan-100 bg-cyan-900/30"
+                                        : "border-cyan-800/60 text-cyan-400 bg-black/30 hover:border-cyan-600"
+                                        }`}
+                                >
+                                    {filter.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : null}
+
                 {shopLoading ? (
                     <div className="border border-cyan-800/50 bg-black/40 rounded-xl p-8 flex items-center justify-center gap-2 text-cyan-300">
                         <Loader2 size={18} className="animate-spin" /> Loading shop items...
                     </div>
-                ) : groupedItems.length === 0 ? (
+                ) : filteredGroupedItems.length === 0 ? (
                     <div className="border border-cyan-800/50 bg-black/40 rounded-xl p-6 text-sm text-cyan-500">
-                        No shop items found yet. Add images in your shop folders to populate this page.
+                        No shop items found in this category.
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        {groupedItems.map(([category, items]) => (
+                        {filteredGroupedItems.map(([category, items]) => (
                             <section key={category} className="space-y-3">
                                 <h2 className="text-lg font-bold uppercase tracking-wider text-white">
                                     {CATEGORY_TITLES[category] || category}
