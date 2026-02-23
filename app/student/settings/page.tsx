@@ -62,6 +62,15 @@ const getPurchasedShopPetIds = (purchasedShopItemIds?: string[]) => {
         .filter(Boolean);
 };
 
+    const formatDynamicPetName = (petId: string) => {
+        return String(petId || "")
+        .replace(/\.[^.]+$/g, "")
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase()) || "Companion";
+    };
+
 const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
     <div className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer ${active ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900/40 hover:border-cyan-500/50 hover:bg-cyan-900/20'}`}>
         <Icon size={24} className={`mb-2 ${active ? 'text-cyan-300' : 'text-cyan-700'}`} />
@@ -675,6 +684,21 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
         ]);
     }, [userData?.unlockedPetIds, userData?.purchasedShopItemIds]);
 
+    const visiblePetOptions = useMemo(() => {
+        const knownPetIds = new Set<string>(PET_OPTIONS.map((pet) => pet.id));
+        const knownUnlockedPets = PET_OPTIONS.filter((pet) => unlockedPetIds.has(pet.id));
+        const dynamicUnlockedPets = Array.from(unlockedPetIds)
+            .filter((petId) => !knownPetIds.has(petId))
+            .map((petId) => ({
+                id: petId,
+                name: formatDynamicPetName(petId),
+                emoji: "🐾",
+                imageSrc: `/images/collectibles/pets/shop/${petId}.png`,
+            }));
+
+        return [...knownUnlockedPets, ...dynamicUnlockedPets];
+    }, [unlockedPetIds]);
+
     const handleSave = async () => {
         if (!user) return;
         setLoading(true);
@@ -755,7 +779,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                         <span className="uppercase tracking-wider">Companion Selection</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                        {PET_OPTIONS.filter((pet) => unlockedPetIds.has(pet.id)).map((pet) => {
+                        {visiblePetOptions.map((pet) => {
                             return (
                                 <button
                                     key={pet.id}

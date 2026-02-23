@@ -7,7 +7,6 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
 import { ArrowLeft, Coins, LayoutDashboard, Loader2, Rocket, Sparkles } from "lucide-react";
 import { SHIP_OPTIONS } from "@/lib/ships";
-import { PET_OPTIONS } from "@/lib/pets";
 import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
 
@@ -29,6 +28,14 @@ const CATEGORY_TITLES: Record<string, string> = {
 const CATEGORY_ORDER = ["pets", "ships", "avatars", "objects"];
 
 const getUnlockIdFromItem = (itemId: string) => String(itemId || "").split("/").pop() || "";
+
+const normalizeShopPetId = (petId: string) =>
+    String(petId || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\.[^.]+$/g, "")
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
 
 export default function StudentShopPage() {
     const { userData, user } = useAuth();
@@ -243,9 +250,10 @@ export default function StudentShopPage() {
                     updates.shopUnlockedAvatarIds = Array.from(unlockedAvatars);
                 }
 
-                if (item.category === "pets" && PET_OPTIONS.some((pet) => pet.id === unlockId)) {
+                if (item.category === "pets") {
                     const unlockedPets = new Set<string>(data?.unlockedPetIds || []);
-                    unlockedPets.add(unlockId);
+                    const normalizedPetId = normalizeShopPetId(unlockId);
+                    if (normalizedPetId) unlockedPets.add(normalizedPetId);
                     updates.unlockedPetIds = Array.from(unlockedPets);
                 }
 
@@ -313,20 +321,20 @@ export default function StudentShopPage() {
                 });
                 setLocalAvatarId(avatar.id);
             } else if (item.category === "pets") {
-                const pet = PET_OPTIONS.find((option) => option.id === unlockId);
-                if (!pet) {
-                    setNotice("This pet cannot be equipped yet.");
+                const normalizedPetId = normalizeShopPetId(unlockId);
+                if (!normalizedPetId) {
+                    setNotice("This pet cannot be equipped.");
                     return;
                 }
 
                 const unlockedPetIds = new Set<string>(userData?.unlockedPetIds || []);
-                unlockedPetIds.add(pet.id);
+                unlockedPetIds.add(normalizedPetId);
 
                 await updateDoc(userRef, {
-                    selectedPetId: pet.id,
+                    selectedPetId: normalizedPetId,
                     unlockedPetIds: Array.from(unlockedPetIds),
                 });
-                setLocalPetId(pet.id);
+                setLocalPetId(normalizedPetId);
             } else {
                 setNotice("This item category is not equippable yet.");
                 return;
@@ -429,7 +437,7 @@ export default function StudentShopPage() {
                                         const isEquippable =
                                             (item.category === "ships") ||
                                             (item.category === "avatars" && AVATAR_OPTIONS.some((avatar) => avatar.id === unlockId)) ||
-                                            (item.category === "pets" && PET_OPTIONS.some((pet) => pet.id === unlockId));
+                                            (item.category === "pets");
 
                                         const isEquipped =
                                             (item.category === "ships" && localShipId === unlockId) ||

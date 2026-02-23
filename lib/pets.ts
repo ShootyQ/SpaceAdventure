@@ -304,6 +304,30 @@ export const getPetById = (petId?: string | null): PetOption => {
     if (petId) {
         const found = PET_OPTIONS.find((pet) => pet.id === petId);
         if (found) return found;
+
+        const normalizedPetId = String(petId)
+            .trim()
+            .toLowerCase()
+            .replace(/\.[^.]+$/g, "")
+            .replace(/[^a-z0-9._-]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+
+        if (normalizedPetId) {
+            const dynamicName = normalizedPetId
+                .replace(/[-_]+/g, " ")
+                .replace(/\s+/g, " ")
+                .trim()
+                .replace(/\b\w/g, (char) => char.toUpperCase()) || "Companion";
+
+            return {
+                id: normalizedPetId,
+                name: dynamicName,
+                emoji: "🐾",
+                imageSrc: `/images/collectibles/pets/shop/${normalizedPetId}.png`,
+                rarity: "common",
+                starter: false,
+            };
+        }
     }
     return PET_OPTIONS.find((pet) => pet.id === DEFAULT_PET_ID) || PET_OPTIONS[0];
 };
