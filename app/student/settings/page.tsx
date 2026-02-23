@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig } from "@/types";
 import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/firestore";
@@ -296,19 +296,41 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
         }
     }, [userData]);
 
+    const visibleShipOptions = useMemo(() => {
+        const builtInUnlocked = SHIP_OPTIONS.filter((option) => unlockedShipIds.has(option.id));
+        const builtInIds = new Set<string>(builtInUnlocked.map((option) => option.id));
+        const dynamicShopIds = Array.from(unlockedShipIds).filter((id) => !builtInIds.has(id));
+
+        const toLabel = (shipId: string) =>
+            String(shipId || "")
+                .replace(/[-_]+/g, " ")
+                .replace(/\s+/g, " ")
+                .trim()
+                .replace(/\b\w/g, (char) => char.toUpperCase()) || "Ship";
+
+        const dynamicOptions = dynamicShopIds.map((id) => ({
+            id,
+            name: toLabel(id),
+            type: "scout" as const,
+            assetPath: resolveShipAssetPath(id),
+        }));
+
+        return [...builtInUnlocked, ...dynamicOptions];
+    }, [unlockedShipIds]);
+
     useEffect(() => {
         const currentShipId = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
         if (!unlockedShipIds.has(selectedShipId)) {
             if (unlockedShipIds.has(currentShipId)) {
                 setSelectedShipId(currentShipId);
             } else if (unlockedShipIds.size > 0) {
-                const firstUnlocked = SHIP_OPTIONS.find((option) => unlockedShipIds.has(option.id));
+                const firstUnlocked = visibleShipOptions[0];
                 if (firstUnlocked) setSelectedShipId(firstUnlocked.id);
             } else {
                 setSelectedShipId("finalship");
             }
         }
-    }, [selectedShipId, unlockedShipIds, userData?.spaceship?.id, userData?.spaceship?.modelId]);
+    }, [selectedShipId, unlockedShipIds, userData?.spaceship?.id, userData?.spaceship?.modelId, visibleShipOptions]);
 
     const handleSave = async () => {
         if (!user) return;
@@ -319,7 +341,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
             const currentShipId = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
             const fallbackShipId = unlockedShipIds.has(currentShipId)
                 ? currentShipId
-                : (SHIP_OPTIONS.find((option) => unlockedShipIds.has(option.id))?.id || "finalship");
+                : (visibleShipOptions[0]?.id || "finalship");
             const safeShipId = unlockedShipIds.has(selectedShipId) ? selectedShipId : fallbackShipId;
             await updateDoc(userRef, {
                 "spaceship.name": safeShipName,
@@ -404,25 +426,18 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                         <Shield size={16} /> Ship Models
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                        {SHIP_OPTIONS.map((opt) => (
-                            (() => {
-                                const isUnlocked = unlockedShipIds.has(opt.id);
-                                return (
+                        {visibleShipOptions.map((opt) => (
                             <button
                                 key={opt.id}
                                 type="button"
-                                disabled={!isUnlocked}
                                 onClick={() => setSelectedShipId(opt.id)}
-                                className={`p-3 rounded border flex items-center gap-3 transition-all ${!isUnlocked ? 'bg-black/30 border-gray-800 opacity-50 cursor-not-allowed' : selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
                             >
                                 <img src={getAssetPath(resolveShipAssetPath(opt.id))} alt={opt.name} className="w-10 h-10 object-contain" />
                                 <div className="min-w-0 flex-1">
-                                    <span className={`block text-xs uppercase font-bold ${selectedShipId === opt.id && isUnlocked ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
-                                    {!isUnlocked && <span className="text-[10px] uppercase text-gray-500 tracking-wider flex items-center gap-1 mt-1"><Lock size={10} />Locked</span>}
+                                    <span className={`block text-xs uppercase font-bold ${selectedShipId === opt.id ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
                                 </div>
                             </button>
-                                );
-                            })()
                         ))}
                     </div>
                 </div>

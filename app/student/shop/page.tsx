@@ -209,7 +209,7 @@ export default function StudentShopPage() {
                     purchasedShopItemIds: Array.from(purchased),
                 };
 
-                if (item.category === "ships" && SHIP_OPTIONS.some((ship) => ship.id === unlockId)) {
+                if (item.category === "ships") {
                     const unlockedShips = new Set<string>(data?.shopUnlockedShipIds || []);
                     unlockedShips.add(unlockId);
                     updates.shopUnlockedShipIds = Array.from(unlockedShips);
@@ -271,17 +271,14 @@ export default function StudentShopPage() {
 
             if (item.category === "ships") {
                 const ship = SHIP_OPTIONS.find((option) => option.id === unlockId);
-                if (!ship) {
-                    setNotice("This ship cannot be equipped yet.");
-                    return;
-                }
+                const shipType = ship?.type || "scout";
 
                 await updateDoc(userRef, {
-                    "spaceship.id": ship.id,
-                    "spaceship.modelId": ship.id,
-                    "spaceship.type": ship.type,
+                    "spaceship.id": unlockId,
+                    "spaceship.modelId": unlockId,
+                    "spaceship.type": shipType,
                 });
-                setLocalShipId(ship.id);
+                setLocalShipId(unlockId);
             } else if (item.category === "avatars") {
                 const avatar = AVATAR_OPTIONS.find((option) => option.id === unlockId);
                 if (!avatar) {
@@ -387,7 +384,7 @@ export default function StudentShopPage() {
                                         const isEquipping = equippingItemId === item.id;
                                         const unlockId = getUnlockIdFromItem(item.id);
                                         const isEquippable =
-                                            (item.category === "ships" && SHIP_OPTIONS.some((ship) => ship.id === unlockId)) ||
+                                            (item.category === "ships") ||
                                             (item.category === "avatars" && AVATAR_OPTIONS.some((avatar) => avatar.id === unlockId)) ||
                                             (item.category === "pets" && PET_OPTIONS.some((pet) => pet.id === unlockId));
 

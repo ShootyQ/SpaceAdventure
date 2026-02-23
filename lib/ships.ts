@@ -47,5 +47,5 @@ export function resolveShipAssetPath(shipId?: string): string {
     const normalized = String(shipId || "finalship").trim();
     if (!normalized) return "/images/ships/finalship.png";
 
-    return SHIP_ASSET_PATHS.get(normalized) || `/images/ships/${normalized}.png`;
+    return SHIP_ASSET_PATHS.get(normalized) || `/images/collectibles/ships/shop/ships/${normalized}.png`;
 }
