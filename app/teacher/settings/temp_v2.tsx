@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
     <img
-        src={getAssetPath("/images/ships/finalship.png")}
+        src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
         alt="Rocket"
         className={`object-contain ${className}`}
         style={{ width: size, height: size }}
@@ -320,7 +320,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src={getAssetPath("/images/ships/finalship.png")}
+                        src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
                         alt="Ship"
                         className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />

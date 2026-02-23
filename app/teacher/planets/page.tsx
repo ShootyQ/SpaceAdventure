@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, onSnapshot, doc, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
@@ -8,9 +8,9 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
-import { UserAvatar } from "@/components/UserAvatar";
-import { resolveShipAssetPath } from "@/lib/ships";
-import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, UnlockRule } from "@/lib/unlocks";
+import { AVATAR_OPTIONS, UserAvatar } from "@/components/UserAvatar";
+import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, UnlockRule } from "@/lib/unlocks";
 
 // Interface for dynamic data stored in DB
 interface PlanetData {
@@ -31,12 +31,16 @@ interface PlanetState extends PlanetData {
     color: string;
 }
 
+const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+
 export default function PlanetManagementPage() {
     const { user } = useAuth();
     const [planets, setPlanets] = useState<PlanetState[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
+    const avatarCatalogIds = useMemo(() => new Set<string>(AVATAR_OPTIONS.map((avatar) => avatar.id)), []);
 
     const AVATAR_UNLOCK_RULES: UnlockRule[] = getXpUnlockRules(unlockConfig.avatars);
     const SHIP_UNLOCK_RULES: UnlockRule[] = getXpUnlockRules(unlockConfig.ships);
@@ -60,7 +64,8 @@ export default function PlanetManagementPage() {
              snapshot.forEach(d => {
                  const data = d.data() as PlanetData;
                  // Ensure ID is set (if not in data, use doc ID)
-                 dynamicMap.set(d.id, { ...data, id: d.id });
+                 const normalizedPlanetId = normalizePlanetId(d.id);
+                 dynamicMap.set(normalizedPlanetId, { ...data, id: normalizedPlanetId });
              });
 
              const merged = PLANETS.map(staticPlanet => {
@@ -239,8 +244,9 @@ export default function PlanetManagementPage() {
                                              <Star size={14} /> Cosmetic Unlocks
                                          </label>
                                          {(() => {
-                                            const avatarRules = AVATAR_UNLOCK_RULES.filter((rule) => rule.planetId === planet.id);
-                                            const shipRules = SHIP_UNLOCK_RULES.filter((rule) => rule.planetId === planet.id);
+                                                          const normalizedPlanetId = normalizePlanetId(planet.id);
+                                                          const avatarRules = AVATAR_UNLOCK_RULES.filter((rule) => normalizePlanetId(rule.planetId) === normalizedPlanetId);
+                                                          const shipRules = SHIP_UNLOCK_RULES.filter((rule) => normalizePlanetId(rule.planetId) === normalizedPlanetId);
                                             const hasUnlocks = avatarRules.length > 0 || shipRules.length > 0;
 
                                             if (!hasUnlocks) {
@@ -251,9 +257,12 @@ export default function PlanetManagementPage() {
                                                 <div className="bg-black/40 border border-white/10 rounded-lg p-3">
                                                     <div className="space-y-3">
                                                         {avatarRules.map((rule) => (
+                                                            (() => {
+                                                                const runtimeAvatarId = resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, avatarCatalogIds);
+                                                                return (
                                                             <div key={`avatar-${rule.unlockKey}`} className="flex items-center gap-3">
                                                                 <div className="w-12 h-12 rounded-full border border-white/10 overflow-hidden">
-                                                                    <UserAvatar avatarId={rule.id} hat="none" className="w-full h-full" />
+                                                                    <UserAvatar avatarId={runtimeAvatarId} hat="none" className="w-full h-full" />
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <div className="text-xs text-white font-bold">{rule.name}</div>
@@ -267,12 +276,17 @@ export default function PlanetManagementPage() {
                                                                     placeholder="0"
                                                                 />
                                                             </div>
-                                                        ))}
+                                                                );
+                                                            })()
+                                                        )}
 
                                                         {shipRules.map((rule) => (
+                                                            (() => {
+                                                                const runtimeShipId = resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, shipCatalogIds);
+                                                                return (
                                                             <div key={`ship-${rule.unlockKey}`} className="flex items-center gap-3">
                                                                 <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-black/40 flex items-center justify-center">
-                                                                    <img src={getAssetPath(resolveShipAssetPath(rule.id))} alt={rule.name} className="w-10 h-10 object-contain" />
+                                                                    <img src={getAssetPath(resolveShipAssetPath(runtimeShipId))} alt={rule.name} className="w-10 h-10 object-contain" />
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <div className="text-xs text-white font-bold">{rule.name}</div>
@@ -286,7 +300,9 @@ export default function PlanetManagementPage() {
                                                                     placeholder="0"
                                                                 />
                                                             </div>
-                                                        ))}
+                                                                );
+                                                            })()
+                                                        )}
                                                     </div>
                                                 </div>
                                             );

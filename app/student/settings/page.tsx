@@ -14,7 +14,7 @@ import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib
 import { UserAvatar, HAT_OPTIONS, AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { DEFAULT_PET_UNLOCK_CHANCE_CONFIG, getEffectiveUnlockedPetIds, getPetUnlockHint, normalizePetUnlockChanceConfig, PET_OPTIONS, PetUnlockChanceConfig, getResolvedSelectedPetId } from "@/lib/pets";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
-import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig } from "@/lib/unlocks";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, type UnlockRule } from "@/lib/unlocks";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -60,6 +60,114 @@ const getPurchasedShopPetIds = (purchasedShopItemIds?: string[]) => {
         .filter((itemId) => String(itemId || "").toLowerCase().startsWith("pets/"))
         .map((itemId) => String(itemId || "").split("/").pop() || "")
         .filter(Boolean);
+};
+
+const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+
+const readPlanetXpValue = (planetXP: Record<string, number> | undefined, planetId: string) => {
+    const normalizedPlanetId = normalizePlanetId(planetId);
+    if (!normalizedPlanetId) return 0;
+
+    const exact = Number(planetXP?.[normalizedPlanetId] || 0);
+    if (exact > 0) return exact;
+
+    const fallbackEntry = Object.entries(planetXP || {}).find(([key]) => normalizePlanetId(key) === normalizedPlanetId);
+    return Number(fallbackEntry?.[1] || 0);
+};
+
+const buildUnlockedShipIdSet = ({
+    starterShipIds,
+    shopUnlockedShipIds,
+    purchasedShopItemIds,
+    currentShipId,
+    shipXpUnlockRules,
+    planetShipUnlocks,
+    planetXP,
+    idAliases,
+    shipCatalogIds,
+}: {
+    starterShipIds: string[];
+    shopUnlockedShipIds?: string[];
+    purchasedShopItemIds?: string[];
+    currentShipId?: string;
+    shipXpUnlockRules: UnlockRule[];
+    planetShipUnlocks: Record<string, Record<string, number>>;
+    planetXP?: Record<string, number>;
+    idAliases?: Record<string, string>;
+    shipCatalogIds: Set<string>;
+}) => {
+    const purchasedShopShipIds = getPurchasedShopShipIds(purchasedShopItemIds);
+    const normalizedPurchasedShopShipIds = purchasedShopShipIds.map((id) =>
+        resolveRuntimeUnlockId(id, idAliases, shipCatalogIds)
+    );
+    const normalizedShopShipIds = (shopUnlockedShipIds || []).map((id) =>
+        resolveRuntimeUnlockId(id, idAliases, shipCatalogIds)
+    );
+
+    const unlocked = new Set<string>([
+        ...starterShipIds,
+        ...normalizedShopShipIds,
+        ...normalizedPurchasedShopShipIds,
+        String(currentShipId || "finalship"),
+    ]);
+
+    shipXpUnlockRules.forEach((rule) => {
+        const normalizedPlanetId = normalizePlanetId(rule.planetId);
+        const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
+        const requiredXP = Number(planetShipUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
+        if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+            unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, shipCatalogIds));
+        }
+    });
+
+    return unlocked;
+};
+
+const buildUnlockedAvatarIdSet = ({
+    starterAvatarIds,
+    shopUnlockedAvatarIds,
+    purchasedShopItemIds,
+    currentAvatarId,
+    avatarXpUnlockRules,
+    planetAvatarUnlocks,
+    planetXP,
+    idAliases,
+    avatarCatalogIds,
+}: {
+    starterAvatarIds: string[];
+    shopUnlockedAvatarIds?: string[];
+    purchasedShopItemIds?: string[];
+    currentAvatarId?: string;
+    avatarXpUnlockRules: UnlockRule[];
+    planetAvatarUnlocks: Record<string, Record<string, number>>;
+    planetXP?: Record<string, number>;
+    idAliases?: Record<string, string>;
+    avatarCatalogIds: Set<string>;
+}) => {
+    const purchasedShopAvatarIds = getPurchasedShopAvatarIds(purchasedShopItemIds).map((id) =>
+        resolveRuntimeUnlockId(id, idAliases, avatarCatalogIds)
+    );
+    const normalizedShopAvatarIds = (shopUnlockedAvatarIds || []).map((id) =>
+        resolveRuntimeUnlockId(id, idAliases, avatarCatalogIds)
+    );
+
+    const unlocked = new Set<string>([
+        ...starterAvatarIds,
+        ...normalizedShopAvatarIds,
+        ...purchasedShopAvatarIds,
+        String(currentAvatarId || "bunny"),
+    ]);
+
+    avatarXpUnlockRules.forEach((rule) => {
+        const normalizedPlanetId = normalizePlanetId(rule.planetId);
+        const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
+        const requiredXP = Number(planetAvatarUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
+        if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+            unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, avatarCatalogIds));
+        }
+    });
+
+    return unlocked;
 };
 
     const formatDynamicPetName = (petId: string) => {
@@ -560,7 +668,13 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const AVATAR_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.avatars);
     const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
-    const STARTER_SHIP_IDS = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+    const avatarCatalogIds = useMemo(() => new Set<string>(AVATAR_OPTIONS.map((avatar) => avatar.id)), []);
+    const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
+    const STARTER_SHIP_IDS = useMemo(() => {
+        const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds));
+        return Array.from(new Set<string>(resolved.filter(Boolean)));
+    }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
 
     // State for visual properties
     const [hue, setHue] = useState(userData?.avatar?.hue || 0);
@@ -610,8 +724,9 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
                     if (threshold > 0) normalizedShips[key] = threshold;
                 });
 
-                avatarMap[d.id] = normalizedAvatars;
-                shipMap[d.id] = normalizedShips;
+                const normalizedPlanetId = normalizePlanetId(d.id);
+                avatarMap[normalizedPlanetId] = normalizedAvatars;
+                shipMap[normalizedPlanetId] = normalizedShips;
             });
             setPlanetAvatarUnlocks(avatarMap);
             setPlanetShipUnlocks(shipMap);
@@ -631,46 +746,37 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
     useEffect(() => {
         const currentAvatar = userData?.avatar?.avatarId || "bunny";
-        const purchasedShopAvatarIds = getPurchasedShopAvatarIds(userData?.purchasedShopItemIds);
-        const unlocked = new Set<string>([
-            ...STARTER_AVATAR_IDS,
-            ...(userData?.shopUnlockedAvatarIds || []),
-            ...purchasedShopAvatarIds,
-            currentAvatar
-        ]);
-
-        AVATAR_XP_UNLOCK_RULES.forEach((rule) => {
-            const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
-            const requiredXP = Number(planetAvatarUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
-            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
-                unlocked.add(rule.id);
-            }
+        const unlocked = buildUnlockedAvatarIdSet({
+            starterAvatarIds: STARTER_AVATAR_IDS,
+            shopUnlockedAvatarIds: userData?.shopUnlockedAvatarIds,
+            purchasedShopItemIds: userData?.purchasedShopItemIds,
+            currentAvatarId: currentAvatar,
+            avatarXpUnlockRules: AVATAR_XP_UNLOCK_RULES,
+            planetAvatarUnlocks,
+            planetXP: userData?.planetXP as Record<string, number> | undefined,
+            idAliases: unlockConfig.idAliases,
+            avatarCatalogIds,
         });
 
         setUnlockedAvatarIds(unlocked);
         if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
-    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, userData?.shopUnlockedAvatarIds, userData?.purchasedShopItemIds, avatarId]);
+    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, userData?.shopUnlockedAvatarIds, userData?.purchasedShopItemIds, avatarId, unlockConfig.idAliases, avatarCatalogIds]);
 
     useEffect(() => {
-        const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
-        const purchasedShopShipIds = getPurchasedShopShipIds(userData?.purchasedShopItemIds);
-        const unlocked = new Set<string>([
-            ...STARTER_SHIP_IDS,
-            ...(userData?.shopUnlockedShipIds || []),
-            ...purchasedShopShipIds,
-            currentShip,
-        ]);
-
-        SHIP_XP_UNLOCK_RULES.forEach((rule) => {
-            const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
-            const requiredXP = Number(planetShipUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
-            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
-                unlocked.add(rule.id);
-            }
+        const unlocked = buildUnlockedShipIdSet({
+            starterShipIds: STARTER_SHIP_IDS,
+            shopUnlockedShipIds: userData?.shopUnlockedShipIds,
+            purchasedShopItemIds: userData?.purchasedShopItemIds,
+            currentShipId: userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship",
+            shipXpUnlockRules: SHIP_XP_UNLOCK_RULES,
+            planetShipUnlocks,
+            planetXP: userData?.planetXP as Record<string, number> | undefined,
+            idAliases: unlockConfig.idAliases,
+            shipCatalogIds,
         });
 
         setUnlockedShipIds(unlocked);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds]);
+    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds, unlockConfig.idAliases, shipCatalogIds]);
 
     useEffect(() => {
         setPetId(getResolvedSelectedPetId(userData));
@@ -1206,7 +1312,12 @@ export default function SettingsPage() {
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
-    const STARTER_SHIP_IDS = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+    const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
+    const STARTER_SHIP_IDS = useMemo(() => {
+        const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds));
+        return Array.from(new Set<string>(resolved.filter(Boolean)));
+    }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
     const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
     const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
 
@@ -1257,7 +1368,8 @@ export default function SettingsPage() {
                     if (threshold > 0) normalizedShips[key] = threshold;
                 });
 
-                shipMap[d.id] = normalizedShips;
+                const normalizedPlanetId = normalizePlanetId(d.id);
+                shipMap[normalizedPlanetId] = normalizedShips;
             });
 
             setPlanetShipUnlocks(shipMap);
@@ -1267,25 +1379,20 @@ export default function SettingsPage() {
     }, [userData?.teacherId]);
 
     useEffect(() => {
-        const currentShip = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
-        const purchasedShopShipIds = getPurchasedShopShipIds(userData?.purchasedShopItemIds);
-        const unlocked = new Set<string>([
-            ...STARTER_SHIP_IDS,
-            ...(userData?.shopUnlockedShipIds || []),
-            ...purchasedShopShipIds,
-            currentShip,
-        ]);
-
-        SHIP_XP_UNLOCK_RULES.forEach((rule) => {
-            const currentPlanetXP = Number((userData?.planetXP || {})?.[rule.planetId] || 0);
-            const requiredXP = Number(planetShipUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
-            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
-                unlocked.add(rule.id);
-            }
+        const unlocked = buildUnlockedShipIdSet({
+            starterShipIds: STARTER_SHIP_IDS,
+            shopUnlockedShipIds: userData?.shopUnlockedShipIds,
+            purchasedShopItemIds: userData?.purchasedShopItemIds,
+            currentShipId: userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship",
+            shipXpUnlockRules: SHIP_XP_UNLOCK_RULES,
+            planetShipUnlocks,
+            planetXP: userData?.planetXP as Record<string, number> | undefined,
+            idAliases: unlockConfig.idAliases,
+            shipCatalogIds,
         });
 
         setUnlockedShipIds(unlocked);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds]);
+    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds, unlockConfig.idAliases, shipCatalogIds]);
 
     // Breadcrumb / Title Logic
     const getTitle = () => {

@@ -29,7 +29,7 @@ const Rocket = ({ size = 24, className = "" }: { size?: number, className?: stri
             src={getAssetPath(resolveShipAssetPath(shipId))}
             onError={(event) => {
                 event.currentTarget.onerror = null;
-                event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
             }}
             alt="Rocket"
             className={`object-contain ${className}`}
@@ -370,7 +370,7 @@ function ShipSettings({ userData, user }: { userData: any, user: any }) {
                         src={getAssetPath(resolveShipAssetPath(selectedShipId))}
                         onError={(event) => {
                             event.currentTarget.onerror = null;
-                            event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                            event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                         }}
                         alt="Ship"
                         className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"

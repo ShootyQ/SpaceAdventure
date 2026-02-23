@@ -117,7 +117,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                         src={getAssetPath(resolveShipAssetPath(shipModelId))}
                         onError={(event) => {
                             event.currentTarget.onerror = null;
-                            event.currentTarget.src = getAssetPath("/images/ships/finalship.png");
+                            event.currentTarget.src = getAssetPath("/images/collectibles/ships/starter/finalship.png");
                         }}
                         alt="Ship"
                         className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.25)]"

@@ -9,87 +9,73 @@
       "id": "jovi",
       "name": "Jovi Avatar",
       "planetId": "jupiter",
-      "unlockKey": "jovi"
+      "unlockKey": "jovi",
+      "channel": "xp"
     },
     {
       "id": "rusty",
       "name": "Rusty Avatar",
       "planetId": "mars",
-      "unlockKey": "rusty"
+      "unlockKey": "rusty",
+      "channel": "xp"
     },
     {
       "id": "vylaet",
       "name": "Vylaet (Secret)",
       "planetId": "mars",
-      "unlockKey": "vylaet"
+      "unlockKey": "vylaet",
+      "channel": "xp"
     }
   ],
   "ships": [
     {
-      "id": "alienship",
-      "name": "Alien Scout",
-      "planetId": "venus",
-      "unlockKey": "alienship"
-    },
-    {
-      "id": "jellyalienship",
-      "name": "Bio-Cruiser",
-      "planetId": "jupiter",
-      "unlockKey": "jellyalienship"
-    },
-    {
-      "id": "coconutship",
-      "name": "Tropical Drifter",
-      "planetId": "mars",
-      "unlockKey": "coconutship"
-    },
-    {
-      "id": "dragoneggship",
-      "name": "Dragon Scale Pod",
-      "planetId": "neptune",
-      "unlockKey": "dragoneggship"
-    },
-    {
       "id": "earth-xp-earn",
       "name": "Terra Vanguard",
       "planetId": "earth",
-      "unlockKey": "earth-xp-earn"
+      "unlockKey": "earth-xp-earn",
+      "channel": "xp"
     },
     {
       "id": "jupiter-xp-earn",
       "name": "Stormbelly Freighter",
       "planetId": "jupiter",
-      "unlockKey": "jupiter-xp-earn"
+      "unlockKey": "jupiter-xp-earn",
+      "channel": "xp"
     },
     {
       "id": "mars-xp-earn",
       "name": "Crimson Striker",
       "planetId": "mars",
-      "unlockKey": "mars-xp-earn"
+      "unlockKey": "mars-xp-earn",
+      "channel": "xp"
     },
     {
       "id": "mercury-xp-earn",
       "name": "Solar Needle",
       "planetId": "mercury",
-      "unlockKey": "mercury-xp-earn"
+      "unlockKey": "mercury-xp-earn",
+      "channel": "xp"
     },
     {
       "id": "saturn-xp-earn",
       "name": "Ringline Hauler",
       "planetId": "saturn",
-      "unlockKey": "saturn-xp-earn"
+      "unlockKey": "saturn-xp-earn",
+      "channel": "xp"
     },
     {
       "id": "uranus-xp-earn",
       "name": "Cryo Bulkrunner",
       "planetId": "uranus",
-      "unlockKey": "uranus-xp-earn"
+      "unlockKey": "uranus-xp-earn",
+      "channel": "xp"
     },
     {
       "id": "venus-xp-earn",
       "name": "Aurora Lance",
       "planetId": "venus",
-      "unlockKey": "venus-xp-earn"
+      "unlockKey": "venus-xp-earn",
+      "channel": "xp"
     }
   ]
 }

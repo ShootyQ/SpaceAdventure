@@ -515,7 +515,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
                     const planetId = (shipData.locationId || '').toLowerCase();
-                    const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
                     const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
                     const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
                     const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
@@ -527,16 +526,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const canRollPetUnlocks = userData.role === 'teacher' || userData.role === 'admin';
 
                     let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
-                    if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
-                        const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
-                        const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
-
-                        if (joviUnlockedNow) {
-                            unlocks = {
-                                avatars: ['jovi'],
-                            };
-                        }
-                    }
 
                     if (canRollPetUnlocks && Boolean(planetId)) {
                         const unlockedPetIds = rollPetUnlocksForXpEvent({
@@ -1384,7 +1373,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                             src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
                                             onError={(event) => {
                                                 event.currentTarget.onerror = null;
-                                                event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                                             }}
                                             alt="Traveling Ship"
                                                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
@@ -1556,7 +1545,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
                                                     onError={(event) => {
                                                         event.currentTarget.onerror = null;
-                                                        event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                                                     }}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
@@ -2022,7 +2011,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                             src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))} 
                                             onError={(event) => {
                                                 event.currentTarget.onerror = null;
-                                                event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                                             }}
                                             alt="Award Ship"
                                             className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
@@ -2125,7 +2114,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     src={getAssetPath(resolveShipAssetPath(id))}
                                                     onError={(event) => {
                                                         event.currentTarget.onerror = null;
-                                                        event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                                                     }}
                                                     alt={id}
                                                     className="w-16 h-16 object-contain drop-shadow-md"

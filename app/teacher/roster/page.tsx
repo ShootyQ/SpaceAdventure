@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy, Printer } from "lucide-react";
@@ -15,10 +15,30 @@ import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib
 import { getTeacherStudentLimit, isSubscriptionActive, isTeacherTrialActive } from "@/lib/subscription";
 import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
-import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig } from "@/lib/unlocks";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId } from "@/lib/unlocks";
 
 const STARTER_PET_OPTIONS = PET_OPTIONS.filter((pet) => STARTER_PET_IDS.includes(pet.id));
 const DEFAULT_STARTER_PET = STARTER_PET_OPTIONS[0]?.id || DEFAULT_PET_ID;
+
+const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+
+const readPlanetXpValue = (planetXP: Record<string, number> | undefined, planetId: string) => {
+    const normalizedPlanetId = normalizePlanetId(planetId);
+    if (!normalizedPlanetId) return 0;
+
+    const exact = Number(planetXP?.[normalizedPlanetId] || 0);
+    if (exact > 0) return exact;
+
+    const fallbackEntry = Object.entries(planetXP || {}).find(([key]) => normalizePlanetId(key) === normalizedPlanetId);
+    return Number(fallbackEntry?.[1] || 0);
+};
+
+const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
+    return (purchasedShopItemIds || [])
+        .filter((itemId) => String(itemId || "").toLowerCase().startsWith("ships/"))
+        .map((itemId) => String(itemId || "").split("/").pop() || "")
+        .filter(Boolean);
+};
 
 export default function RosterPage() {
   const { user, userData } = useAuth();
@@ -26,7 +46,12 @@ export default function RosterPage() {
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
-    const STARTER_SHIP_IDS: string[] = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+    const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
+    const STARTER_SHIP_IDS: string[] = useMemo(() => {
+        const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds));
+        return Array.from(new Set<string>(resolved.filter(Boolean)));
+    }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
     const STARTER_SHIP_OPTIONS = SHIP_OPTIONS.filter((ship) => STARTER_SHIP_IDS.includes(ship.id));
     const DEFAULT_STARTER_SHIP = STARTER_SHIP_OPTIONS[0] || SHIP_OPTIONS[0];
     const SHIP_XP_UNLOCK_RULES: Array<{ id: string; planetId: string; unlockKey: string }> = getXpUnlockRules(unlockConfig.ships);
@@ -114,7 +139,7 @@ export default function RosterPage() {
                       if (threshold > 0) normalized[key] = threshold;
                   });
 
-                  nextMap[planetDoc.id] = normalized;
+                  nextMap[normalizePlanetId(planetDoc.id)] = normalized;
               });
 
               if (!cancelled) setTeacherPlanetShipUnlocks(nextMap);
@@ -133,15 +158,25 @@ export default function RosterPage() {
   const getUnlockedShipIdsForStudent = (student?: UserData) => {
       const unlocked = new Set<string>(STARTER_SHIP_IDS);
 
+      const shopUnlockedShipIds = (student?.shopUnlockedShipIds || []).map((id) =>
+          resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds)
+      );
+      const purchasedShopShipIds = getPurchasedShopShipIds(student?.purchasedShopItemIds).map((id) =>
+          resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds)
+      );
+      shopUnlockedShipIds.forEach((id) => unlocked.add(id));
+      purchasedShopShipIds.forEach((id) => unlocked.add(id));
+
       const currentShipId = student?.spaceship?.modelId || student?.spaceship?.id;
       if (currentShipId) unlocked.add(String(currentShipId));
 
       const planetXP = (student?.planetXP || {}) as Record<string, number>;
       SHIP_XP_UNLOCK_RULES.forEach((rule) => {
-          const requiredXP = Number(teacherPlanetShipUnlocks?.[rule.planetId]?.[rule.unlockKey] || 0);
-          const currentPlanetXP = Number(planetXP?.[rule.planetId] || 0);
+          const normalizedPlanetId = normalizePlanetId(rule.planetId);
+          const requiredXP = Number(teacherPlanetShipUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
+          const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
           if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
-              unlocked.add(rule.id);
+              unlocked.add(resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, shipCatalogIds));
           }
       });
 

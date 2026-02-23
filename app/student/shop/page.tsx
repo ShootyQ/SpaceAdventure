@@ -9,6 +9,7 @@ import { ArrowLeft, Coins, LayoutDashboard, Loader2, Rocket, Sparkles } from "lu
 import { SHIP_OPTIONS } from "@/lib/ships";
 import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
+import { ensurePrefixedUnlockId } from "@/lib/unlocks";
 
 type ShopItem = {
     id: string;
@@ -36,6 +37,38 @@ const normalizeShopPetId = (petId: string) =>
         .replace(/\.[^.]+$/g, "")
         .replace(/[^a-z0-9._-]+/g, "-")
         .replace(/^-+|-+$/g, "");
+
+const toCanonicalUnlockId = (category: string, unlockId: string) => {
+    if (category === "ships") return ensurePrefixedUnlockId(unlockId, "ships");
+    if (category === "avatars") return ensurePrefixedUnlockId(unlockId, "avatars");
+    if (category === "pets") return normalizeShopPetId(unlockId);
+    return String(unlockId || "").trim();
+};
+
+const getEquivalentUnlockIds = (category: string, unlockId: string) => {
+    const raw = String(unlockId || "").trim();
+    const canonical = toCanonicalUnlockId(category, raw);
+    const options = new Set<string>([raw, canonical]);
+
+    if (category === "ships" && canonical.startsWith("ship_")) {
+        options.add(canonical.replace(/^ship_/, ""));
+    }
+    if (category === "avatars" && canonical.startsWith("avatar_")) {
+        options.add(canonical.replace(/^avatar_/, ""));
+    }
+
+    return Array.from(options).filter(Boolean);
+};
+
+const resolveRuntimeShipId = (unlockId: string) => {
+    const candidates = getEquivalentUnlockIds("ships", unlockId);
+    return candidates.find((candidate) => SHIP_OPTIONS.some((ship) => ship.id === candidate)) || unlockId;
+};
+
+const resolveRuntimeAvatarId = (unlockId: string) => {
+    const candidates = getEquivalentUnlockIds("avatars", unlockId);
+    return candidates.find((candidate) => AVATAR_OPTIONS.some((avatar) => avatar.id === candidate)) || "";
+};
 
 export default function StudentShopPage() {
     const { userData, user } = useAuth();
@@ -79,9 +112,11 @@ export default function StudentShopPage() {
             const unlockId = getUnlockIdFromItem(item.id);
             if (!unlockId) return;
 
-            if (item.category === "ships" && unlockedShipIds.has(unlockId)) owned.add(item.id);
-            if (item.category === "avatars" && unlockedAvatarIds.has(unlockId)) owned.add(item.id);
-            if (item.category === "pets" && unlockedPetIds.has(unlockId)) owned.add(item.id);
+            const equivalents = getEquivalentUnlockIds(item.category, unlockId);
+
+            if (item.category === "ships" && equivalents.some((id) => unlockedShipIds.has(id))) owned.add(item.id);
+            if (item.category === "avatars" && equivalents.some((id) => unlockedAvatarIds.has(id))) owned.add(item.id);
+            if (item.category === "pets" && equivalents.some((id) => unlockedPetIds.has(id))) owned.add(item.id);
         });
 
         setLocalPurchasedIds(owned);
@@ -240,14 +275,17 @@ export default function StudentShopPage() {
 
                 if (item.category === "ships") {
                     const unlockedShips = new Set<string>(data?.shopUnlockedShipIds || []);
-                    unlockedShips.add(unlockId);
+                    getEquivalentUnlockIds("ships", unlockId).forEach((id) => unlockedShips.add(id));
                     updates.shopUnlockedShipIds = Array.from(unlockedShips);
                 }
 
-                if (item.category === "avatars" && AVATAR_OPTIONS.some((avatar) => avatar.id === unlockId)) {
-                    const unlockedAvatars = new Set<string>(data?.shopUnlockedAvatarIds || []);
-                    unlockedAvatars.add(unlockId);
-                    updates.shopUnlockedAvatarIds = Array.from(unlockedAvatars);
+                if (item.category === "avatars") {
+                    const runtimeAvatarId = resolveRuntimeAvatarId(unlockId);
+                    if (runtimeAvatarId) {
+                        const unlockedAvatars = new Set<string>(data?.shopUnlockedAvatarIds || []);
+                        getEquivalentUnlockIds("avatars", runtimeAvatarId).forEach((id) => unlockedAvatars.add(id));
+                        updates.shopUnlockedAvatarIds = Array.from(unlockedAvatars);
+                    }
                 }
 
                 if (item.category === "pets") {
@@ -300,26 +338,27 @@ export default function StudentShopPage() {
             const userRef = doc(db, "users", user.uid);
 
             if (item.category === "ships") {
-                const ship = SHIP_OPTIONS.find((option) => option.id === unlockId);
+                const runtimeShipId = resolveRuntimeShipId(unlockId);
+                const ship = SHIP_OPTIONS.find((option) => option.id === runtimeShipId);
                 const shipType = ship?.type || "scout";
 
                 await updateDoc(userRef, {
-                    "spaceship.id": unlockId,
-                    "spaceship.modelId": unlockId,
+                    "spaceship.id": runtimeShipId,
+                    "spaceship.modelId": runtimeShipId,
                     "spaceship.type": shipType,
                 });
-                setLocalShipId(unlockId);
+                setLocalShipId(runtimeShipId);
             } else if (item.category === "avatars") {
-                const avatar = AVATAR_OPTIONS.find((option) => option.id === unlockId);
-                if (!avatar) {
+                const runtimeAvatarId = resolveRuntimeAvatarId(unlockId);
+                if (!runtimeAvatarId) {
                     setNotice("This avatar cannot be equipped yet.");
                     return;
                 }
 
                 await updateDoc(userRef, {
-                    "avatar.avatarId": avatar.id,
+                    "avatar.avatarId": runtimeAvatarId,
                 });
-                setLocalAvatarId(avatar.id);
+                setLocalAvatarId(runtimeAvatarId);
             } else if (item.category === "pets") {
                 const normalizedPetId = normalizeShopPetId(unlockId);
                 if (!normalizedPetId) {
@@ -434,15 +473,18 @@ export default function StudentShopPage() {
                                         const isPurchasing = purchasingItemId === item.id;
                                         const isEquipping = equippingItemId === item.id;
                                         const unlockId = getUnlockIdFromItem(item.id);
+                                        const runtimeShipId = item.category === "ships" ? resolveRuntimeShipId(unlockId) : "";
+                                        const runtimeAvatarId = item.category === "avatars" ? resolveRuntimeAvatarId(unlockId) : "";
+                                        const runtimePetId = item.category === "pets" ? normalizeShopPetId(unlockId) : "";
                                         const isEquippable =
                                             (item.category === "ships") ||
-                                            (item.category === "avatars" && AVATAR_OPTIONS.some((avatar) => avatar.id === unlockId)) ||
+                                            (item.category === "avatars" && Boolean(runtimeAvatarId)) ||
                                             (item.category === "pets");
 
                                         const isEquipped =
-                                            (item.category === "ships" && localShipId === unlockId) ||
-                                            (item.category === "avatars" && localAvatarId === unlockId) ||
-                                            (item.category === "pets" && localPetId === unlockId);
+                                            (item.category === "ships" && localShipId === runtimeShipId) ||
+                                            (item.category === "avatars" && localAvatarId === runtimeAvatarId) ||
+                                            (item.category === "pets" && localPetId === runtimePetId);
 
                                         return (
                                             <div key={item.id} className="border border-cyan-800/50 bg-black/40 rounded-xl p-4">

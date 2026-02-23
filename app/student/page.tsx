@@ -29,7 +29,7 @@ const DEFAULT_RANKS: Rank[] = [
 // Custom Icon
 const Rocket = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
     <img 
-        src={getAssetPath("/images/ships/finalship.png")}
+        src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
         alt="Rocket"
         className={`object-contain ${className}`}
         style={{ width: size, height: size }}
@@ -170,7 +170,7 @@ export default function StudentConsole() {
                                         src={getAssetPath(resolveShipAssetPath(selectedShipId))}
                                         onError={(event) => {
                                             event.currentTarget.onerror = null;
-                                            event.currentTarget.src = getAssetPath('/images/ships/finalship.png');
+                                            event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                                         }}
                                         alt="Current Ship"
                                         className="w-full h-full object-contain drop-shadow-[0_0_16px_rgba(34,211,238,0.35)]"

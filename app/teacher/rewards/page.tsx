@@ -16,7 +16,7 @@ import Link from "next/link";
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
     return (
         <img 
-            src={getAssetPath("/images/ships/finalship.png")}
+            src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
             alt="Rocket"
             className={`object-contain ${className}`}
             style={{ width: size, height: size }}
@@ -483,7 +483,7 @@ export default function RewardsPage() {
                                                         src={getAssetPath(resolveShipAssetPath(selectedShipId))}
                                                         onError={(event) => {
                                                             event.currentTarget.onerror = null;
-                                                            event.currentTarget.src = getAssetPath("/images/ships/finalship.png");
+                                                            event.currentTarget.src = getAssetPath("/images/collectibles/ships/starter/finalship.png");
                                                         }}
                                                         className="w-full h-full object-contain relative z-20 scale-75"
                                                         alt="Rocket"
