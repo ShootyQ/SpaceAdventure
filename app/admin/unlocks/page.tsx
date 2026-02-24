@@ -428,11 +428,14 @@ export default function AdminUnlocksPage() {
         const nextMethod: PetUnlockMethod = row.method === "starter" || row.method === "unassigned" ? row.method : "chance";
         const nextScope: PetUnlockScope = row.scope === "planet" ? "planet" : "any";
 
-        nextPetAssignments[normalizedPetId] = {
+        const nextAssignment: PetUnlockAssignment = {
           method: nextMethod,
           scope: nextScope,
-          planetId: nextScope === "planet" ? normalizePlanetValue(row.planetId) : undefined,
         };
+        if (nextScope === "planet") {
+          nextAssignment.planetId = normalizePlanetValue(row.planetId);
+        }
+        nextPetAssignments[normalizedPetId] = nextAssignment;
 
         const trimmedName = String(row.name || "").trim();
         if (trimmedName && trimmedName !== row.sourceName) {
