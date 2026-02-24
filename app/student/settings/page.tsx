@@ -27,6 +27,7 @@ const Rocket = ({ size = 24, className = "" }: { size?: number, className?: stri
 );
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 
 const SHIP_COLORS = [
     { name: "Nebula Blue", class: "text-blue-400", bg: "bg-blue-400" },
@@ -36,10 +37,6 @@ const SHIP_COLORS = [
     { name: "Void Purple", class: "text-purple-400", bg: "bg-purple-400" },
     { name: "Ice Cyan", class: "text-cyan-400", bg: "bg-cyan-400" },
 ];
-
-const STARTER_AVATAR_IDS: string[] = AVATAR_OPTIONS
-    .filter((avatar) => String(avatar.src || "").includes("/collectibles/avatars/starter/"))
-    .map((avatar) => avatar.id);
 
 const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
     return (purchasedShopItemIds || [])
@@ -670,6 +667,11 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
     const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
     const avatarCatalogIds = useMemo(() => new Set<string>(AVATAR_OPTIONS.map((avatar) => avatar.id)), []);
     const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
+    const STARTER_AVATAR_IDS = useMemo(() => {
+        const starters = unlockConfig.starters?.avatars?.length ? unlockConfig.starters.avatars : ["bunny"];
+        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, avatarCatalogIds));
+        return Array.from(new Set<string>(resolved.filter(Boolean)));
+    }, [unlockConfig.starters?.avatars, unlockConfig.idAliases, avatarCatalogIds]);
     const STARTER_SHIP_IDS = useMemo(() => {
         const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
         const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds));
@@ -760,7 +762,7 @@ function AvatarConfigView({ onBack }: { onBack: () => void }) {
 
         setUnlockedAvatarIds(unlocked);
         if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
-    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, userData?.shopUnlockedAvatarIds, userData?.purchasedShopItemIds, avatarId, unlockConfig.idAliases, avatarCatalogIds]);
+    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, userData?.shopUnlockedAvatarIds, userData?.purchasedShopItemIds, avatarId, STARTER_AVATAR_IDS, unlockConfig.idAliases, avatarCatalogIds]);
 
     useEffect(() => {
         const unlocked = buildUnlockedShipIdSet({
@@ -1308,6 +1310,7 @@ const DEFAULT_RANKS: Rank[] = [
 
 export default function SettingsPage() {
     const { userData, user } = useAuth();
+    const searchParams = useSearchParams();
     const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
@@ -1320,6 +1323,13 @@ export default function SettingsPage() {
     }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
     const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
     const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
+
+    useEffect(() => {
+        const requestedView = String(searchParams?.get("view") || "").toLowerCase();
+        if (requestedView === "ship" || requestedView === "inventory" || requestedView === "avatar" || requestedView === "avatar-config" || requestedView === "flag" || requestedView === "cockpit") {
+            setView(requestedView as typeof view);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
@@ -1415,14 +1425,14 @@ export default function SettingsPage() {
                 {/* Header Navigation */}
                 <div className="flex items-center gap-4 mb-8">
                     {view === 'cockpit' ? (
-                        <Link href="/student" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                        <Link href="/student/studentnavigation" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                             <ArrowLeft size={20} />
                             <span className="sr-only">Exit Cockpit</span>
                         </Link>
                     ) : (
-                        <button onClick={() => setView(view === 'avatar-config' ? 'avatar' : 'cockpit')} className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
+                        <Link href="/student/studentnavigation" className="p-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/50 hover:text-white transition-all">
                             <LayoutDashboard size={20} />
-                        </button>
+                        </Link>
                     )}
 
                     <div>

@@ -63,7 +63,7 @@ type EditableRow = {
 };
 
 const METHOD_OPTIONS: EarnMethod[] = ["xp", "chance", "shop", "starter", "unassigned"];
-const PET_METHOD_OPTIONS: EarnMethod[] = ["chance", "starter", "unassigned"];
+const PET_METHOD_OPTIONS: EarnMethod[] = ["chance", "shop", "starter", "unassigned"];
 const SHOP_METHOD_OPTIONS: EarnMethod[] = ["shop"];
 const UNLOCK_RULE_CHANNELS = new Set<UnlockChannel>(["xp", "chance", "shop"]);
 
@@ -428,7 +428,7 @@ export default function AdminUnlocksPage() {
         const normalizedPetId = String(row.id || "").trim().toLowerCase();
         if (!normalizedPetId) return;
 
-        const nextMethod: PetUnlockMethod = row.method === "starter" || row.method === "unassigned" ? row.method : "chance";
+        const nextMethod: PetUnlockMethod = row.method === "starter" || row.method === "unassigned" || row.method === "shop" ? row.method : "chance";
         const nextScope: PetUnlockScope = row.scope === "planet" ? "planet" : "any";
 
         const nextAssignment: PetUnlockAssignment = {

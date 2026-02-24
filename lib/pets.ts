@@ -27,7 +27,7 @@ export interface PetUnlockChanceConfig {
     };
 }
 
-export type PetUnlockMethod = "chance" | "starter" | "unassigned";
+export type PetUnlockMethod = "chance" | "shop" | "starter" | "unassigned";
 export type PetUnlockScope = "planet" | "any";
 
 export interface PetUnlockAssignment {
@@ -178,7 +178,7 @@ export const normalizePetUnlockAssignments = (raw?: Record<string, any> | null):
         if (!normalizedPetId) return;
 
         const methodRaw = String((value as any)?.method || "chance").trim().toLowerCase();
-        const method: PetUnlockMethod = (methodRaw === "starter" || methodRaw === "unassigned") ? methodRaw : "chance";
+        const method: PetUnlockMethod = (methodRaw === "starter" || methodRaw === "unassigned" || methodRaw === "shop") ? methodRaw : "chance";
 
         const scopeRaw = String((value as any)?.scope || "any").trim().toLowerCase();
         const scope: PetUnlockScope = scopeRaw === "planet" ? "planet" : "any";

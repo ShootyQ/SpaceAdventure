@@ -201,7 +201,7 @@ export default function StudentConsole() {
 
                     {/* Overlay Controls for Student */}
                     <div className="absolute top-6 left-6 z-30">
-                        <Link href="/student/settings" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
+                        <Link href="/student/studentnavigation" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
                             <Settings size={20} />
                             <span className="hidden md:inline font-bold">Back to Cockpit</span>
                         </Link>

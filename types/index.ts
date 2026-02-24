@@ -100,6 +100,7 @@ export interface AvatarConfig {
     activeHat?: string;
     hat?: string; // Legacy support if needed
     avatarId?: string;
+    name?: string;
 }
 
 export interface UserData {
@@ -139,6 +140,7 @@ export interface UserData {
     completedMissions?: string[];
     missionProgress?: Record<string, MissionProgress>;
     selectedPetId?: string;
+    selectedPetName?: string;
     unlockedPetIds?: string[];
     purchasedShopItemIds?: string[];
     shopUnlockedShipIds?: string[];

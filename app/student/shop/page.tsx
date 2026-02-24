@@ -393,7 +393,7 @@ export default function StudentShopPage() {
             <div className="max-w-6xl mx-auto space-y-6">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <Link href="/student/settings" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
+                        <Link href="/student/studentnavigation" className="p-2 rounded-full border border-cyan-500/30 hover:bg-cyan-900/20 text-cyan-500">
                             <ArrowLeft size={20} />
                         </Link>
                         <div>
@@ -412,7 +412,7 @@ export default function StudentShopPage() {
                         <div className="flex items-center gap-2 text-emerald-300 font-bold uppercase tracking-wider text-sm"><LayoutDashboard size={16} /> Spaceship Interior</div>
                         <div className="text-xs text-emerald-200/70 mt-1">Visit your interior and view your current setup.</div>
                     </Link>
-                    <Link href="/student/settings" className="border border-purple-500/30 bg-purple-950/20 rounded-xl p-4 hover:border-purple-400 transition-colors">
+                    <Link href="/student/studentnavigation" className="border border-purple-500/30 bg-purple-950/20 rounded-xl p-4 hover:border-purple-400 transition-colors">
                         <div className="flex items-center gap-2 text-purple-300 font-bold uppercase tracking-wider text-sm"><Sparkles size={16} /> DNA Sequencer</div>
                         <div className="text-xs text-purple-200/70 mt-1">Open pilot customization and identity controls.</div>
                     </Link>

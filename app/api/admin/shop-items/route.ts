@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { AVATAR_OPTIONS } from "@/components/UserAvatar";
+import { PET_OPTIONS, normalizePetUnlockAssignments } from "@/lib/pets";
+import { resolveShipAssetPath } from "@/lib/ships";
+import { normalizeUnlockConfig } from "@/lib/unlocks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,11 +143,52 @@ async function getConfiguredNameOverrides(): Promise<Record<string, string>> {
   }
 }
 
+async function getUnlockConfigSafe() {
+  try {
+    const adminDb = await getAdminDbSafe();
+    if (!adminDb) return normalizeUnlockConfig(null);
+
+    const snapshot = await adminDb.doc("game-config/unlocks").get();
+    return normalizeUnlockConfig((snapshot.data() as any) || null);
+  } catch (error) {
+    console.error("Failed to read unlock config for shop inventory map:", error);
+    return normalizeUnlockConfig(null);
+  }
+}
+
+async function getCollectiblesConfigSafe() {
+  try {
+    const adminDb = await getAdminDbSafe();
+    if (!adminDb) return { petUnlockAssignments: {}, petNameOverrides: {} };
+
+    const snapshot = await adminDb.doc("game-config/collectibles").get();
+    const raw = (snapshot.data() as any) || {};
+
+    const petUnlockAssignments = normalizePetUnlockAssignments(raw?.petUnlockAssignments || null);
+    const rawNameOverrides = raw?.petNameOverrides || {};
+    const petNameOverrides: Record<string, string> = {};
+
+    Object.entries(rawNameOverrides).forEach(([petId, value]) => {
+      const normalizedId = String(petId || "").trim().toLowerCase();
+      const nextName = String(value || "").trim();
+      if (!normalizedId || !nextName) return;
+      petNameOverrides[normalizedId] = nextName;
+    });
+
+    return { petUnlockAssignments, petNameOverrides };
+  } catch (error) {
+    console.error("Failed to read collectibles config for shop inventory map:", error);
+    return { petUnlockAssignments: {}, petNameOverrides: {} };
+  }
+}
+
 async function getDiscoveredShopItems(): Promise<ShopItem[]> {
   const path = await import("node:path");
-  const [configuredPrices, configuredNameOverrides, legacyRoot, categoryRoots] = await Promise.all([
+  const [configuredPrices, configuredNameOverrides, unlockConfig, collectiblesConfig, legacyRoot, categoryRoots] = await Promise.all([
     getConfiguredPrices(),
     getConfiguredNameOverrides(),
+    getUnlockConfigSafe(),
+    getCollectiblesConfigSafe(),
     resolveShopAssetRoot(),
     Promise.all(SHOP_CATEGORIES.map((category) => resolveCategoryShopRoot(category))),
   ]);
@@ -215,6 +260,74 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       category,
       imagePath,
       price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
+    });
+  });
+
+  const addConfigShopItem = ({
+    category,
+    unlockId,
+    displayName,
+    imagePath,
+  }: {
+    category: "ships" | "avatars" | "pets";
+    unlockId: string;
+    displayName: string;
+    imagePath: string;
+  }) => {
+    const normalizedUnlockId = String(unlockId || "").trim().toLowerCase();
+    if (!normalizedUnlockId) return;
+
+    const id = `${category}/${normalizedUnlockId}`;
+    if (dedupe.has(id)) return;
+    dedupe.add(id);
+
+    const configuredPrice = configuredPrices[id];
+    const configuredName = configuredNameOverrides[id];
+
+    items.push({
+      id,
+      name: configuredName || String(displayName || normalizedUnlockId),
+      category,
+      imagePath,
+      price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
+    });
+  };
+
+  (unlockConfig.ships || []).forEach((rule) => {
+    if (String(rule.channel || "").toLowerCase() !== "shop") return;
+    const unlockId = String(rule.unlockKey || rule.id || "").trim();
+    addConfigShopItem({
+      category: "ships",
+      unlockId,
+      displayName: String(rule.name || unlockId),
+      imagePath: resolveShipAssetPath(unlockId),
+    });
+  });
+
+  (unlockConfig.avatars || []).forEach((rule) => {
+    if (String(rule.channel || "").toLowerCase() !== "shop") return;
+    const unlockId = String(rule.unlockKey || rule.id || "").trim();
+    const avatarOption = AVATAR_OPTIONS.find((avatar) => avatar.id === unlockId || avatar.id === String(rule.id || "").trim());
+    addConfigShopItem({
+      category: "avatars",
+      unlockId,
+      displayName: String(rule.name || avatarOption?.name || unlockId),
+      imagePath: String(avatarOption?.src || `/images/collectibles/avatars/shop/${unlockId}.png`),
+    });
+  });
+
+  Object.entries(collectiblesConfig.petUnlockAssignments || {}).forEach(([petId, assignment]) => {
+    if (String((assignment as any)?.method || "").toLowerCase() !== "shop") return;
+
+    const normalizedPetId = String(petId || "").trim().toLowerCase();
+    if (!normalizedPetId) return;
+
+    const petOption = PET_OPTIONS.find((pet) => String(pet.id || "").trim().toLowerCase() === normalizedPetId);
+    addConfigShopItem({
+      category: "pets",
+      unlockId: normalizedPetId,
+      displayName: String(collectiblesConfig.petNameOverrides?.[normalizedPetId] || petOption?.name || normalizedPetId),
+      imagePath: String(petOption?.imageSrc || `/images/collectibles/pets/shop/${normalizedPetId}.png`),
     });
   });
 
