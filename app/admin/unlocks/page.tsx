@@ -66,6 +66,7 @@ const METHOD_OPTIONS: EarnMethod[] = ["xp", "chance", "shop", "starter", "unassi
 const PET_METHOD_OPTIONS: EarnMethod[] = ["chance", "shop", "starter", "unassigned"];
 const SHOP_METHOD_OPTIONS: EarnMethod[] = ["shop"];
 const UNLOCK_RULE_CHANNELS = new Set<UnlockChannel>(["xp", "chance", "shop"]);
+const DEFAULT_SHOP_PRICE = 100;
 
 const toIntMin = (value: unknown, minValue: number) => {
   const numeric = Number(value);
@@ -87,6 +88,15 @@ const normalizePlanetValue = (value?: string) => {
   return PLANET_OPTIONS.some((planet) => planet.id === normalized) ? normalized : firstPlanetId;
 };
 
+const toShopConfigItemId = (category: string, id: string) => {
+  return `${String(category || "misc").trim().toLowerCase()}/${String(id || "").trim().toLowerCase()}`;
+};
+
+const getShopConfigIdForRow = (row: EditableRow) => {
+  if (row.domain === "shop") return String(row.id || "").trim().toLowerCase();
+  return toShopConfigItemId(row.category, row.id);
+};
+
 const getRuleForItem = (rules: UnlockRule[], itemId: string, kind: "ships" | "avatars") => {
   const normalizedId = String(itemId || "").trim();
   const canonicalId = ensurePrefixedUnlockId(normalizedId, kind);
@@ -98,7 +108,11 @@ const getRuleForItem = (rules: UnlockRule[], itemId: string, kind: "ships" | "av
   });
 };
 
-const buildUnlockRows = (unlockConfig: UnlockConfig): EditableRow[] => {
+const buildUnlockRows = (
+  unlockConfig: UnlockConfig,
+  shopPrices: Record<string, number>,
+  shopNameOverrides: Record<string, string>
+): EditableRow[] => {
   const starterShipSet = new Set(unlockConfig.starters?.ships || []);
   const starterAvatarSet = new Set(unlockConfig.starters?.avatars || []);
 
@@ -112,17 +126,21 @@ const buildUnlockRows = (unlockConfig: UnlockConfig): EditableRow[] => {
 
     const normalizedPlanet = normalizePlanetValue(rule?.planetId);
     const scope: ScopeMode = normalizedPlanet === "any" ? "any" : "planet";
+    const shopItemId = toShopConfigItemId("ships", ship.id);
+    const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
+    const resolvedName = String(rule?.name || ship.name || ship.id);
 
     return {
       key: `ship:${ship.id}`,
       domain: "ship",
       id: ship.id,
-      name: String(rule?.name || ship.name || ship.id),
+      name: String((method === "shop" ? shopNameOverrides[shopItemId] : "") || resolvedName),
       sourceName: String(ship.name || ship.id),
       category: "ships",
       method,
       scope,
       planetId: scope === "planet" ? normalizedPlanet : firstPlanetId,
+      price: method === "shop" ? shopPrice : undefined,
       assetPath: ship.assetPath,
       existingRuleId: rule?.id,
       existingUnlockKey: rule?.unlockKey,
@@ -139,17 +157,21 @@ const buildUnlockRows = (unlockConfig: UnlockConfig): EditableRow[] => {
 
     const normalizedPlanet = normalizePlanetValue(rule?.planetId);
     const scope: ScopeMode = normalizedPlanet === "any" ? "any" : "planet";
+    const shopItemId = toShopConfigItemId("avatars", avatar.id);
+    const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
+    const resolvedName = String(rule?.name || avatar.name || avatar.id);
 
     return {
       key: `avatar:${avatar.id}`,
       domain: "avatar",
       id: avatar.id,
-      name: String(rule?.name || avatar.name || avatar.id),
+      name: String((method === "shop" ? shopNameOverrides[shopItemId] : "") || resolvedName),
       sourceName: String(avatar.name || avatar.id),
       category: "avatars",
       method,
       scope,
       planetId: scope === "planet" ? normalizedPlanet : firstPlanetId,
+      price: method === "shop" ? shopPrice : undefined,
       assetPath: avatar.src,
       existingRuleId: rule?.id,
       existingUnlockKey: rule?.unlockKey,
@@ -161,24 +183,30 @@ const buildUnlockRows = (unlockConfig: UnlockConfig): EditableRow[] => {
 
 const buildPetRows = (
   petAssignments: Record<string, PetUnlockAssignment>,
-  petNameOverrides: Record<string, string>
+  petNameOverrides: Record<string, string>,
+  shopPrices: Record<string, number>,
+  shopNameOverrides: Record<string, string>
 ): EditableRow[] => {
   return PET_OPTIONS.map((pet) => {
     const assignment = petAssignments[String(pet.id || "").toLowerCase()];
     const resolvedMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
     const resolvedScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
     const resolvedPlanetId = normalizePlanetValue(assignment?.planetId || pet.unlockPlanetId || firstPlanetId);
+    const shopItemId = toShopConfigItemId("pets", pet.id);
+    const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
+    const resolvedBaseName = String(petNameOverrides[pet.id] || pet.name || pet.id);
 
     return {
       key: `pet:${pet.id}`,
       domain: "pet",
       id: pet.id,
-      name: String(petNameOverrides[pet.id] || pet.name || pet.id),
+      name: String((resolvedMethod === "shop" ? shopNameOverrides[shopItemId] : "") || resolvedBaseName),
       sourceName: String(pet.name || pet.id),
       category: "pets",
       method: resolvedMethod,
       scope: resolvedScope,
       planetId: resolvedScope === "planet" ? resolvedPlanetId : firstPlanetId,
+      price: resolvedMethod === "shop" ? shopPrice : undefined,
       rarity: pet.rarity,
       assetPath: pet.imageSrc,
     };
@@ -203,7 +231,7 @@ const buildShopRows = (
     scope: "any",
     planetId: firstPlanetId,
     assetPath: item.imagePath,
-    price: toIntMin(shopPrices[item.id] ?? item.price, 0),
+    price: toIntMin(shopPrices[normalizedItemId] ?? item.price, 0),
     lockedMethod: true,
   };
   });
@@ -317,11 +345,18 @@ export default function AdminUnlocksPage() {
     if (!unlockLoaded || !collectiblesLoaded || !shopLoaded || !shopInventoryLoaded) return;
     if (initializedRows) return;
 
-    const nextRows = [
-      ...buildUnlockRows(unlockConfig),
-      ...buildPetRows(petAssignments, petNameOverrides),
-      ...buildShopRows(shopItems, shopPrices, shopNameOverrides),
-    ];
+    const unlockRows = buildUnlockRows(unlockConfig, shopPrices, shopNameOverrides);
+    const petRows = buildPetRows(petAssignments, petNameOverrides, shopPrices, shopNameOverrides);
+    const discoveredShopRows = buildShopRows(shopItems, shopPrices, shopNameOverrides);
+
+    const managedShopItemIds = new Set<string>([
+      ...unlockRows.map((row) => getShopConfigIdForRow(row)),
+      ...petRows.map((row) => getShopConfigIdForRow(row)),
+    ]);
+
+    const shopRows = discoveredShopRows.filter((row) => !managedShopItemIds.has(getShopConfigIdForRow(row)));
+
+    const nextRows = [...unlockRows, ...petRows, ...shopRows];
 
     setRows(nextRows);
     setInitializedRows(true);
@@ -361,11 +396,16 @@ export default function AdminUnlocksPage() {
     updateRow(key, (row) => {
       const method = row.lockedMethod ? row.method : nextMethod;
       const needsScope = method === "xp" || method === "chance";
+      const shopItemId = getShopConfigIdForRow(row);
+      const nextPrice = method === "shop"
+        ? toIntMin(row.price ?? shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0)
+        : row.price;
       return {
         ...row,
         method,
         scope: needsScope ? row.scope : "any",
         planetId: needsScope ? row.planetId : firstPlanetId,
+        price: nextPrice,
       };
     });
   };
@@ -382,7 +422,6 @@ export default function AdminUnlocksPage() {
       const shipRows = rows.filter((row) => row.domain === "ship");
       const avatarRows = rows.filter((row) => row.domain === "avatar");
       const petRows = rows.filter((row) => row.domain === "pet");
-      const shopRows = rows.filter((row) => row.domain === "shop");
 
       const nextStarterShips = shipRows.filter((row) => row.method === "starter").map((row) => row.id);
       const nextStarterAvatars = avatarRows.filter((row) => row.method === "starter").map((row) => row.id);
@@ -398,7 +437,7 @@ export default function AdminUnlocksPage() {
               id: row.existingRuleId || ensurePrefixedUnlockId(row.id, kind),
               name: String(row.name || row.id).trim() || row.id,
               planetId: channel === "xp" || channel === "chance" ? normalizedPlanet : "",
-              unlockKey: row.existingUnlockKey || row.id,
+              unlockKey: row.id,
               channel,
             };
           });
@@ -448,12 +487,21 @@ export default function AdminUnlocksPage() {
 
       const nextShopPrices: Record<string, number> = {};
       const nextShopNames: Record<string, string> = {};
+      const shopBackedRows = rows.filter((row) => row.method === "shop" || row.domain === "shop");
+      const prioritizedRows = [...shopBackedRows].sort((a, b) => {
+        if (a.domain === b.domain) return 0;
+        if (a.domain === "shop") return 1;
+        if (b.domain === "shop") return -1;
+        return 0;
+      });
+      const seenShopIds = new Set<string>();
 
-      shopRows.forEach((row) => {
-        const normalizedItemId = String(row.id || "").trim().toLowerCase();
-        if (!normalizedItemId) return;
+      prioritizedRows.forEach((row) => {
+        const normalizedItemId = getShopConfigIdForRow(row);
+        if (!normalizedItemId || seenShopIds.has(normalizedItemId)) return;
+        seenShopIds.add(normalizedItemId);
 
-        nextShopPrices[normalizedItemId] = toIntMin(row.price ?? 0, 0);
+        nextShopPrices[normalizedItemId] = toIntMin(row.price ?? shopPrices[normalizedItemId] ?? DEFAULT_SHOP_PRICE, 0);
 
         const trimmedName = String(row.name || "").trim();
         nextShopNames[normalizedItemId] = trimmedName || row.sourceName || row.id;
@@ -687,18 +735,14 @@ export default function AdminUnlocksPage() {
 
                       <td className="px-3 py-2">
                         {showPrice ? (
-                          row.domain === "shop" ? (
-                            <input
-                              type="number"
-                              min={0}
-                              value={row.price ?? 0}
-                              onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, price: toIntMin(e.target.value, 0) }))}
-                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
-                              aria-label={`Price for ${row.id}`}
-                            />
-                          ) : (
-                            <span className="text-xs text-slate-500">Managed by shop assets</span>
-                          )
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.price ?? 0}
+                            onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, price: toIntMin(e.target.value, 0) }))}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                            aria-label={`Price for ${row.id}`}
+                          />
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
                         )}
