@@ -166,14 +166,19 @@ const normalizeRule = (raw: any): UnlockRule | null => {
 
   const rarity = String(raw?.rarity || "").trim() || undefined;
 
-  return {
+  const normalizedRule: UnlockRule = {
     id,
     name,
     planetId,
     unlockKey,
     channel: channel || "xp",
-    rarity,
   };
+
+  if (rarity) {
+    normalizedRule.rarity = rarity;
+  }
+
+  return normalizedRule;
 };
 
 const normalizeRuleArray = (rawArray: any): UnlockRule[] => {

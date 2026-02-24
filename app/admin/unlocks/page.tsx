@@ -534,7 +534,7 @@ export default function AdminUnlocksPage() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="mt-1 w-full bg-transparent text-sm outline-none"
+            className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-blue-400"
           >
             {categories.map((category) => (
               <option key={category} value={category}>
@@ -549,7 +549,7 @@ export default function AdminUnlocksPage() {
           <select
             value={methodFilter}
             onChange={(e) => setMethodFilter(e.target.value)}
-            className="mt-1 w-full bg-transparent text-sm outline-none"
+            className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-blue-400"
           >
             <option value="all">all</option>
             {METHOD_OPTIONS.map((method) => (
@@ -635,7 +635,7 @@ export default function AdminUnlocksPage() {
                           value={row.method}
                           onChange={(e) => updateMethod(row.key, e.target.value as EarnMethod)}
                           disabled={row.lockedMethod}
-                          className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100"
+                          className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-500"
                           aria-label={`Method for ${row.id}`}
                         >
                           {rowMethodOptions.map((method) => (
@@ -651,7 +651,7 @@ export default function AdminUnlocksPage() {
                           <select
                             value={row.scope}
                             onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, scope: e.target.value as ScopeMode }))}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                            className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-blue-400"
                             aria-label={`Scope for ${row.id}`}
                           >
                             <option value="planet">planet</option>
@@ -667,7 +667,7 @@ export default function AdminUnlocksPage() {
                           <select
                             value={row.planetId}
                             onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, planetId: normalizePlanetValue(e.target.value) }))}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                            className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-blue-400"
                             aria-label={`Planet for ${row.id}`}
                           >
                             {PLANET_OPTIONS.map((planet) => (
