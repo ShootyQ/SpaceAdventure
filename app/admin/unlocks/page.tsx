@@ -190,11 +190,13 @@ const buildShopRows = (
   shopPrices: Record<string, number>,
   shopNameOverrides: Record<string, string>
 ): EditableRow[] => {
-  return shopItems.map((item) => ({
+  return shopItems.map((item) => {
+    const normalizedItemId = String(item.id || "").trim().toLowerCase();
+    return {
     key: `shop:${item.id}`,
     domain: "shop",
     id: item.id,
-    name: String(shopNameOverrides[item.id] || item.name || item.id),
+    name: String(shopNameOverrides[normalizedItemId] || item.name || item.id),
     sourceName: String(item.name || item.id),
     category: String(item.category || "misc").toLowerCase(),
     method: "shop",
@@ -203,7 +205,8 @@ const buildShopRows = (
     assetPath: item.imagePath,
     price: toIntMin(shopPrices[item.id] ?? item.price, 0),
     lockedMethod: true,
-  }));
+  };
+  });
 };
 
 export default function AdminUnlocksPage() {
@@ -453,9 +456,7 @@ export default function AdminUnlocksPage() {
         nextShopPrices[normalizedItemId] = toIntMin(row.price ?? 0, 0);
 
         const trimmedName = String(row.name || "").trim();
-        if (trimmedName && trimmedName !== row.sourceName) {
-          nextShopNames[normalizedItemId] = trimmedName;
-        }
+        nextShopNames[normalizedItemId] = trimmedName || row.sourceName || row.id;
       });
 
       await Promise.all([
