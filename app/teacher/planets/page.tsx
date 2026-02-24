@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { collection, onSnapshot, doc, updateDoc, setDoc, query, where } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Save, Globe, Gift, Database, Star } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Gift, Database, Star, RotateCcw } from "lucide-react";
 import { PLANETS } from "@/types"; // Using types instead of redeclaring
 import { AVATAR_OPTIONS, UserAvatar } from "@/components/UserAvatar";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
@@ -32,6 +32,12 @@ interface PlanetState extends PlanetData {
 }
 
 const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+
+const toIntMin = (value: unknown, minimum: number) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return minimum;
+    return Math.max(Math.floor(numeric), minimum);
+};
 
 export default function PlanetManagementPage() {
     const { user } = useAuth();
@@ -94,6 +100,14 @@ export default function PlanetManagementPage() {
         setPlanets(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
+    const handleNumberChange = (planetId: string, field: "xpGoal" | "currentXP", value: string, minValue: number) => {
+        setPlanets(prev => prev.map((p) => {
+            if (p.id !== planetId) return p;
+            if (value.trim() === "") return { ...p, [field]: minValue };
+            return { ...p, [field]: toIntMin(value, minValue) };
+        }));
+    };
+
     const handleAvatarUnlockChange = (planetId: string, avatarKey: string, value: string) => {
         const numeric = Number(value);
         setPlanets(prev => prev.map(p => {
@@ -126,12 +140,12 @@ export default function PlanetManagementPage() {
         try {
             const avatarUnlocks: Record<string, number> = {};
             Object.entries(planet.unlocks?.avatars || {}).forEach(([key, value]) => {
-                const threshold = Number(value || 0);
+                const threshold = toIntMin(value, 1);
                 if (threshold > 0) avatarUnlocks[key] = threshold;
             });
             const shipUnlocks: Record<string, number> = {};
             Object.entries(planet.unlocks?.ships || {}).forEach(([key, value]) => {
-                const threshold = Number(value || 0);
+                const threshold = toIntMin(value, 1);
                 if (threshold > 0) shipUnlocks[key] = threshold;
             });
             const unlocksToSave = { ships: shipUnlocks, avatars: avatarUnlocks };
@@ -139,7 +153,8 @@ export default function PlanetManagementPage() {
             // Save to subcollection
             await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
                 id: planet.id,
-                xpGoal: Number(planet.xpGoal),
+                xpGoal: toIntMin(planet.xpGoal, 1),
+                currentXP: toIntMin(planet.currentXP, 0),
                 rewardName: planet.rewardName,
                 rewardDescription: planet.rewardDescription,
                 unlocks: unlocksToSave,
@@ -215,10 +230,39 @@ export default function PlanetManagementPage() {
                                          <input 
                                             type="number"
                                             value={planet.xpGoal}
-                                            onChange={(e) => handleChange(planet.id, 'xpGoal', e.target.value)}
-                                            className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none transition-colors"
+                                                          min={1}
+                                                          step={1}
+                                                          title="XP goal"
+                                                          aria-label={`XP goal for ${planet.name}`}
+                                                          onChange={(e) => handleNumberChange(planet.id, "xpGoal", e.target.value, 1)}
+                                                          className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                          />
                                      </div>
+
+                                                 <div>
+                                                      <label className="block text-xs uppercase tracking-wider text-cyan-600 mb-1">Current XP</label>
+                                                      <div className="flex gap-2">
+                                                            <input
+                                                                type="number"
+                                                                value={planet.currentXP}
+                                                                min={0}
+                                                                step={1}
+                                                                title="Current XP"
+                                                                aria-label={`Current XP for ${planet.name}`}
+                                                                onChange={(e) => handleNumberChange(planet.id, "currentXP", e.target.value, 0)}
+                                                                className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleChange(planet.id, "currentXP", 0)}
+                                                                className="px-3 bg-black/50 border border-cyan-800 rounded text-cyan-300 hover:border-cyan-500 hover:text-cyan-200 transition-colors"
+                                                                aria-label={`Reset ${planet.name} current XP`}
+                                                                title="Reset current XP"
+                                                            >
+                                                                <RotateCcw size={14} />
+                                                            </button>
+                                                      </div>
+                                                 </div>
                                      
                                      <div className="border-t border-cyan-900/30 pt-4 mt-4">
                                          <label className="block text-xs uppercase tracking-wider text-yellow-500 mb-2 flex items-center gap-2">
@@ -271,8 +315,12 @@ export default function PlanetManagementPage() {
                                                                         type="number"
                                                                         value={planet.unlocks?.avatars?.[rule.unlockKey] ?? ""}
                                                                         onChange={(e) => handleAvatarUnlockChange(planet.id, rule.unlockKey, e.target.value)}
-                                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
-                                                                        placeholder="0"
+                                                                        min={1}
+                                                                        step={1}
+                                                                        title="Avatar unlock XP threshold"
+                                                                        aria-label={`${rule.name} avatar unlock XP`}
+                                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                        placeholder="1"
                                                                     />
                                                                 </div>
                                                             );
@@ -293,8 +341,12 @@ export default function PlanetManagementPage() {
                                                                         type="number"
                                                                         value={planet.unlocks?.ships?.[rule.unlockKey] ?? ""}
                                                                         onChange={(e) => handleShipUnlockChange(planet.id, rule.unlockKey, e.target.value)}
-                                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center"
-                                                                        placeholder="0"
+                                                                        min={1}
+                                                                        step={1}
+                                                                        title="Ship unlock XP threshold"
+                                                                        aria-label={`${rule.name} ship unlock XP`}
+                                                                        className="w-24 bg-black/50 border border-cyan-900/60 rounded p-2 text-white text-xs focus:border-cyan-400 outline-none transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                        placeholder="1"
                                                                     />
                                                                 </div>
                                                             );

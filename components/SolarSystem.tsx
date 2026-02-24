@@ -17,7 +17,9 @@ import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, Asteroid
 import {
     DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
     getPetById,
+    normalizePetUnlockAssignments,
     normalizePetUnlockChanceConfig,
+    PetUnlockAssignment,
     PetUnlockChanceConfig,
     rollPetUnlocksForXpEvent,
 } from "@/lib/pets";
@@ -136,6 +138,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
     const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+    const [petUnlockAssignments, setPetUnlockAssignments] = useState<Record<string, PetUnlockAssignment>>({});
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
@@ -167,8 +170,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
-            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            const rawSnapshot = (snapshot.data() as any) || {};
+            const rawConfig = rawSnapshot?.petUnlockChances;
+            const rawAssignments = rawSnapshot?.petUnlockAssignments;
             setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+            setPetUnlockAssignments(normalizePetUnlockAssignments(rawAssignments));
         });
 
         return () => unsub();
@@ -532,6 +538,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             planetId,
                             currentlyUnlockedPetIds: effectiveUnlockedPets,
                             chanceConfig: petUnlockChanceConfig,
+                            assignmentOverrides: petUnlockAssignments,
                         });
 
                         if (unlockedPetIds.length > 0) {
@@ -665,7 +672,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, isStudentPersonalView, petUnlockChanceConfig]);
+    }, [userData, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {

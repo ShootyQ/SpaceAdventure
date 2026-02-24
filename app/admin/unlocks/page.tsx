@@ -4,586 +4,711 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Save } from "lucide-react";
+import { PLANETS } from "@/types";
+import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { SHIP_OPTIONS } from "@/lib/ships";
 import {
   DEFAULT_UNLOCK_CONFIG,
-  getUnlockMigrationReport,
-  migrateRuleIdsToCanonical,
+  ensurePrefixedUnlockId,
   normalizeUnlockConfig,
   validateUnlockConfig,
   type UnlockChannel,
   type UnlockConfig,
   type UnlockRule,
 } from "@/lib/unlocks";
+import {
+  DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
+  normalizePetUnlockAssignments,
+  normalizePetUnlockChanceConfig,
+  PET_OPTIONS,
+  type PetUnlockAssignment,
+  type PetUnlockChanceConfig,
+  type PetUnlockMethod,
+  type PetUnlockScope,
+} from "@/lib/pets";
 
-const CHANNEL_OPTIONS: UnlockChannel[] = ["starter", "xp", "shop", "chance"];
-const MIGRATION_HISTORY_STORAGE_KEY = "unlockMigrationHistory:v1";
-const MAX_MIGRATION_HISTORY = 5;
-
-type MigrationArtifact = {
-  mode: "dry-run" | "migrate-save";
-  before: UnlockConfig;
-  after: UnlockConfig;
-  report: ReturnType<typeof getUnlockMigrationReport>;
-  generatedAt: number;
+type ShopItem = {
+  id: string;
+  name: string;
+  category: string;
+  imagePath: string;
+  price: number;
 };
 
-const emptyRule = (type: "ship" | "avatar"): UnlockRule => ({
-  id: "",
-  name: "",
-  planetId: "",
-  unlockKey: "",
-  channel: "xp",
-  rarity: type === "ship" ? "common" : "common",
-});
+type ShopResponse = {
+  items: ShopItem[];
+};
+
+type EarnMethod = "xp" | "chance" | "shop" | "starter" | "unassigned";
+type ScopeMode = "planet" | "any";
+type RowDomain = "ship" | "avatar" | "pet" | "shop";
+
+type EditableRow = {
+  key: string;
+  domain: RowDomain;
+  id: string;
+  name: string;
+  sourceName: string;
+  category: string;
+  method: EarnMethod;
+  scope: ScopeMode;
+  planetId: string;
+  rarity?: string;
+  assetPath?: string;
+  price?: number;
+  lockedMethod?: boolean;
+  existingRuleId?: string;
+  existingUnlockKey?: string;
+};
+
+const METHOD_OPTIONS: EarnMethod[] = ["xp", "chance", "shop", "starter", "unassigned"];
+const PET_METHOD_OPTIONS: EarnMethod[] = ["chance", "starter", "unassigned"];
+const SHOP_METHOD_OPTIONS: EarnMethod[] = ["shop"];
+const UNLOCK_RULE_CHANNELS = new Set<UnlockChannel>(["xp", "chance", "shop"]);
+
+const toIntMin = (value: unknown, minValue: number) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return minValue;
+  return Math.max(minValue, Math.round(numeric));
+};
+
+const PLANET_OPTIONS = PLANETS.filter((planet) => planet.id !== "sun").map((planet) => ({
+  id: String(planet.id).toLowerCase(),
+  name: planet.name,
+}));
+
+const firstPlanetId = PLANET_OPTIONS[0]?.id || "earth";
+
+const normalizePlanetValue = (value?: string) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return firstPlanetId;
+  if (normalized === "any") return "any";
+  return PLANET_OPTIONS.some((planet) => planet.id === normalized) ? normalized : firstPlanetId;
+};
+
+const getRuleForItem = (rules: UnlockRule[], itemId: string, kind: "ships" | "avatars") => {
+  const normalizedId = String(itemId || "").trim();
+  const canonicalId = ensurePrefixedUnlockId(normalizedId, kind);
+
+  return rules.find((rule) => {
+    const ruleId = String(rule.id || "").trim();
+    const ruleUnlockKey = String(rule.unlockKey || "").trim();
+    return ruleUnlockKey === normalizedId || ruleId === normalizedId || ruleId === canonicalId;
+  });
+};
+
+const buildUnlockRows = (unlockConfig: UnlockConfig): EditableRow[] => {
+  const starterShipSet = new Set(unlockConfig.starters?.ships || []);
+  const starterAvatarSet = new Set(unlockConfig.starters?.avatars || []);
+
+  const shipRows: EditableRow[] = SHIP_OPTIONS.map((ship) => {
+    const rule = getRuleForItem(unlockConfig.ships || [], ship.id, "ships");
+    const channel = String(rule?.channel || "").toLowerCase();
+
+    let method: EarnMethod = "unassigned";
+    if (starterShipSet.has(ship.id)) method = "starter";
+    else if (channel === "xp" || channel === "chance" || channel === "shop") method = channel as EarnMethod;
+
+    const normalizedPlanet = normalizePlanetValue(rule?.planetId);
+    const scope: ScopeMode = normalizedPlanet === "any" ? "any" : "planet";
+
+    return {
+      key: `ship:${ship.id}`,
+      domain: "ship",
+      id: ship.id,
+      name: String(rule?.name || ship.name || ship.id),
+      sourceName: String(ship.name || ship.id),
+      category: "ships",
+      method,
+      scope,
+      planetId: scope === "planet" ? normalizedPlanet : firstPlanetId,
+      assetPath: ship.assetPath,
+      existingRuleId: rule?.id,
+      existingUnlockKey: rule?.unlockKey,
+    };
+  });
+
+  const avatarRows: EditableRow[] = AVATAR_OPTIONS.map((avatar) => {
+    const rule = getRuleForItem(unlockConfig.avatars || [], avatar.id, "avatars");
+    const channel = String(rule?.channel || "").toLowerCase();
+
+    let method: EarnMethod = "unassigned";
+    if (starterAvatarSet.has(avatar.id)) method = "starter";
+    else if (channel === "xp" || channel === "chance" || channel === "shop") method = channel as EarnMethod;
+
+    const normalizedPlanet = normalizePlanetValue(rule?.planetId);
+    const scope: ScopeMode = normalizedPlanet === "any" ? "any" : "planet";
+
+    return {
+      key: `avatar:${avatar.id}`,
+      domain: "avatar",
+      id: avatar.id,
+      name: String(rule?.name || avatar.name || avatar.id),
+      sourceName: String(avatar.name || avatar.id),
+      category: "avatars",
+      method,
+      scope,
+      planetId: scope === "planet" ? normalizedPlanet : firstPlanetId,
+      assetPath: avatar.src,
+      existingRuleId: rule?.id,
+      existingUnlockKey: rule?.unlockKey,
+    };
+  });
+
+  return [...shipRows, ...avatarRows];
+};
+
+const buildPetRows = (
+  petAssignments: Record<string, PetUnlockAssignment>,
+  petNameOverrides: Record<string, string>
+): EditableRow[] => {
+  return PET_OPTIONS.map((pet) => {
+    const assignment = petAssignments[String(pet.id || "").toLowerCase()];
+    const resolvedMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
+    const resolvedScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
+    const resolvedPlanetId = normalizePlanetValue(assignment?.planetId || pet.unlockPlanetId || firstPlanetId);
+
+    return {
+      key: `pet:${pet.id}`,
+      domain: "pet",
+      id: pet.id,
+      name: String(petNameOverrides[pet.id] || pet.name || pet.id),
+      sourceName: String(pet.name || pet.id),
+      category: "pets",
+      method: resolvedMethod,
+      scope: resolvedScope,
+      planetId: resolvedScope === "planet" ? resolvedPlanetId : firstPlanetId,
+      rarity: pet.rarity,
+      assetPath: pet.imageSrc,
+    };
+  });
+};
+
+const buildShopRows = (
+  shopItems: ShopItem[],
+  shopPrices: Record<string, number>,
+  shopNameOverrides: Record<string, string>
+): EditableRow[] => {
+  return shopItems.map((item) => ({
+    key: `shop:${item.id}`,
+    domain: "shop",
+    id: item.id,
+    name: String(shopNameOverrides[item.id] || item.name || item.id),
+    sourceName: String(item.name || item.id),
+    category: String(item.category || "misc").toLowerCase(),
+    method: "shop",
+    scope: "any",
+    planetId: firstPlanetId,
+    assetPath: item.imagePath,
+    price: toIntMin(shopPrices[item.id] ?? item.price, 0),
+    lockedMethod: true,
+  }));
+};
 
 export default function AdminUnlocksPage() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+
+  const [unlockConfig, setUnlockConfig] = useState<UnlockConfig>(DEFAULT_UNLOCK_CONFIG);
+  const [petChanceConfig, setPetChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+  const [petAssignments, setPetAssignments] = useState<Record<string, PetUnlockAssignment>>({});
+  const [petNameOverrides, setPetNameOverrides] = useState<Record<string, string>>({});
+
+  const [shopItems, setShopItems] = useState<ShopItem[]>([]);
+  const [shopPrices, setShopPrices] = useState<Record<string, number>>({});
+  const [shopNameOverrides, setShopNameOverrides] = useState<Record<string, string>>({});
+
+  const [unlockLoaded, setUnlockLoaded] = useState(false);
+  const [collectiblesLoaded, setCollectiblesLoaded] = useState(false);
+  const [shopLoaded, setShopLoaded] = useState(false);
+  const [shopInventoryLoaded, setShopInventoryLoaded] = useState(false);
+
   const [saving, setSaving] = useState(false);
-  const [migrating, setMigrating] = useState(false);
-  const [dryRunning, setDryRunning] = useState(false);
-  const [draft, setDraft] = useState<UnlockConfig>(DEFAULT_UNLOCK_CONFIG);
-  const [migrationReport, setMigrationReport] = useState<MigrationArtifact["report"] | null>(null);
-  const [migrationArtifact, setMigrationArtifact] = useState<MigrationArtifact | null>(null);
-  const [migrationHistory, setMigrationHistory] = useState<MigrationArtifact[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+
+  const [rows, setRows] = useState<EditableRow[]>([]);
+  const [initializedRows, setInitializedRows] = useState(false);
+
+  const reloadShopInventory = async () => {
+    setRefreshing(true);
+    try {
+      const response = await fetch("/api/admin/shop-items", { cache: "no-store" });
+      if (!response.ok) throw new Error("Failed to load shop items");
+      const payload: ShopResponse = await response.json();
+      const nextItems = Array.isArray(payload?.items) ? payload.items : [];
+      setShopItems(nextItems);
+    } catch (error) {
+      console.error("Failed to load shop inventory:", error);
+      setShopItems([]);
+    } finally {
+      setShopInventoryLoaded(true);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    reloadShopInventory();
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
-      const next = migrateRuleIdsToCanonical(normalizeUnlockConfig((snapshot.data() as any) || null));
-      setDraft(next);
-      setLoading(false);
+      const normalized = normalizeUnlockConfig((snapshot.data() as Partial<UnlockConfig>) || null);
+      setUnlockConfig(normalized);
+      setUnlockLoaded(true);
     });
 
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const raw = window.localStorage.getItem(MIGRATION_HISTORY_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
+    const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
+      const raw = (snapshot.data() as any) || {};
+      setPetChanceConfig(normalizePetUnlockChanceConfig(raw?.petUnlockChances || null));
+      setPetAssignments(normalizePetUnlockAssignments(raw?.petUnlockAssignments || null));
 
-      const sanitized: MigrationArtifact[] = parsed
-        .map((entry: any) => ({
-          mode: (entry?.mode === "migrate-save" ? "migrate-save" : "dry-run") as MigrationArtifact["mode"],
-          before: normalizeUnlockConfig(entry?.before || null),
-          after: normalizeUnlockConfig(entry?.after || null),
-          report: {
-            migratedShipRuleIds: Number(entry?.report?.migratedShipRuleIds || 0),
-            migratedAvatarRuleIds: Number(entry?.report?.migratedAvatarRuleIds || 0),
-            aliasesAdded: Number(entry?.report?.aliasesAdded || 0),
-            totalAliases: Number(entry?.report?.totalAliases || 0),
-            blockingConflicts: Array.isArray(entry?.report?.blockingConflicts) ? entry.report.blockingConflicts.map((value: any) => String(value)) : [],
-            warnings: Array.isArray(entry?.report?.warnings) ? entry.report.warnings.map((value: any) => String(value)) : [],
-          },
-          generatedAt: Number(entry?.generatedAt || Date.now()),
-        }))
-        .sort((a, b) => b.generatedAt - a.generatedAt)
-        .slice(0, MAX_MIGRATION_HISTORY);
+      const rawNameOverrides = raw?.petNameOverrides || {};
+      const normalizedNames: Record<string, string> = {};
+      Object.entries(rawNameOverrides).forEach(([petId, value]) => {
+        const key = String(petId || "").trim().toLowerCase();
+        const nextName = String(value || "").trim();
+        if (key && nextName) normalizedNames[key] = nextName;
+      });
+      setPetNameOverrides(normalizedNames);
+      setCollectiblesLoaded(true);
+    });
 
-      setMigrationHistory(sanitized);
-    } catch (error) {
-      console.error("Failed to load migration history:", error);
-    }
+    return () => unsub();
   }, []);
 
-  const pushMigrationHistory = (entry: MigrationArtifact) => {
-    setMigrationHistory((prev) => {
-      const next = [entry, ...prev]
-        .sort((a, b) => b.generatedAt - a.generatedAt)
-        .slice(0, MAX_MIGRATION_HISTORY);
-      try {
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(MIGRATION_HISTORY_STORAGE_KEY, JSON.stringify(next));
-        }
-      } catch (error) {
-        console.error("Failed to persist migration history:", error);
-      }
-      return next;
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
+      const raw = (snapshot.data() as any) || {};
+      const rawPrices = raw?.prices || {};
+      const normalizedPrices: Record<string, number> = {};
+      Object.entries(rawPrices).forEach(([itemId, value]) => {
+        const key = String(itemId || "").trim().toLowerCase();
+        if (!key) return;
+        normalizedPrices[key] = toIntMin(value, 0);
+      });
+      setShopPrices(normalizedPrices);
+
+      const rawNameOverrides = raw?.nameOverrides || {};
+      const normalizedNames: Record<string, string> = {};
+      Object.entries(rawNameOverrides).forEach(([itemId, value]) => {
+        const key = String(itemId || "").trim().toLowerCase();
+        const nextName = String(value || "").trim();
+        if (key && nextName) normalizedNames[key] = nextName;
+      });
+      setShopNameOverrides(normalizedNames);
+
+      setShopLoaded(true);
     });
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!unlockLoaded || !collectiblesLoaded || !shopLoaded || !shopInventoryLoaded) return;
+    if (initializedRows) return;
+
+    const nextRows = [
+      ...buildUnlockRows(unlockConfig),
+      ...buildPetRows(petAssignments, petNameOverrides),
+      ...buildShopRows(shopItems, shopPrices, shopNameOverrides),
+    ];
+
+    setRows(nextRows);
+    setInitializedRows(true);
+  }, [
+    unlockLoaded,
+    collectiblesLoaded,
+    shopLoaded,
+    shopInventoryLoaded,
+    initializedRows,
+    unlockConfig,
+    petAssignments,
+    petNameOverrides,
+    shopItems,
+    shopPrices,
+    shopNameOverrides,
+  ]);
+
+  const categories = useMemo(() => {
+    const discovered = new Set<string>(["ships", "avatars", "pets", "objects", "flags"]);
+    rows.forEach((row) => discovered.add(String(row.category || "misc").toLowerCase()));
+    return ["all", ...Array.from(discovered).sort((a, b) => a.localeCompare(b))];
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const categoryPass = categoryFilter === "all" || row.category === categoryFilter;
+      const methodPass = methodFilter === "all" || row.method === methodFilter;
+      return categoryPass && methodPass;
+    });
+  }, [rows, categoryFilter, methodFilter]);
+
+  const updateRow = (key: string, updater: (row: EditableRow) => EditableRow) => {
+    setRows((prev) => prev.map((row) => (row.key === key ? updater(row) : row)));
   };
 
-  const starterShipSet = useMemo(() => new Set(draft.starters.ships || []), [draft.starters.ships]);
-  const validation = useMemo(() => validateUnlockConfig(draft), [draft]);
-
-  const toggleStarterShip = (shipId: string) => {
-    setDraft((prev) => {
-      const nextSet = new Set(prev.starters.ships || []);
-      const wasChecked = nextSet.has(shipId);
-      if (nextSet.has(shipId)) nextSet.delete(shipId);
-      else nextSet.add(shipId);
-
-      if (nextSet.size === 0) nextSet.add("finalship");
-
-      const nextRules = wasChecked
-        ? prev.ships
-        : prev.ships.filter((rule) => String(rule.id || "").trim() !== shipId);
-
+  const updateMethod = (key: string, nextMethod: EarnMethod) => {
+    updateRow(key, (row) => {
+      const method = row.lockedMethod ? row.method : nextMethod;
+      const needsScope = method === "xp" || method === "chance";
       return {
-        ...prev,
-        starters: {
-          ...prev.starters,
-          ships: Array.from(nextSet),
-        },
-        ships: nextRules,
+        ...row,
+        method,
+        scope: needsScope ? row.scope : "any",
+        planetId: needsScope ? row.planetId : firstPlanetId,
       };
     });
   };
 
-  const updateRule = (collection: "ships" | "avatars", index: number, key: keyof UnlockRule, value: string) => {
-    setDraft((prev) => {
-      const nextRules = [...prev[collection]];
-      nextRules[index] = {
-        ...nextRules[index],
-        [key]: value,
-      };
-      return { ...prev, [collection]: nextRules };
-    });
+  const reloadAll = async () => {
+    setInitializedRows(false);
+    await reloadShopInventory();
   };
 
-  const addRule = (collection: "ships" | "avatars") => {
-    setDraft((prev) => ({
-      ...prev,
-      [collection]: [...prev[collection], emptyRule(collection === "ships" ? "ship" : "avatar")],
-    }));
-  };
-
-  const removeRule = (collection: "ships" | "avatars", index: number) => {
-    setDraft((prev) => ({
-      ...prev,
-      [collection]: prev[collection].filter((_, currentIndex) => currentIndex !== index),
-    }));
-  };
-
-  const saveConfig = async () => {
+  const saveAll = async () => {
     try {
       setSaving(true);
-      const normalized = migrateRuleIdsToCanonical(normalizeUnlockConfig(draft));
-      const result = validateUnlockConfig(normalized);
-      if (result.errors.length > 0) {
-        alert(`Unlock config has ${result.errors.length} blocking issue(s). Fix them before saving.\n\n${result.errors.slice(0, 5).join("\n")}`);
+
+      const shipRows = rows.filter((row) => row.domain === "ship");
+      const avatarRows = rows.filter((row) => row.domain === "avatar");
+      const petRows = rows.filter((row) => row.domain === "pet");
+      const shopRows = rows.filter((row) => row.domain === "shop");
+
+      const nextStarterShips = shipRows.filter((row) => row.method === "starter").map((row) => row.id);
+      const nextStarterAvatars = avatarRows.filter((row) => row.method === "starter").map((row) => row.id);
+
+      const buildRulesFor = (targetRows: EditableRow[], kind: "ships" | "avatars"): UnlockRule[] => {
+        return targetRows
+          .filter((row) => row.method === "xp" || row.method === "chance" || row.method === "shop")
+          .map((row) => {
+            const channel = row.method as UnlockChannel;
+            const normalizedPlanet = row.scope === "planet" ? normalizePlanetValue(row.planetId) : "any";
+
+            return {
+              id: row.existingRuleId || ensurePrefixedUnlockId(row.id, kind),
+              name: String(row.name || row.id).trim() || row.id,
+              planetId: channel === "xp" || channel === "chance" ? normalizedPlanet : "",
+              unlockKey: row.existingUnlockKey || row.id,
+              channel,
+            };
+          });
+      };
+
+      const nextUnlockDraft = normalizeUnlockConfig({
+        ...unlockConfig,
+        starters: {
+          ...unlockConfig.starters,
+          ships: nextStarterShips.length > 0 ? nextStarterShips : ["finalship"],
+          avatars: nextStarterAvatars,
+        },
+        ships: buildRulesFor(shipRows, "ships"),
+        avatars: buildRulesFor(avatarRows, "avatars"),
+      });
+
+      const validation = validateUnlockConfig(nextUnlockDraft);
+      if (validation.errors.length > 0) {
+        alert(`Unlock config has ${validation.errors.length} blocking issue(s).\n\n${validation.errors.slice(0, 8).join("\n")}`);
         return;
       }
 
-      await setDoc(
-        doc(db, "game-config", "unlocks"),
-        {
-          ...normalized,
-          updatedAt: Date.now(),
-          updatedBy: user?.email || null,
-        },
-        { merge: true }
-      );
-      alert("Unlock config saved.");
+      const nextPetAssignments: Record<string, PetUnlockAssignment> = {};
+      const nextPetNameOverrides: Record<string, string> = {};
+
+      petRows.forEach((row) => {
+        const normalizedPetId = String(row.id || "").trim().toLowerCase();
+        if (!normalizedPetId) return;
+
+        const nextMethod: PetUnlockMethod = row.method === "starter" || row.method === "unassigned" ? row.method : "chance";
+        const nextScope: PetUnlockScope = row.scope === "planet" ? "planet" : "any";
+
+        nextPetAssignments[normalizedPetId] = {
+          method: nextMethod,
+          scope: nextScope,
+          planetId: nextScope === "planet" ? normalizePlanetValue(row.planetId) : undefined,
+        };
+
+        const trimmedName = String(row.name || "").trim();
+        if (trimmedName && trimmedName !== row.sourceName) {
+          nextPetNameOverrides[normalizedPetId] = trimmedName;
+        }
+      });
+
+      const nextShopPrices: Record<string, number> = {};
+      const nextShopNames: Record<string, string> = {};
+
+      shopRows.forEach((row) => {
+        const normalizedItemId = String(row.id || "").trim().toLowerCase();
+        if (!normalizedItemId) return;
+
+        nextShopPrices[normalizedItemId] = toIntMin(row.price ?? 0, 0);
+
+        const trimmedName = String(row.name || "").trim();
+        if (trimmedName && trimmedName !== row.sourceName) {
+          nextShopNames[normalizedItemId] = trimmedName;
+        }
+      });
+
+      await Promise.all([
+        setDoc(
+          doc(db, "game-config", "unlocks"),
+          {
+            ...nextUnlockDraft,
+            updatedAt: Date.now(),
+            updatedBy: user?.email || null,
+          },
+          { merge: true }
+        ),
+        setDoc(
+          doc(db, "game-config", "collectibles"),
+          {
+            petUnlockChances: petChanceConfig,
+            petUnlockAssignments: nextPetAssignments,
+            petNameOverrides: nextPetNameOverrides,
+            updatedAt: Date.now(),
+            updatedBy: user?.email || null,
+          },
+          { merge: true }
+        ),
+        setDoc(
+          doc(db, "game-config", "shop"),
+          {
+            prices: nextShopPrices,
+            nameOverrides: nextShopNames,
+            updatedAt: Date.now(),
+            updatedBy: user?.email || null,
+          },
+          { merge: true }
+        ),
+      ]);
+
+      alert("Unlock assignments saved.");
     } catch (error) {
-      console.error("Failed to save unlock config:", error);
-      alert("Failed to save unlock config.");
+      console.error("Failed to save unlock assignments:", error);
+      alert("Failed to save unlock assignments.");
     } finally {
       setSaving(false);
     }
   };
 
-  const migrateConfigNow = async () => {
-    try {
-      setMigrating(true);
-      const before = normalizeUnlockConfig(draft);
-      const migrated = migrateRuleIdsToCanonical(before);
-      const report = getUnlockMigrationReport(before, migrated);
-      const artifact: MigrationArtifact = {
-        mode: "migrate-save",
-        before,
-        after: migrated,
-        report,
-        generatedAt: Date.now(),
-      };
-      setMigrationReport(report);
-      setMigrationArtifact(artifact);
-      pushMigrationHistory(artifact);
-
-      if (report.blockingConflicts.length > 0) {
-        setDraft(migrated);
-        alert(`Migration found ${report.blockingConflicts.length} blocking issue(s). Resolve them before saving.\n\n${report.blockingConflicts.slice(0, 5).join("\n")}`);
-        return;
-      }
-
-      await setDoc(
-        doc(db, "game-config", "unlocks"),
-        {
-          ...migrated,
-          updatedAt: Date.now(),
-          updatedBy: user?.email || null,
-        },
-        { merge: true }
-      );
-
-      setDraft(migrated);
-      alert(`Migration complete. Converted ${report.migratedShipRuleIds + report.migratedAvatarRuleIds} rule IDs and added ${report.aliasesAdded} alias(es).`);
-    } catch (error) {
-      console.error("Failed to migrate unlock config:", error);
-      alert("Failed to migrate unlock config.");
-    } finally {
-      setMigrating(false);
-    }
-  };
-
-  const dryRunMigration = () => {
-    try {
-      setDryRunning(true);
-      const before = normalizeUnlockConfig(draft);
-      const migrated = migrateRuleIdsToCanonical(before);
-      const report = getUnlockMigrationReport(before, migrated);
-      const artifact: MigrationArtifact = {
-        mode: "dry-run",
-        before,
-        after: migrated,
-        report,
-        generatedAt: Date.now(),
-      };
-
-      setMigrationReport(report);
-      setMigrationArtifact(artifact);
-      pushMigrationHistory(artifact);
-    } finally {
-      setDryRunning(false);
-    }
-  };
-
-  const downloadMigrationReport = (artifact?: MigrationArtifact | null) => {
-    const target = artifact || migrationArtifact;
-    if (!target) {
-      alert("Run migration or dry-run first to generate a report.");
-      return;
-    }
-
-    const payload = {
-      generatedAt: new Date(target.generatedAt).toISOString(),
-      generatedBy: user?.email || null,
-      mode: target.mode,
-      report: target.report,
-      before: target.before,
-      after: target.after,
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    const stamp = new Date(target.generatedAt).toISOString().replace(/[:.]/g, "-");
-    anchor.href = url;
-    anchor.download = `unlock-migration-report-${stamp}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-20 text-slate-500">
-          <Loader2 size={24} className="animate-spin" />
-        </div>
-      </div>
-    );
-  }
+  const isLoading = !unlockLoaded || !collectiblesLoaded || !shopLoaded || !shopInventoryLoaded || !initializedRows;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 text-slate-900">
-      <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Unlock Config</h1>
-          <p className="mt-1 text-sm text-slate-600">Reassign starter lists, rarity, channels, and unlock behavior without editing JSON files.</p>
-          <p className="mt-1 text-xs text-slate-500">Legacy ID aliases tracked: {Object.keys(draft.idAliases || {}).length}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Unlock Assignment Manager</h1>
+          <p className="mt-1 text-sm text-slate-600">Filter by category and earn type, then edit assignment fields in one list.</p>
+          <p className="mt-1 text-xs text-slate-500">Saves to Firebase docs under game-config: unlocks, collectibles, and shop.</p>
         </div>
+
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setDraft(migrateRuleIdsToCanonical(normalizeUnlockConfig(DEFAULT_UNLOCK_CONFIG)))}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={reloadAll}
+            disabled={refreshing || saving}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw size={16} />
-            Reset to JSON Defaults
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            Reload
           </button>
           <button
-            onClick={dryRunMigration}
-            disabled={dryRunning || migrating || saving}
-            className="inline-flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {dryRunning ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            Dry Run Migration
-          </button>
-          <button
-            onClick={migrateConfigNow}
-            disabled={migrating || saving || dryRunning}
-            className="inline-flex items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {migrating ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            Migrate IDs + Save
-          </button>
-          <button
-            onClick={() => downloadMigrationReport()}
-            disabled={!migrationArtifact || migrating || saving || dryRunning}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Save size={16} />
-            Download Migration Report
-          </button>
-          <button
-            onClick={saveConfig}
-            disabled={saving || migrating}
+            onClick={saveAll}
+            disabled={saving || isLoading}
             className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Save Unlock Config
+            Save All
           </button>
         </div>
       </div>
 
-      <div className="space-y-6">
-        {migrationReport && (
-          <section className={`rounded-xl border p-4 ${migrationReport.blockingConflicts.length > 0 ? "border-rose-300 bg-rose-50" : "border-blue-300 bg-blue-50"}`}>
-            <h2 className={`text-sm font-semibold uppercase tracking-wide ${migrationReport.blockingConflicts.length > 0 ? "text-rose-800" : "text-blue-800"}`}>
-              Migration Report
-            </h2>
-            <div className={`mt-2 grid gap-2 text-sm ${migrationReport.blockingConflicts.length > 0 ? "text-rose-900" : "text-blue-900"}`}>
-              <div>Mode: {migrationArtifact?.mode === "dry-run" ? "Dry run (no save)" : "Migrate + save"}</div>
-              <div>Ship rule IDs migrated: {migrationReport.migratedShipRuleIds}</div>
-              <div>Avatar rule IDs migrated: {migrationReport.migratedAvatarRuleIds}</div>
-              <div>Aliases added: {migrationReport.aliasesAdded}</div>
-              <div>Total aliases tracked: {migrationReport.totalAliases}</div>
-            </div>
-
-            {migrationReport.blockingConflicts.length > 0 && (
-              <ul className="mt-3 space-y-1 text-sm text-rose-800">
-                {migrationReport.blockingConflicts.map((issue) => (
-                  <li key={issue}>• {issue}</li>
-                ))}
-              </ul>
-            )}
-
-            {migrationReport.warnings.length > 0 && (
-              <ul className={`mt-3 space-y-1 text-sm ${migrationReport.blockingConflicts.length > 0 ? "text-rose-700" : "text-blue-800"}`}>
-                {migrationReport.warnings.map((warning) => (
-                  <li key={warning}>• {warning}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
-
-        {migrationHistory.length > 0 && (
-          <section className="rounded-xl border border-slate-300 bg-slate-50 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-800">Recent Migration Reports</h2>
-            <div className="mt-3 space-y-2">
-              {migrationHistory.map((entry, index) => {
-                const migratedTotal = entry.report.migratedShipRuleIds + entry.report.migratedAvatarRuleIds;
-                const hasBlocking = entry.report.blockingConflicts.length > 0;
-                return (
-                  <div key={`${entry.generatedAt}-${index}`} className="flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-xs">
-                    <span className="font-medium text-slate-800">{new Date(entry.generatedAt).toLocaleString()}</span>
-                    <span className={`rounded px-2 py-0.5 font-semibold ${entry.mode === "dry-run" ? "bg-indigo-100 text-indigo-800" : "bg-blue-100 text-blue-800"}`}>
-                      {entry.mode === "dry-run" ? "Dry Run" : "Migrate + Save"}
-                    </span>
-                    <span className="text-slate-600">Migrated: {migratedTotal}</span>
-                    <span className="text-slate-600">Aliases +{entry.report.aliasesAdded}</span>
-                    <span className={hasBlocking ? "text-rose-700" : "text-emerald-700"}>
-                      {hasBlocking ? `${entry.report.blockingConflicts.length} conflict(s)` : "No blocking conflicts"}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setMigrationArtifact(entry);
-                        setMigrationReport(entry.report);
-                      }}
-                      className="ml-auto rounded border border-slate-300 px-2 py-1 font-medium text-slate-700 hover:bg-slate-100"
-                    >
-                      Open
-                    </button>
-                    <button
-                      onClick={() => downloadMigrationReport(entry)}
-                      className="rounded border border-slate-300 px-2 py-1 font-medium text-slate-700 hover:bg-slate-100"
-                    >
-                      Download
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {(validation.errors.length > 0 || validation.warnings.length > 0) && (
-          <section className={`rounded-xl border p-4 ${validation.errors.length > 0 ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}>
-            <h2 className={`text-sm font-semibold uppercase tracking-wide ${validation.errors.length > 0 ? "text-rose-800" : "text-amber-800"}`}>
-              Config Validation
-            </h2>
-            {validation.errors.length > 0 && (
-              <ul className="mt-2 space-y-1 text-sm text-rose-800">
-                {validation.errors.map((error) => (
-                  <li key={error}>• {error}</li>
-                ))}
-              </ul>
-            )}
-            {validation.warnings.length > 0 && (
-              <ul className={`mt-2 space-y-1 text-sm ${validation.errors.length > 0 ? "text-rose-700" : "text-amber-800"}`}>
-                {validation.warnings.map((warning) => (
-                  <li key={warning}>• {warning}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
-
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-700">Starter Ships</h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {SHIP_OPTIONS.map((ship) => {
-              const checked = starterShipSet.has(ship.id);
-              return (
-                <label key={ship.id} className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm">
-                  <input type="checkbox" checked={checked} onChange={() => toggleStarterShip(ship.id)} />
-                  <span>{ship.name}</span>
-                  <span className="ml-auto font-mono text-xs text-slate-500">{ship.id}</span>
-                </label>
-              );
-            })}
-          </div>
-        </section>
-
-        <RuleTable
-          title="Ship Rules"
-          rules={draft.ships}
-          onAdd={() => addRule("ships")}
-          onRemove={(index) => removeRule("ships", index)}
-          onUpdate={(index, key, value) => updateRule("ships", index, key, value)}
-        />
-
-        <RuleTable
-          title="Avatar Rules"
-          rules={draft.avatars}
-          onAdd={() => addRule("avatars")}
-          onRemove={(index) => removeRule("avatars", index)}
-          onUpdate={(index, key, value) => updateRule("avatars", index, key, value)}
-        />
-      </div>
-    </div>
-  );
-}
-
-function RuleTable({
-  title,
-  rules,
-  onAdd,
-  onRemove,
-  onUpdate,
-}: {
-  title: string;
-  rules: UnlockRule[];
-  onAdd: () => void;
-  onRemove: (index: number) => void;
-  onUpdate: (index: number, key: keyof UnlockRule, value: string) => void;
-}) {
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">{title}</h2>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <Plus size={12} />
-          Add Rule
-        </button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] text-left text-sm">
-          <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-2 py-2">ID</th>
-              <th className="px-2 py-2">Name</th>
-              <th className="px-2 py-2">Planet</th>
-              <th className="px-2 py-2">Unlock Key</th>
-              <th className="px-2 py-2">Channel</th>
-              <th className="px-2 py-2">Rarity</th>
-              <th className="px-2 py-2">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rules.map((rule, index) => (
-              <tr key={`${rule.id || "new"}-${index}`} className="border-b border-slate-100">
-                <td className="px-2 py-2">
-                  <input
-                    value={rule.id}
-                    onChange={(event) => onUpdate(index, "id", event.target.value)}
-                    title="Rule ID"
-                    placeholder="item-id"
-                    className="w-full rounded border border-slate-300 px-2 py-1"
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <input
-                    value={rule.name}
-                    onChange={(event) => onUpdate(index, "name", event.target.value)}
-                    title="Rule Name"
-                    placeholder="Display name"
-                    className="w-full rounded border border-slate-300 px-2 py-1"
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <input
-                    value={rule.planetId}
-                    onChange={(event) => onUpdate(index, "planetId", event.target.value.toLowerCase())}
-                    title="Planet ID"
-                    placeholder="earth"
-                    className="w-full rounded border border-slate-300 px-2 py-1"
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <input
-                    value={rule.unlockKey}
-                    onChange={(event) => onUpdate(index, "unlockKey", event.target.value)}
-                    title="Unlock Key"
-                    placeholder="unlock-key"
-                    className="w-full rounded border border-slate-300 px-2 py-1"
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <select
-                    value={rule.channel || "xp"}
-                    onChange={(event) => onUpdate(index, "channel", event.target.value)}
-                    title="Unlock Channel"
-                    className="w-full rounded border border-slate-300 px-2 py-1"
-                  >
-                    {CHANNEL_OPTIONS.map((channel) => (
-                      <option key={channel} value={channel}>
-                        {channel}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-2">
-                  <input
-                    value={rule.rarity || ""}
-                    onChange={(event) => onUpdate(index, "rarity", event.target.value)}
-                    className="w-full rounded border border-slate-300 px-2 py-1"
-                    placeholder="common / uncommon / rare"
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <button
-                    onClick={() => onRemove(index)}
-                    className="inline-flex items-center gap-1 rounded border border-rose-300 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
-                  >
-                    <Trash2 size={12} />
-                    Remove
-                  </button>
-                </td>
-              </tr>
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Category</div>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="mt-1 w-full bg-transparent text-sm outline-none"
+          >
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        </label>
+
+        <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Earn Method</div>
+          <select
+            value={methodFilter}
+            onChange={(e) => setMethodFilter(e.target.value)}
+            className="mt-1 w-full bg-transparent text-sm outline-none"
+          >
+            <option value="all">all</option>
+            {METHOD_OPTIONS.map((method) => (
+              <option key={method} value={method}>
+                {method}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Items Shown</div>
+          <div className="mt-1 text-base font-semibold text-slate-900">{filteredRows.length}</div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Data Sources</div>
+          <div className="mt-1 text-xs text-slate-700">Unlocks + Collectibles + Shop</div>
+        </div>
       </div>
-    </section>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-20 text-slate-500">
+          <Loader2 size={24} className="animate-spin" />
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1260px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">Item</th>
+                  <th className="px-3 py-2">Category</th>
+                  <th className="px-3 py-2">Method</th>
+                  <th className="px-3 py-2">Scope</th>
+                  <th className="px-3 py-2">Planet</th>
+                  <th className="px-3 py-2">Price</th>
+                  <th className="px-3 py-2">ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => {
+                  const rowMethodOptions = row.domain === "pet"
+                    ? PET_METHOD_OPTIONS
+                    : row.domain === "shop"
+                      ? SHOP_METHOD_OPTIONS
+                      : METHOD_OPTIONS;
+
+                  const showScope = row.method === "xp" || row.method === "chance";
+                  const showPlanet = showScope && row.scope === "planet";
+                  const showPrice = row.domain === "shop" || row.method === "shop";
+
+                  return (
+                    <tr key={row.key} className="border-b border-slate-100 align-top hover:bg-slate-50/70">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-50">
+                            {row.assetPath ? (
+                              <img src={row.assetPath} alt={row.name} className="h-8 w-8 object-contain" />
+                            ) : (
+                              <span className="text-[10px] text-slate-500">N/A</span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <input
+                              type="text"
+                              value={row.name}
+                              onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, name: e.target.value }))}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                              aria-label={`Name for ${row.id}`}
+                              title={`Name for ${row.id}`}
+                              placeholder={row.sourceName}
+                            />
+                            {row.rarity && <div className="mt-1 text-[10px] uppercase text-slate-500">{row.rarity}</div>}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-2 align-middle text-slate-700">{row.category}</td>
+
+                      <td className="px-3 py-2">
+                        <select
+                          value={row.method}
+                          onChange={(e) => updateMethod(row.key, e.target.value as EarnMethod)}
+                          disabled={row.lockedMethod}
+                          className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100"
+                          aria-label={`Method for ${row.id}`}
+                        >
+                          {rowMethodOptions.map((method) => (
+                            <option key={`${row.key}-${method}`} value={method}>
+                              {method}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      <td className="px-3 py-2">
+                        {showScope ? (
+                          <select
+                            value={row.scope}
+                            onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, scope: e.target.value as ScopeMode }))}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                            aria-label={`Scope for ${row.id}`}
+                          >
+                            <option value="planet">planet</option>
+                            <option value="any">any</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2">
+                        {showPlanet ? (
+                          <select
+                            value={row.planetId}
+                            onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, planetId: normalizePlanetValue(e.target.value) }))}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                            aria-label={`Planet for ${row.id}`}
+                          >
+                            {PLANET_OPTIONS.map((planet) => (
+                              <option key={`${row.key}-${planet.id}`} value={planet.id}>
+                                {planet.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2">
+                        {showPrice ? (
+                          row.domain === "shop" ? (
+                            <input
+                              type="number"
+                              min={0}
+                              value={row.price ?? 0}
+                              onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, price: toIntMin(e.target.value, 0) }))}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-400"
+                              aria-label={`Price for ${row.id}`}
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-500">Managed by shop assets</span>
+                          )
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2 font-mono text-xs text-slate-600">{row.id}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -114,10 +114,36 @@ async function getConfiguredPrices(): Promise<Record<string, number>> {
   }
 }
 
+async function getConfiguredNameOverrides(): Promise<Record<string, string>> {
+  try {
+    const adminDb = await getAdminDbSafe();
+    if (!adminDb) return {};
+
+    const snapshot = await adminDb.doc(SHOP_CONFIG_PATH).get();
+    if (!snapshot.exists) return {};
+
+    const raw = (snapshot.data() as any)?.nameOverrides || {};
+    const names: Record<string, string> = {};
+
+    Object.entries(raw).forEach(([itemId, value]) => {
+      const normalizedId = String(itemId || "").trim().toLowerCase();
+      const nextName = String(value || "").trim();
+      if (!normalizedId || !nextName) return;
+      names[normalizedId] = nextName;
+    });
+
+    return names;
+  } catch (error) {
+    console.error("Failed to read shop name overrides config; using filename defaults:", error);
+    return {};
+  }
+}
+
 async function getDiscoveredShopItems(): Promise<ShopItem[]> {
   const path = await import("node:path");
-  const [configuredPrices, legacyRoot, categoryRoots] = await Promise.all([
+  const [configuredPrices, configuredNameOverrides, legacyRoot, categoryRoots] = await Promise.all([
     getConfiguredPrices(),
+    getConfiguredNameOverrides(),
     resolveShopAssetRoot(),
     Promise.all(SHOP_CATEGORIES.map((category) => resolveCategoryShopRoot(category))),
   ]);
@@ -146,7 +172,8 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       dedupe.add(id);
 
       const imagePath = `/images/collectibles/${category}/shop/${relativePath}`;
-      const name = normalizeNameFromFile((normalizedRelativePath || relativePath).split("/").pop() || relativePath);
+      const nameFromFile = normalizeNameFromFile((normalizedRelativePath || relativePath).split("/").pop() || relativePath);
+      const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
       const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
 
       items.push({
@@ -177,8 +204,9 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
     dedupe.add(id);
 
     const imagePath = `/images/collectibles/ships/shop/${relativePath}`;
-    const name = normalizeNameFromFile((normalizedRelative || relativePath).split("/").pop() || relativePath);
+    const nameFromFile = normalizeNameFromFile((normalizedRelative || relativePath).split("/").pop() || relativePath);
     const legacyId = normalizeItemIdFromRelativePath(`${category}/${segments.slice(1).join("/")}`);
+    const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
     const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
 
     items.push({
