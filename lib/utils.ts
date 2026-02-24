@@ -22,7 +22,7 @@ export const generateClassCode = () => {
 export const NAME_MAX_LENGTH = 24;
 export const PROFILE_NAME_MAX_LENGTH = 30;
 export const PROFILE_NAME_MIN_LENGTH = 1;
-const PROFILE_NAME_ALLOWED_REGEX = /^[\p{L}\p{M}\p{N} ]+$/u;
+const PROFILE_NAME_ALLOWED_REGEX = /^[0-9A-Za-zÀ-ÖØ-öø-ÿĀ-žƀ-ɏ ]+$/;
 
 export const sanitizeName = (value: string, maxLength = NAME_MAX_LENGTH) => {
     return String(value || '')
