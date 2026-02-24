@@ -7,12 +7,11 @@ import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/fire
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
-    Box, User, LayoutDashboard, Database, Crosshair, Sparkles, Star, Eye, Map, Sun, Award, Crown, Activity, Store
+    Box, User, LayoutDashboard, Database, Crosshair, Star, Eye, Map, Sun, Award, Crown, Activity, Store
 } from "lucide-react";
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
-import { UserAvatar, HAT_OPTIONS, AVATAR_OPTIONS } from "@/components/UserAvatar";
-import { DEFAULT_PET_UNLOCK_CHANCE_CONFIG, getEffectiveUnlockedPetIds, getPetUnlockHint, normalizePetUnlockChanceConfig, PET_OPTIONS, PetUnlockChanceConfig, getResolvedSelectedPetId } from "@/lib/pets";
+import { UserAvatar } from "@/components/UserAvatar";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, type UnlockRule } from "@/lib/unlocks";
 
@@ -27,7 +26,7 @@ const Rocket = ({ size = 24, className = "" }: { size?: number, className?: stri
 );
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const SHIP_COLORS = [
     { name: "Nebula Blue", class: "text-blue-400", bg: "bg-blue-400" },
@@ -41,20 +40,6 @@ const SHIP_COLORS = [
 const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
     return (purchasedShopItemIds || [])
         .filter((itemId) => String(itemId || "").toLowerCase().startsWith("ships/"))
-        .map((itemId) => String(itemId || "").split("/").pop() || "")
-        .filter(Boolean);
-};
-
-const getPurchasedShopAvatarIds = (purchasedShopItemIds?: string[]) => {
-    return (purchasedShopItemIds || [])
-        .filter((itemId) => String(itemId || "").toLowerCase().startsWith("avatars/"))
-        .map((itemId) => String(itemId || "").split("/").pop() || "")
-        .filter(Boolean);
-};
-
-const getPurchasedShopPetIds = (purchasedShopItemIds?: string[]) => {
-    return (purchasedShopItemIds || [])
-        .filter((itemId) => String(itemId || "").toLowerCase().startsWith("pets/"))
         .map((itemId) => String(itemId || "").split("/").pop() || "")
         .filter(Boolean);
 };
@@ -120,62 +105,6 @@ const buildUnlockedShipIdSet = ({
     return unlocked;
 };
 
-const buildUnlockedAvatarIdSet = ({
-    starterAvatarIds,
-    shopUnlockedAvatarIds,
-    purchasedShopItemIds,
-    currentAvatarId,
-    avatarXpUnlockRules,
-    planetAvatarUnlocks,
-    planetXP,
-    idAliases,
-    avatarCatalogIds,
-}: {
-    starterAvatarIds: string[];
-    shopUnlockedAvatarIds?: string[];
-    purchasedShopItemIds?: string[];
-    currentAvatarId?: string;
-    avatarXpUnlockRules: UnlockRule[];
-    planetAvatarUnlocks: Record<string, Record<string, number>>;
-    planetXP?: Record<string, number>;
-    idAliases?: Record<string, string>;
-    avatarCatalogIds: Set<string>;
-}) => {
-    const purchasedShopAvatarIds = getPurchasedShopAvatarIds(purchasedShopItemIds).map((id) =>
-        resolveRuntimeUnlockId(id, idAliases, avatarCatalogIds)
-    );
-    const normalizedShopAvatarIds = (shopUnlockedAvatarIds || []).map((id) =>
-        resolveRuntimeUnlockId(id, idAliases, avatarCatalogIds)
-    );
-
-    const unlocked = new Set<string>([
-        ...starterAvatarIds,
-        ...normalizedShopAvatarIds,
-        ...purchasedShopAvatarIds,
-        String(currentAvatarId || "bunny"),
-    ]);
-
-    avatarXpUnlockRules.forEach((rule) => {
-        const normalizedPlanetId = normalizePlanetId(rule.planetId);
-        const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
-        const requiredXP = Number(planetAvatarUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
-        if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
-            unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, avatarCatalogIds));
-        }
-    });
-
-    return unlocked;
-};
-
-    const formatDynamicPetName = (petId: string) => {
-        return String(petId || "")
-        .replace(/\.[^.]+$/g, "")
-        .replace(/[-_]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .replace(/\b\w/g, (char) => char.toUpperCase()) || "Companion";
-    };
-
 const UpgradeSlot = ({ icon: Icon, label, level = 0, active = false }: { icon: any, label: string, level?: number, active?: boolean }) => (
     <div className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 border transition-all cursor-pointer ${active ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900/40 hover:border-cyan-500/50 hover:bg-cyan-900/20'}`}>
         <Icon size={24} className={`mb-2 ${active ? 'text-cyan-300' : 'text-cyan-700'}`} />
@@ -240,7 +169,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
     const MENU_ITEMS = [
         { id: 'ship', title: 'Hangar Bay', icon: Rocket, color: 'text-cyan-400', border: 'border-cyan-500', bg: 'bg-cyan-950/30' },
         { id: 'inventory', title: 'Cargo Hold', icon: Box, color: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/30' },
-        { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30' },
+        { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30', href: '/student/avatar' },
         { id: 'flag', title: 'Flag Designer', icon: Flag, color: 'text-red-400', border: 'border-red-500', bg: 'bg-red-950/30' },
         { id: 'missions', title: 'Mission Log', icon: Activity, color: 'text-green-400', border: 'border-green-500', bg: 'bg-green-950/20', href: '/student/missions' },
         { id: 'interior', title: 'Spaceship Interior', icon: LayoutDashboard, color: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-950/30', href: '/student' },
@@ -657,394 +586,6 @@ function InventoryView() {
     );
 }
 
-
-
-function AvatarConfigView({ onBack }: { onBack: () => void }) {
-    const { user, userData } = useAuth();
-    const [loading, setLoading] = useState(false);
-    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
-    const AVATAR_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.avatars);
-    const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
-    const avatarCatalogIds = useMemo(() => new Set<string>(AVATAR_OPTIONS.map((avatar) => avatar.id)), []);
-    const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
-    const STARTER_AVATAR_IDS = useMemo(() => {
-        const starters = unlockConfig.starters?.avatars?.length ? unlockConfig.starters.avatars : ["bunny"];
-        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, avatarCatalogIds));
-        return Array.from(new Set<string>(resolved.filter(Boolean)));
-    }, [unlockConfig.starters?.avatars, unlockConfig.idAliases, avatarCatalogIds]);
-    const STARTER_SHIP_IDS = useMemo(() => {
-        const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
-        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds));
-        return Array.from(new Set<string>(resolved.filter(Boolean)));
-    }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
-
-    // State for visual properties
-    const [hue, setHue] = useState(userData?.avatar?.hue || 0);
-    const [skinHue, setSkinHue] = useState(userData?.avatar?.skinHue || 0);
-    const [bgHue, setBgHue] = useState(userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 240);
-    const [bgSat, setBgSat] = useState(userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50);
-    const [bgLight, setBgLight] = useState(userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20);
-    const [activeHat, setActiveHat] = useState(userData?.avatar?.activeHat || 'none');
-    const [avatarId, setAvatarId] = useState(userData?.avatar?.avatarId || 'bunny');
-    const [petId, setPetId] = useState(getResolvedSelectedPetId(userData));
-
-    const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<Record<string, Record<string, number>>>({});
-    const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
-    const [unlockedAvatarIds, setUnlockedAvatarIds] = useState<Set<string>>(new Set(STARTER_AVATAR_IDS));
-    const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
-    const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
-
-    useEffect(() => {
-        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
-            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
-        });
-
-        return () => unsub();
-    }, []);
-
-    useEffect(() => {
-        const teacherId = userData?.teacherId;
-        if (!teacherId) return;
-
-        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
-            const avatarMap: Record<string, Record<string, number>> = {};
-            const shipMap: Record<string, Record<string, number>> = {};
-            snap.forEach((d) => {
-                const data = d.data() as any;
-                const rawAvatarUnlocks = data?.unlocks?.avatars || {};
-                const rawShipUnlocks = data?.unlocks?.ships || {};
-                const normalizedAvatars: Record<string, number> = {};
-                const normalizedShips: Record<string, number> = {};
-
-                Object.keys(rawAvatarUnlocks).forEach((key) => {
-                    const threshold = Number(rawAvatarUnlocks[key] || 0);
-                    if (threshold > 0) normalizedAvatars[key] = threshold;
-                });
-
-                Object.keys(rawShipUnlocks).forEach((key) => {
-                    const threshold = Number(rawShipUnlocks[key] || 0);
-                    if (threshold > 0) normalizedShips[key] = threshold;
-                });
-
-                const normalizedPlanetId = normalizePlanetId(d.id);
-                avatarMap[normalizedPlanetId] = normalizedAvatars;
-                shipMap[normalizedPlanetId] = normalizedShips;
-            });
-            setPlanetAvatarUnlocks(avatarMap);
-            setPlanetShipUnlocks(shipMap);
-        });
-
-        return () => unsub();
-    }, [userData?.teacherId]);
-
-    useEffect(() => {
-        const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
-            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
-            setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
-        });
-
-        return () => unsub();
-    }, []);
-
-    useEffect(() => {
-        const currentAvatar = userData?.avatar?.avatarId || "bunny";
-        const unlocked = buildUnlockedAvatarIdSet({
-            starterAvatarIds: STARTER_AVATAR_IDS,
-            shopUnlockedAvatarIds: userData?.shopUnlockedAvatarIds,
-            purchasedShopItemIds: userData?.purchasedShopItemIds,
-            currentAvatarId: currentAvatar,
-            avatarXpUnlockRules: AVATAR_XP_UNLOCK_RULES,
-            planetAvatarUnlocks,
-            planetXP: userData?.planetXP as Record<string, number> | undefined,
-            idAliases: unlockConfig.idAliases,
-            avatarCatalogIds,
-        });
-
-        setUnlockedAvatarIds(unlocked);
-        if (!unlocked.has(avatarId)) setAvatarId(currentAvatar);
-    }, [planetAvatarUnlocks, userData?.planetXP, userData?.avatar?.avatarId, userData?.shopUnlockedAvatarIds, userData?.purchasedShopItemIds, avatarId, STARTER_AVATAR_IDS, unlockConfig.idAliases, avatarCatalogIds]);
-
-    useEffect(() => {
-        const unlocked = buildUnlockedShipIdSet({
-            starterShipIds: STARTER_SHIP_IDS,
-            shopUnlockedShipIds: userData?.shopUnlockedShipIds,
-            purchasedShopItemIds: userData?.purchasedShopItemIds,
-            currentShipId: userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship",
-            shipXpUnlockRules: SHIP_XP_UNLOCK_RULES,
-            planetShipUnlocks,
-            planetXP: userData?.planetXP as Record<string, number> | undefined,
-            idAliases: unlockConfig.idAliases,
-            shipCatalogIds,
-        });
-
-        setUnlockedShipIds(unlocked);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds, unlockConfig.idAliases, shipCatalogIds]);
-
-    useEffect(() => {
-        setPetId(getResolvedSelectedPetId(userData));
-    }, [userData?.selectedPetId, userData?.unlockedPetIds]);
-
-    const purchasedShopPetIds = getPurchasedShopPetIds(userData?.purchasedShopItemIds);
-    const unlockedPetIds = useMemo(() => {
-        return new Set<string>([
-            ...Array.from(getEffectiveUnlockedPetIds(userData)),
-            ...purchasedShopPetIds,
-        ]);
-    }, [userData?.unlockedPetIds, userData?.purchasedShopItemIds]);
-
-    const visiblePetOptions = useMemo(() => {
-        const knownPetIds = new Set<string>(PET_OPTIONS.map((pet) => pet.id));
-        const knownUnlockedPets = PET_OPTIONS.filter((pet) => unlockedPetIds.has(pet.id));
-        const dynamicUnlockedPets = Array.from(unlockedPetIds)
-            .filter((petId) => !knownPetIds.has(petId))
-            .map((petId) => ({
-                id: petId,
-                name: formatDynamicPetName(petId),
-                emoji: "🐾",
-                imageSrc: `/images/collectibles/pets/shop/${petId}.png`,
-            }));
-
-        return [...knownUnlockedPets, ...dynamicUnlockedPets];
-    }, [unlockedPetIds]);
-
-    const handleSave = async () => {
-        if (!user) return;
-        setLoading(true);
-        try {
-            const safeAvatarId = unlockedAvatarIds.has(avatarId) ? avatarId : (userData?.avatar?.avatarId || "bunny");
-            const safePetId = unlockedPetIds.has(petId) ? petId : getResolvedSelectedPetId(userData);
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, {
-                "avatar.hue": hue,
-                "avatar.skinHue": skinHue,
-                "avatar.bgHue": bgHue,
-                "avatar.bgSat": bgSat,
-                "avatar.bgLight": bgLight,
-                "avatar.activeHat": activeHat,
-                "avatar.avatarId": safeAvatarId,
-                "selectedPetId": safePetId,
-                "unlockedPetIds": Array.from(unlockedPetIds)
-            });
-            onBack();
-        } catch (e) {
-            console.error(e);
-            alert("Error saving DNA sequence.");
-        }
-        setLoading(false);
-    };
-
-    return (
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="border border-purple-500/30 bg-black/40 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[400px] relative">
-                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 to-transparent pointer-events-none" />
-                 
-                 <div className="relative w-64 h-64 rounded-full border-4 border-purple-500/50 overflow-visible flex items-center justify-center transition-colors duration-300 ring-4 ring-purple-900/30 shadow-[0_0_50px_rgba(168,85,247,0.4)]">
-                    <UserAvatar
-                        hue={hue}
-                        skinHue={skinHue}
-                        bgHue={bgHue}
-                        bgSat={bgSat}
-                        bgLight={bgLight}
-                        hat={activeHat}
-                        avatarId={avatarId}
-                        className="w-full h-full rounded-full"
-                    />
-                 </div>
-
-                 <div className="mt-8 text-center">
-                    <h3 className="text-xl font-bold text-purple-400 uppercase tracking-widest mb-1">Preview</h3>
-                    <p className="text-purple-300/60 text-sm font-mono">{activeHat !== 'none' ? HAT_OPTIONS.find(h => h.id === activeHat)?.name : 'Standard Uniform'}</p>
-                 </div>
-            </div>
-
-            <div className="space-y-6 max-h-[700px] overflow-y-auto custom-scrollbar pr-2">
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <User size={20} className="text-purple-400" />
-                        <span className="uppercase tracking-wider">Unlocked Avatars</span>
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4">
-                        {AVATAR_OPTIONS.filter(opt => unlockedAvatarIds.has(opt.id)).map((opt) => (
-                            <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => setAvatarId(opt.id)}
-                                className={`group relative p-3 rounded-xl border transition-all flex flex-col items-center gap-2 ${avatarId === opt.id ? 'bg-purple-900/40 border-purple-400' : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'}`}
-                                title={opt.name}
-                            >
-                                <div className="w-14 h-14 rounded-full border-2 border-white/20 overflow-hidden">
-                                    <UserAvatar avatarId={opt.id} hat={activeHat} className="w-full h-full" />
-                                </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${avatarId === opt.id ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>{opt.name}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="bg-purple-950/20 p-6 rounded-xl border border-purple-500/20">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Sparkles size={20} className="text-purple-400" />
-                        <span className="uppercase tracking-wider">Companion Selection</span>
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        {visiblePetOptions.map((pet) => {
-                            return (
-                                <button
-                                    key={pet.id}
-                                    type="button"
-                                    onClick={() => setPetId(pet.id)}
-                                    className={`group relative p-3 rounded-xl border transition-all flex items-center gap-3 ${petId === pet.id
-                                            ? 'bg-purple-900/40 border-purple-400'
-                                            : 'border-white/10 bg-black/40 hover:bg-purple-900/20 hover:border-purple-500/50'
-                                        }`}
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-2xl overflow-hidden">
-                                        {pet.imageSrc ? (
-                                            <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
-                                        ) : (
-                                            <>{pet.emoji}</>
-                                        )}
-                                    </div>
-                                    <div className="text-left min-w-0">
-                                        <div className={`text-xs font-bold uppercase tracking-wider truncate ${petId === pet.id ? 'text-white' : 'text-purple-300 group-hover:text-white'}`}>
-                                            {pet.name}
-                                        </div>
-                                        <div className="mt-1 text-[10px] text-green-300/80 uppercase tracking-widest">Unlocked</div>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="flex gap-4">
-                    <button
-                        onClick={onBack}
-                        disabled={loading}
-                        className="flex-1 py-4 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 uppercase tracking-widest font-bold transition-all"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="flex-1 py-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-black uppercase tracking-widest font-bold transition-all shadow-[0_0_20px_rgba(147,51,234,0.4)]"
-                    >
-                        {loading ? "Saving..." : "Confirm Identity"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function AvatarView({ onNavigate, ranks }: { onNavigate: (path: string) => void, ranks: Rank[] }) {
-    const { userData, user } = useAuth(); // Added user to update name
-    const [isEditingName, setIsEditingName] = useState(false);
-    const [newName, setNewName] = useState("");
-
-    const hue = userData?.avatar?.hue || 0;
-    const skinHue = userData?.avatar?.skinHue || 0;
-    const bgHue = userData?.avatar?.bgHue !== undefined ? userData.avatar.bgHue : 260;
-    const bgSat = userData?.avatar?.bgSat !== undefined ? userData.avatar.bgSat : 50;
-    const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
-    const hat = userData?.avatar?.activeHat || (userData?.avatar?.hat === 'hat1' ? 'helmet1' : userData?.avatar?.hat);
-    const avatarId = userData?.avatar?.avatarId || 'bunny';
-
-    // Rank Logic
-    const currentXP = userData?.xp || 0;
-    const sortedRanks = [...(ranks || [])].sort((a,b) => a.minXP - b.minXP);
-    const currentRank = sortedRanks.slice().reverse().find(r => currentXP >= r.minXP) || { name: 'Recruit', minXP: 0 };
-
-    useEffect(() => {
-        if (userData?.displayName) setNewName(sanitizeName(userData.displayName));
-    }, [userData]);
-
-    const handleSaveName = async () => {
-        const safeName = sanitizeName(newName);
-        if (!user || !safeName) return;
-        try {
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, { displayName: safeName });
-            setNewName(safeName);
-            setIsEditingName(false);
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update identification.");
-        }
-    };
-
-    return (
-        <div className="max-w-4xl mx-auto border border-purple-500/30 bg-black/40 rounded-3xl p-8 min-h-[500px] flex flex-col items-center justify-center">
-            <div className="relative mb-8 group">
-                <div className="w-48 h-48 rounded-full border-4 border-purple-500/50 overflow-hidden flex items-center justify-center relative transition-colors duration-300">
-                    <UserAvatar 
-                         bgHue={bgHue} 
-                         bgSat={bgSat} 
-                         bgLight={bgLight} 
-                         skinHue={skinHue} 
-                         hue={hue} 
-                         hat={hat}
-                         avatarId={avatarId}
-                         className="w-full h-full"
-                    />
-                    
-                    {/* Scan effect overlay */}
-                    <div className="absolute inset-0 bg-purple-500/10 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none" />
-                </div>
-                <button
-                    onClick={() => onNavigate('avatar-config')}
-                    className="absolute bottom-0 right-0 p-3 bg-purple-500 rounded-full text-black hover:bg-purple-400 transition-colors shadow-[0_0_15px_rgba(168,85,247,0.5)] z-30"
-                >
-                    <Wrench size={20} />
-                </button>
-            </div>
-            
-            {/* Editable Name Field */}
-            <div className="flex items-center gap-3 mb-2 relative">
-                {isEditingName ? (
-                    <div className="flex items-center gap-2">
-                        <input 
-                            type="text" 
-                            value={newName} 
-                            onChange={(e) => setNewName(e.target.value.slice(0, NAME_MAX_LENGTH))}
-                            maxLength={NAME_MAX_LENGTH}
-                            className="bg-black/50 border border-purple-500 text-white font-bold text-2xl px-2 py-1 rounded w-64 text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            autoFocus
-                        />
-                        <button onClick={handleSaveName} className="p-2 bg-green-600 rounded-lg hover:bg-green-500 text-white"><Save size={16} /></button>
-                        <button onClick={() => setIsEditingName(false)} className="p-2 bg-red-600 rounded-lg hover:bg-red-500 text-white">?</button>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-3 group/edit">
-                        <h2 className="text-2xl font-bold text-white cursor-pointer" onClick={() => setIsEditingName(true)}>
-                            {truncateName(userData?.displayName || "Cadet Pilot")}
-                        </h2>
-                        <button 
-                            onClick={() => setIsEditingName(true)} 
-                            className="text-purple-500 opacity-0 group-hover/edit:opacity-100 transition-opacity p-1 hover:bg-purple-500/20 rounded"
-                        >
-                            <Wrench size={14} />
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            <p className="text-purple-400 font-mono text-sm tracking-wider mb-8 uppercase">{currentRank.name}  |  NO FACTION</p>
-            <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-                 <div className="bg-purple-950/30 p-4 rounded-xl border border-purple-500/20 text-center">
-                    <div className="text-2xl font-bold text-white">{currentXP} XP</div>
-                    <div className="text-xs text-purple-400 uppercase tracking-wider">Experience</div>
-                 </div>
-                 <div className="bg-purple-950/30 p-4 rounded-xl border border-purple-500/20 text-center">
-                    <div className="text-2xl font-bold text-white">{currentXP}</div>
-                    <div className="text-xs text-purple-400 uppercase tracking-wider">Current XP</div>
-                 </div>
-            </div>
-        </div>
-    );
-}
-
 // --- Flag Designer ---
 
 const FLAG_POLES = [
@@ -1310,8 +851,9 @@ const DEFAULT_RANKS: Rank[] = [
 
 export default function SettingsPage() {
     const { userData, user } = useAuth();
+    const router = useRouter();
     const searchParams = useSearchParams();
-    const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'avatar' | 'avatar-config' | 'flag'>('cockpit');
+    const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'flag'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
@@ -1326,10 +868,18 @@ export default function SettingsPage() {
 
     useEffect(() => {
         const requestedView = String(searchParams?.get("view") || "").toLowerCase();
-        if (requestedView === "ship" || requestedView === "inventory" || requestedView === "avatar" || requestedView === "avatar-config" || requestedView === "flag" || requestedView === "cockpit") {
+        if (requestedView === "avatar") {
+            router.replace("/student/avatar");
+            return;
+        }
+        if (requestedView === "avatar-config") {
+            router.replace("/student/pets");
+            return;
+        }
+        if (requestedView === "ship" || requestedView === "inventory" || requestedView === "flag" || requestedView === "cockpit") {
             setView(requestedView as typeof view);
         }
-    }, [searchParams]);
+    }, [router, searchParams]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
@@ -1409,8 +959,6 @@ export default function SettingsPage() {
         switch(view) {
             case 'ship': return 'Hangar Bay';
             case 'inventory': return 'Cargo Hold';
-            case 'avatar': return 'Pilot Profile';
-            case 'avatar-config': return 'DNA Sequencer';
             case 'flag': return 'Flag Fabricator';
             default: return 'Main Cockpit';
         }
@@ -1458,8 +1006,6 @@ export default function SettingsPage() {
                         {view === 'cockpit' && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
                         {view === 'ship' && <ShipSettings userData={userData} user={user} unlockedShipIds={unlockedShipIds} />}
                         {view === 'inventory' && <InventoryView />}
-                        {view === 'avatar' && <AvatarView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
-                        {view === 'avatar-config' && <AvatarConfigView onBack={() => setView('avatar')} />}
                         {view === 'flag' && <FlagDesigner />}
                     </motion.div>
                 </AnimatePresence>

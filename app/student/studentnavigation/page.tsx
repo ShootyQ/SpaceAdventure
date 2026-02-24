@@ -231,12 +231,23 @@ function LoadoutCard({
     onChange: (value: string) => void;
     onSave: () => void;
 }) {
+    const [hasImageError, setHasImageError] = useState(false);
+
+    useEffect(() => {
+        setHasImageError(false);
+    }, [assetSrc]);
+
     return (
         <div className="border border-cyan-900/50 bg-black/30 rounded-xl p-4">
             <div className="text-xs uppercase tracking-wider text-cyan-600 mb-2">{label}</div>
             <div className="h-24 rounded-lg border border-cyan-900/40 bg-black/40 flex items-center justify-center p-2 mb-3">
-                {assetSrc ? (
-                    <img src={getAssetPath(assetSrc)} alt={label} className="max-h-full max-w-full object-contain" />
+                {assetSrc && !hasImageError ? (
+                    <img
+                        src={getAssetPath(assetSrc)}
+                        alt={label}
+                        className="max-h-full max-w-full object-contain"
+                        onError={() => setHasImageError(true)}
+                    />
                 ) : (
                     <div className="text-xs text-cyan-700">No asset</div>
                 )}
