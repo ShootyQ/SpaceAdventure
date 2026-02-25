@@ -6,10 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
 import { ArrowLeft, Coins, LayoutDashboard, Loader2, Rocket, Sparkles } from "lucide-react";
-import { SHIP_OPTIONS } from "@/lib/ships";
+import { resolveShipAssetPath, SHIP_OPTIONS } from "@/lib/ships";
 import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
-import { ensurePrefixedUnlockId } from "@/lib/unlocks";
+import { DEFAULT_UNLOCK_CONFIG, normalizeUnlockConfig, ensurePrefixedUnlockId } from "@/lib/unlocks";
+import { normalizePetUnlockAssignments, PET_OPTIONS, type PetUnlockAssignment } from "@/lib/pets";
 
 type ShopItem = {
     id: string;
@@ -27,6 +28,7 @@ const CATEGORY_TITLES: Record<string, string> = {
 };
 
 const CATEGORY_ORDER = ["pets", "ships", "avatars", "objects"];
+const DEFAULT_PRICE = 100;
 
 const getUnlockIdFromItem = (itemId: string) => String(itemId || "").split("/").pop() || "";
 
@@ -84,6 +86,9 @@ export default function StudentShopPage() {
     const [localAvatarId, setLocalAvatarId] = useState("bunny");
     const [localPetId, setLocalPetId] = useState("");
     const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
+    const [nameOverrides, setNameOverrides] = useState<Record<string, string>>({});
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const [petUnlockAssignments, setPetUnlockAssignments] = useState<Record<string, PetUnlockAssignment>>({});
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
     useEffect(() => {
@@ -162,34 +167,148 @@ export default function StudentShopPage() {
     }, [userData?.teacherId]);
 
     useEffect(() => {
-        if (!user) return;
-
         const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
-            const raw = (snapshot.data() as any)?.prices || {};
-            const normalized: Record<string, number> = {};
+            const data = (snapshot.data() as any) || {};
 
-            Object.entries(raw).forEach(([itemId, value]) => {
+            const rawPrices = data?.prices || {};
+            const normalizedPrices: Record<string, number> = {};
+
+            Object.entries(rawPrices).forEach(([itemId, value]) => {
+                const key = String(itemId || "").trim().toLowerCase();
+                if (!key) return;
                 const numeric = Number(value);
                 if (Number.isFinite(numeric)) {
-                    normalized[String(itemId)] = Math.max(0, Math.round(numeric));
+                    normalizedPrices[key] = Math.max(0, Math.round(numeric));
                 }
             });
 
-            setPriceOverrides(normalized);
+            const rawNames = data?.nameOverrides || {};
+            const normalizedNames: Record<string, string> = {};
+            Object.entries(rawNames).forEach(([itemId, value]) => {
+                const key = String(itemId || "").trim().toLowerCase();
+                const name = String(value || "").trim();
+                if (!key || !name) return;
+                normalizedNames[key] = name;
+            });
+
+            setPriceOverrides(normalizedPrices);
+            setNameOverrides(normalizedNames);
         });
 
         return () => unsub();
-    }, [user]);
+    }, []);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
+            const raw = (snapshot.data() as any) || {};
+            setPetUnlockAssignments(normalizePetUnlockAssignments(raw?.petUnlockAssignments || null));
+        });
+
+        return () => unsub();
+    }, []);
 
     const resolvedItems = useMemo(() => {
-        return shopItems.map((item) => {
-            const override = priceOverrides[item.id];
-            return {
+        const merged = new Map<string, ShopItem>();
+
+        const upsert = (item: ShopItem) => {
+            const normalizedId = String(item.id || "").trim().toLowerCase();
+            if (!normalizedId) return;
+            merged.set(normalizedId, {
                 ...item,
-                price: Number.isFinite(override) ? override : item.price,
-            };
+                id: normalizedId,
+                category: String(item.category || "misc").trim().toLowerCase(),
+            });
+        };
+
+        shopItems.forEach((item) => upsert(item));
+
+        (unlockConfig.ships || []).forEach((rule) => {
+            if (String(rule.channel || "").toLowerCase() !== "shop") return;
+
+            const unlockId = String(rule.unlockKey || rule.id || "").trim().toLowerCase();
+            if (!unlockId) return;
+
+            const itemId = `ships/${unlockId}`;
+            const existing = merged.get(itemId);
+            const fallbackName = String(rule.name || unlockId);
+
+            upsert({
+                id: itemId,
+                name: existing?.name || fallbackName,
+                category: "ships",
+                imagePath: existing?.imagePath || resolveShipAssetPath(unlockId),
+                price: Number.isFinite(existing?.price) ? Number(existing?.price) : DEFAULT_PRICE,
+            });
         });
-    }, [shopItems, priceOverrides]);
+
+        (unlockConfig.avatars || []).forEach((rule) => {
+            if (String(rule.channel || "").toLowerCase() !== "shop") return;
+
+            const unlockId = String(rule.unlockKey || rule.id || "").trim().toLowerCase();
+            if (!unlockId) return;
+
+            const itemId = `avatars/${unlockId}`;
+            const existing = merged.get(itemId);
+            const avatarOption = AVATAR_OPTIONS.find((avatar) => avatar.id === unlockId || avatar.id === String(rule.id || "").trim().toLowerCase());
+            const fallbackName = String(rule.name || avatarOption?.name || unlockId);
+
+            upsert({
+                id: itemId,
+                name: existing?.name || fallbackName,
+                category: "avatars",
+                imagePath: existing?.imagePath || String(avatarOption?.src || `/images/collectibles/avatars/shop/${unlockId}.png`),
+                price: Number.isFinite(existing?.price) ? Number(existing?.price) : DEFAULT_PRICE,
+            });
+        });
+
+        Object.entries(petUnlockAssignments || {}).forEach(([petId, assignment]) => {
+            if (String((assignment as any)?.method || "").toLowerCase() !== "shop") return;
+
+            const normalizedPetId = normalizeShopPetId(petId);
+            if (!normalizedPetId) return;
+
+            const itemId = `pets/${normalizedPetId}`;
+            const existing = merged.get(itemId);
+            const petOption = PET_OPTIONS.find((pet) => normalizeShopPetId(pet.id) === normalizedPetId);
+            const fallbackName = String(petOption?.name || normalizedPetId);
+
+            upsert({
+                id: itemId,
+                name: existing?.name || fallbackName,
+                category: "pets",
+                imagePath: existing?.imagePath || String(petOption?.imageSrc || `/images/collectibles/pets/shop/${normalizedPetId}.png`),
+                price: Number.isFinite(existing?.price) ? Number(existing?.price) : DEFAULT_PRICE,
+            });
+        });
+
+        return Array.from(merged.values())
+            .map((item) => {
+                const normalizedId = String(item.id || "").trim().toLowerCase();
+                const overridePrice = priceOverrides[normalizedId];
+                const overrideName = nameOverrides[normalizedId];
+                const fallbackPrice = Number(item.price);
+                return {
+                    ...item,
+                    name: String(overrideName || item.name || normalizedId),
+                    price: Number.isFinite(overridePrice)
+                        ? Math.max(0, Math.round(overridePrice))
+                        : (Number.isFinite(fallbackPrice) ? Math.max(0, Math.round(fallbackPrice)) : DEFAULT_PRICE),
+                };
+            })
+            .sort((a, b) => {
+                const categoryDiff = String(a.category).localeCompare(String(b.category));
+                if (categoryDiff !== 0) return categoryDiff;
+                return String(a.name).localeCompare(String(b.name));
+            });
+    }, [shopItems, unlockConfig, petUnlockAssignments, priceOverrides, nameOverrides]);
 
     const groupedItems = useMemo(() => {
         const map: Record<string, ShopItem[]> = {};

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getAssetPath } from "@/lib/utils";
 import { getEffectiveUnlockedPetIds, getResolvedSelectedPetId, PET_OPTIONS } from "@/lib/pets";
 import { Check, Loader2 } from "lucide-react";
@@ -37,6 +37,7 @@ export default function StudentPetsPage() {
     const [saving, setSaving] = useState(false);
     const [notice, setNotice] = useState("");
     const [shopPetMeta, setShopPetMeta] = useState<Record<string, ShopPetMeta>>({});
+    const [shopNameOverrides, setShopNameOverrides] = useState<Record<string, string>>({});
     const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
@@ -81,6 +82,30 @@ export default function StudentPetsPage() {
         };
     }, []);
 
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
+            const raw = (snapshot.data() as any)?.nameOverrides || {};
+            const normalized: Record<string, string> = {};
+
+            Object.entries(raw).forEach(([itemId, value]) => {
+                const normalizedItemId = String(itemId || "").trim().toLowerCase();
+                const nextName = String(value || "").trim();
+                if (!normalizedItemId || !nextName) return;
+
+                const petIdFromPath = normalizedItemId.startsWith("pets/")
+                    ? normalizedItemId.split("/").pop() || ""
+                    : "";
+                if (!petIdFromPath) return;
+
+                normalized[petIdFromPath] = nextName;
+            });
+
+            setShopNameOverrides(normalized);
+        });
+
+        return () => unsub();
+    }, []);
+
     const purchasedShopPetIds = getPurchasedShopPetIds(userData?.purchasedShopItemIds);
     const unlockedPetIds = useMemo(() => {
         return new Set<string>([
@@ -105,13 +130,13 @@ export default function StudentPetsPage() {
             .filter((id) => !knownPetIds.has(id))
             .map((id) => ({
                 id,
-                name: String(shopPetMeta[id]?.name || formatDynamicPetName(id)),
+                name: String(shopNameOverrides[id] || shopPetMeta[id]?.name || formatDynamicPetName(id)),
                 emoji: "🐾",
                 imageSrc: String(shopPetMeta[id]?.imagePath || `/images/collectibles/pets/shop/${id}.png`),
             }));
 
         return [...knownUnlockedPets, ...dynamicUnlockedPets].sort((a, b) => a.name.localeCompare(b.name));
-    }, [shopPetMeta, unlockedPetIds]);
+    }, [shopNameOverrides, shopPetMeta, unlockedPetIds]);
 
     const handleSave = async () => {
         if (!user) return;
