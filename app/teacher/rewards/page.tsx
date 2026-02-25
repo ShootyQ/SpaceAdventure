@@ -5,6 +5,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { getAssetPath } from "@/lib/utils";
+import { resolveShipAssetPath } from "@/lib/ships";
 import { UserData, Rank } from "@/types";
 import { UserAvatar } from '@/components/UserAvatar';
 import { Star, Plus, Trash2, Save, X, Zap, Award, Check } from "lucide-react";
@@ -15,7 +16,7 @@ import Link from "next/link";
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
     return (
         <img 
-            src={getAssetPath("/images/ships/finalship.png")}
+            src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
             alt="Rocket"
             className={`object-contain ${className}`}
             style={{ width: size, height: size }}
@@ -42,7 +43,8 @@ export default function RewardsPage() {
     
     // Forms
     const [newLabel, setNewLabel] = useState("");
-    const [newXp, setNewXp] = useState(50);
+    const [newXpInput, setNewXpInput] = useState("50");
+    const [creditsPerAward, setCreditsPerAward] = useState(1);
     const { user } = useAuth();
 
     // Helper for Multi-Select
@@ -114,10 +116,23 @@ export default function RewardsPage() {
             }
         });
 
+        const economyRef = doc(db, `users/${user.uid}/settings`, "economy");
+        const unsubEconomy = onSnapshot(economyRef, async (snapshot) => {
+            if (!snapshot.exists()) {
+                await setDoc(economyRef, { creditsPerAward: 1, teacherId: user.uid, updatedAt: serverTimestamp() }, { merge: true });
+                setCreditsPerAward(1);
+                return;
+            }
+
+            const value = Number((snapshot.data() as any)?.creditsPerAward || 1);
+            setCreditsPerAward(Number.isFinite(value) ? Math.max(0, Math.round(value)) : 1);
+        });
+
         return () => {
             unsubStudents();
             unsubBehaviors();
             unsubRanks();
+            unsubEconomy();
         };
     }, [user]);
 
@@ -128,6 +143,7 @@ export default function RewardsPage() {
         const xpAmount = Number(behavior.xp);
         const awardedStudents = selectedIds.size;
         const totalAwardedPoints = xpAmount * awardedStudents;
+        const creditsAwardValue = Math.max(0, Math.round(Number(creditsPerAward) || 0));
 
         // Play notification sound immediately (User Interaction)
         const audioElement = document.getElementById('notification-audio') as HTMLAudioElement;
@@ -162,8 +178,17 @@ export default function RewardsPage() {
                             const userUpdates: Record<string, any> = {
                                 xp: increment(xpAmount),
                                 fuel: newFuel,
+                                lastAward: {
+                                    reason: behavior.label,
+                                    xpGained: xpAmount,
+                                    timestamp: Date.now(),
+                                },
                                 lastXpReason: behavior.label
                             };
+
+                     if (xpAmount > 0 && creditsAwardValue > 0) {
+                         userUpdates.galacticCredits = increment(creditsAwardValue);
+                     }
 
                      // 4. Queue Planet Update (Atomic)
                      const rawLocation = data.location;
@@ -222,16 +247,21 @@ export default function RewardsPage() {
     const handleAddBehavior = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
+        const parsedXp = Number(newXpInput);
+        if (!Number.isInteger(parsedXp) || parsedXp < -1000 || parsedXp > 1000) {
+            alert("XP must be an integer between -1000 and 1000.");
+            return;
+        }
         try {
             // Add to subcollection
             await addDoc(collection(db, `users/${user.uid}/behaviors`), {
                 label: newLabel,
-                xp: Number(newXp),
-                color: Number(newXp) > 0 ? "bg-green-600" : "bg-red-600",
+                xp: parsedXp,
+                color: parsedXp > 0 ? "bg-green-600" : "bg-red-600",
                 teacherId: user.uid
             });
             setNewLabel("");
-            setNewXp(50);
+            setNewXpInput("50");
         } catch (error) {
             console.error("Error adding behavior:", error);
             alert("Failed to add protocol. ensure you have permission.");
@@ -244,6 +274,26 @@ export default function RewardsPage() {
         try {
             await deleteDoc(doc(db, `users/${user.uid}/behaviors`, id));
         } catch (e) { console.error(e); }
+    };
+
+    const handleSaveCreditsPerAward = async () => {
+        if (!user) return;
+        const normalized = Math.max(0, Math.round(Number(creditsPerAward) || 0));
+        try {
+            await setDoc(
+                doc(db, `users/${user.uid}/settings`, "economy"),
+                {
+                    creditsPerAward: normalized,
+                    teacherId: user.uid,
+                    updatedAt: serverTimestamp(),
+                },
+                { merge: true }
+            );
+            setCreditsPerAward(normalized);
+        } catch (error) {
+            console.error("Failed to save economy settings:", error);
+            alert("Could not save credits settings.");
+        }
     };
 
     return (
@@ -262,6 +312,23 @@ export default function RewardsPage() {
                         <h1 className="text-xl md:text-2xl font-bold uppercase tracking-widest text-white">Rewards Command</h1>
                     </div>
                     <div className="flex gap-2 w-full md:w-auto">
+                        <div className="flex items-center gap-2 border border-cyan-800 rounded px-2 py-1 bg-black/30">
+                            <label className="text-[10px] uppercase tracking-wider text-cyan-500">Credits / Award</label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={creditsPerAward}
+                                onChange={(e) => setCreditsPerAward(Math.max(0, Number(e.target.value) || 0))}
+                                className="w-16 bg-black/50 border border-cyan-800 rounded px-2 py-1 text-white text-xs focus:border-cyan-400 outline-none"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleSaveCreditsPerAward}
+                                className="text-[10px] uppercase tracking-wider px-2 py-1 rounded border border-cyan-700 text-cyan-300 hover:border-cyan-500"
+                            >
+                                Save
+                            </button>
+                        </div>
                          <button 
                             onClick={() => setIsManagingProtocols(!isManagingProtocols)}
                             className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border transition-colors ${isManagingProtocols ? 'bg-cyan-900/40 border-cyan-400 text-white' : 'border-cyan-800 text-cyan-500 hover:border-cyan-500'}`}
@@ -305,9 +372,16 @@ export default function RewardsPage() {
                                             <label className="text-xs text-cyan-500 uppercase">XP Amount</label>
                                             <div className="flex gap-2">
                                                 <input 
-                                                    type="number"
-                                                    value={newXp}
-                                                    onChange={e => setNewXp(Number(e.target.value))}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={newXpInput}
+                                                    onChange={(e) => {
+                                                        const next = e.target.value.trim();
+                                                        if (/^-?\d*$/.test(next)) {
+                                                            setNewXpInput(next);
+                                                        }
+                                                    }}
+                                                    placeholder="-1000 to 1000"
                                                     className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none"
                                                     required
                                                 />
@@ -367,6 +441,7 @@ export default function RewardsPage() {
                                     {students.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
                                         const isSelected = selectedIds.has(student.uid);
+                                        const selectedShipId = student.spaceship?.modelId || student.spaceship?.id || "finalship";
                                         return (
                                         <motion.button
                                             whileTap={{ scale: 0.95 }}
@@ -405,7 +480,11 @@ export default function RewardsPage() {
                                                 {/* (Desktop Only) Avatar Circle */}
                                                 <div className="hidden md:flex w-28 h-28 rounded-full items-center justify-center bg-gradient-to-b from-white/10 to-transparent group-hover:from-cyan-500/20 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 group-hover:border-cyan-400/30 overflow-hidden relative">
                                                     <img 
-                                                        src={getAssetPath("/images/ships/finalship.png")}
+                                                        src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                                                        onError={(event) => {
+                                                            event.currentTarget.onerror = null;
+                                                            event.currentTarget.src = getAssetPath("/images/collectibles/ships/starter/finalship.png");
+                                                        }}
                                                         className="w-full h-full object-contain relative z-20 scale-75"
                                                         alt="Rocket"
                                                     />

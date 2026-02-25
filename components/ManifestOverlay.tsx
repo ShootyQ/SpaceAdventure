@@ -7,6 +7,7 @@ import { Ship, Rank, Behavior } from "@/types";
 import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
+import { resolveShipAssetPath } from "@/lib/ships";
 import { UserAvatar } from "./UserAvatar";
 import { getPetById } from "@/lib/pets";
 
@@ -69,6 +70,7 @@ interface ManifestOverlayProps {
     selectedIds: Set<string>;
     setSelectedIds: (ids: Set<string>) => void;
     behaviors: Behavior[];
+    creditsPerAward: number;
 }
 
 const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void }) => {
@@ -112,7 +114,11 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
 
                 <div className="relative z-20 w-24 h-24 md:w-28 md:h-28">
                     <img
-                        src={getAssetPath(`/images/ships/${shipModelId}.png`)}
+                        src={getAssetPath(resolveShipAssetPath(shipModelId))}
+                        onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = getAssetPath("/images/collectibles/ships/starter/finalship.png");
+                        }}
                         alt="Ship"
                         className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.25)]"
                     />
@@ -158,7 +164,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
 });
 ShipCard.displayName = "ShipCard";
 
-const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, setSelectedIds, behaviors }: ManifestOverlayProps) => {
+const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, setSelectedIds, behaviors, creditsPerAward }: ManifestOverlayProps) => {
     
     // 1. Optimize Ranks (Sort once)
     const sortedRanks = React.useMemo(() => ranks.slice().sort((a,b) => b.minXP - a.minXP), [ranks]);
@@ -318,6 +324,10 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                         // Ensure legacy field is updated too for compatibility
                                                         lastXpReason: reasonInput
                                                     };
+
+                                                    if (xpInput > 0 && creditsPerAward > 0) {
+                                                        userUpdates.galacticCredits = increment(creditsPerAward);
+                                                    }
 
                                                     // 3. Queue Class Bonus Update (If student has a teacher)
                                                     if (data.teacherId && xpInput > 0) {

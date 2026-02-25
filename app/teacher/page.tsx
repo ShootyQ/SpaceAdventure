@@ -223,10 +223,10 @@ export default function TeacherAdventurePortal() {
                     ) : (
                         <>
                              <p className="text-sm text-slate-500 mt-1">
-                                Upgrade to unlock full access.
+                          Trial access is active. Add billing before trial ends to avoid interruption.
                             </p>
                             <div className="mt-4 flex items-center gap-1 text-sm font-semibold text-amber-700 group-hover:gap-2 transition-all">
-                                View plans <ChevronRight className="w-4 h-4" />
+                          Set up billing <ChevronRight className="w-4 h-4" />
                             </div>
                         </>
                     )}

@@ -10,7 +10,7 @@ export default function PendingPage() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white p-4 text-center">
             <div className="mb-8 animate-pulse">
                 <img 
-                    src={getAssetPath("/images/ships/finalship.png")}
+                    src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
                     alt="Pending"
                     className="w-20 h-20 object-contain drop-shadow-[0_0_15px_rgba(234,179,8,0.5)] transform -rotate-45"
                 />

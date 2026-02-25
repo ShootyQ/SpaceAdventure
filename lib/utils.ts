@@ -20,6 +20,9 @@ export const generateClassCode = () => {
 };
 
 export const NAME_MAX_LENGTH = 24;
+export const PROFILE_NAME_MAX_LENGTH = 30;
+export const PROFILE_NAME_MIN_LENGTH = 1;
+const PROFILE_NAME_ALLOWED_REGEX = /^[0-9A-Za-zÀ-ÖØ-öø-ÿĀ-žƀ-ɏ ]+$/;
 
 export const sanitizeName = (value: string, maxLength = NAME_MAX_LENGTH) => {
     return String(value || '')
@@ -32,4 +35,17 @@ export const truncateName = (value: string, maxLength = NAME_MAX_LENGTH) => {
     const safe = String(value || '');
     if (safe.length <= maxLength) return safe;
     return `${safe.slice(0, maxLength).trimEnd()}…`;
+};
+
+export const sanitizeProfileName = (value: string, maxLength = PROFILE_NAME_MAX_LENGTH) => {
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxLength);
+};
+
+export const isValidProfileName = (value: string, minLength = PROFILE_NAME_MIN_LENGTH, maxLength = PROFILE_NAME_MAX_LENGTH) => {
+    const sanitized = sanitizeProfileName(value, maxLength);
+    if (sanitized.length < minLength || sanitized.length > maxLength) return false;
+    return PROFILE_NAME_ALLOWED_REGEX.test(sanitized);
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveShipAssetPath } from "@/lib/ships";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -16,10 +17,13 @@ import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, Asteroid
 import {
     DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
     getPetById,
+    normalizePetUnlockAssignments,
     normalizePetUnlockChanceConfig,
+    PetUnlockAssignment,
     PetUnlockChanceConfig,
     rollPetUnlocksForXpEvent,
 } from "@/lib/pets";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, type UnlockRule } from "@/lib/unlocks";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -135,10 +139,16 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
     const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+    const [petUnlockAssignments, setPetUnlockAssignments] = useState<Record<string, PetUnlockAssignment>>({});
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
   const [className, setClassName] = useState("");
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const shipXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.ships));
+    const avatarXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.avatars));
+
+    const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
 
   useEffect(() => {
     if (!userData) return;
@@ -166,12 +176,28 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
-            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            const rawSnapshot = (snapshot.data() as any) || {};
+            const rawConfig = rawSnapshot?.petUnlockChances;
+            const rawAssignments = rawSnapshot?.petUnlockAssignments;
             setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+            setPetUnlockAssignments(normalizePetUnlockAssignments(rawAssignments));
         });
 
         return () => unsub();
     }, []);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        shipXpUnlockRulesRef.current = getXpUnlockRules(unlockConfig.ships || []);
+        avatarXpUnlockRulesRef.current = getXpUnlockRules(unlockConfig.avatars || []);
+    }, [unlockConfig]);
 
   // Trigger Bonus Victory
   useEffect(() => {
@@ -227,6 +253,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
+    const [creditsPerAward, setCreditsPerAward] = useState(1);
   const previousXPRef = useRef<Map<string, number>>(new Map());
   const isFirstLoad = useRef(true);
 
@@ -279,6 +306,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     return () => unsub();
   }, [userData]);
+
+    useEffect(() => {
+        if (!userData) return;
+        const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        if (!teacherId) return;
+
+        const economyRef = doc(db, `users/${teacherId}/settings`, "economy");
+        const unsub = onSnapshot(economyRef, (snapshot) => {
+            const value = Number((snapshot.data() as any)?.creditsPerAward || 1);
+            setCreditsPerAward(Number.isFinite(value) ? Math.max(0, Math.round(value)) : 1);
+        });
+
+        return () => unsub();
+    }, [userData]);
 
   const zoomRef = useRef(zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -499,7 +540,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
                     const planetId = (shipData.locationId || '').toLowerCase();
-                    const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
                     const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
                     const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
                     const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
@@ -511,13 +551,35 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const canRollPetUnlocks = userData.role === 'teacher' || userData.role === 'admin';
 
                     let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
-                    if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
-                        const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
-                        const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
 
-                        if (joviUnlockedNow) {
+                    if (Boolean(planetId) && newPlanetXP > oldPlanetXP) {
+                        const dynamicPlanetData = dynamicPlanetsRef.current.get(planetId) || {};
+                        const planetShipThresholds = (dynamicPlanetData?.unlocks?.ships || {}) as Record<string, number>;
+                        const planetAvatarThresholds = (dynamicPlanetData?.unlocks?.avatars || {}) as Record<string, number>;
+
+                        const newlyUnlockedShips = shipXpUnlockRulesRef.current
+                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                            .filter((rule) => {
+                                const threshold = Number(planetShipThresholds?.[rule.unlockKey] || 0);
+                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                            })
+                            .map((rule) => String(rule.unlockKey || "").trim())
+                            .filter(Boolean);
+
+                        const newlyUnlockedAvatars = avatarXpUnlockRulesRef.current
+                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                            .filter((rule) => {
+                                const threshold = Number(planetAvatarThresholds?.[rule.unlockKey] || 0);
+                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                            })
+                            .map((rule) => String(rule.unlockKey || "").trim())
+                            .filter(Boolean);
+
+                        if (newlyUnlockedShips.length > 0 || newlyUnlockedAvatars.length > 0) {
                             unlocks = {
-                                avatars: ['jovi'],
+                                ...unlocks,
+                                ...(newlyUnlockedShips.length > 0 ? { ships: [...(unlocks?.ships || []), ...newlyUnlockedShips] } : {}),
+                                ...(newlyUnlockedAvatars.length > 0 ? { avatars: [...(unlocks?.avatars || []), ...newlyUnlockedAvatars] } : {}),
                             };
                         }
                     }
@@ -527,6 +589,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             planetId,
                             currentlyUnlockedPetIds: effectiveUnlockedPets,
                             chanceConfig: petUnlockChanceConfig,
+                            assignmentOverrides: petUnlockAssignments,
                         });
 
                         if (unlockedPetIds.length > 0) {
@@ -660,7 +723,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, isStudentPersonalView, petUnlockChanceConfig]);
+    }, [userData, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -1365,7 +1428,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                               >
                                   <div className="relative w-full h-full">
                                       <img 
-                                            src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
+                                            src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                            }}
                                             alt="Traveling Ship"
                                                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
@@ -1533,7 +1600,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
-                                                    src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
+                                                    src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                                    }}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
@@ -1914,6 +1985,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              selectedIds={selectedIds}
              setSelectedIds={setSelectedIds}
              behaviors={behaviors}
+             creditsPerAward={creditsPerAward}
          />
       )}
 
@@ -1994,7 +2066,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                                     <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
                                         <img 
-                                            src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
+                                            src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))} 
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                            }}
                                             alt="Award Ship"
                                             className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
                                         />
@@ -2092,7 +2168,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start justify-items-center">
                                         {(activeUnlockReveal.unlocks?.ships || []).map((id) => (
                                             <div key={`reveal-ship-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-16 h-16 object-contain drop-shadow-md" />
+                                                <img
+                                                    src={getAssetPath(resolveShipAssetPath(id))}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                                    }}
+                                                    alt={id}
+                                                    className="w-16 h-16 object-contain drop-shadow-md"
+                                                />
                                                 <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Ship</div>
                                             </div>
                                         ))}

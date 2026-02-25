@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getAssetPath } from '@/lib/utils';
+import { getTeacherTrialInfo, isTeacherTrialActive } from '@/lib/subscription';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import DashboardTutorial from '../DashboardTutorial';
@@ -18,6 +19,9 @@ interface ClassBonusConfig {
 
 export default function TeacherConsole() {
     const { logout, user, userData, loading } = useAuth();
+    const trialInfo = getTeacherTrialInfo(userData);
+    const trialActive = isTeacherTrialActive(userData);
+    const trialDaysRemaining = trialInfo?.trialDaysRemaining;
   const pathname = usePathname();
     const router = useRouter();
 
@@ -123,7 +127,9 @@ export default function TeacherConsole() {
                         </span>
                     ) : (
                         <Link href="/teacher/settings?mode=billing" className="text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/50 px-2 py-0.5 rounded uppercase tracking-widest font-normal flex items-center gap-1 transition-colors">
-                            Trial Version <span className="hidden sm:inline">- Upgrade</span>
+                            {trialActive && trialDaysRemaining !== null && trialDaysRemaining !== undefined
+                                ? `Trial: ${trialDaysRemaining}d left`
+                                : "Access Paused - Billing"}
                         </Link>
                     )}
                 </h1>
