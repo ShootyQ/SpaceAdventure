@@ -490,7 +490,7 @@ export default function RewardsPage() {
                          ) : (
                              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-24">
                                 {/* Density adjustments for mobile: grid-cols-4, smaller gap */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4 auto-rows-fr">
+                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-4 auto-rows-fr">
                                     {students.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
                                         const isSelected = selectedIds.has(student.uid);
@@ -500,7 +500,7 @@ export default function RewardsPage() {
                                             key={student.uid}
                                             onClick={() => handleCadetTap(student.uid)}
                                             className={`
-                                                relative w-full min-h-[108px] md:min-h-[136px] flex flex-col p-2 md:p-3 rounded-lg md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
+                                                relative w-full min-h-[66px] md:min-h-[136px] flex flex-col p-1.5 md:p-3 rounded-md md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
                                                 ${isSelected 
                                                     ? 'bg-cyan-900/60 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
                                                     : 'bg-black/40 border-cyan-900/50 hover:bg-cyan-900/40 hover:border-cyan-400'}
@@ -508,8 +508,8 @@ export default function RewardsPage() {
                                             `}
                                         >
                                             {/* CHECKMARK for Selection */}
-                                            <div className={`absolute top-1 left-1 md:top-2 md:left-2 z-20 w-4 h-4 md:w-6 md:h-6 rounded-full border md:border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
-                                                 {isSelected && <Check size={12} className="text-black stroke-[4] block md:hidden" />}
+                                                <div className={`absolute top-1 left-1 md:top-2 md:left-2 z-20 w-3.5 h-3.5 md:w-6 md:h-6 rounded-full border md:border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
+                                                    {isSelected && <Check size={10} className="text-black stroke-[4] block md:hidden" />}
                                                  {isSelected && <Check size={14} className="text-black stroke-[4] hidden md:block" />}
                                             </div>
 
@@ -528,20 +528,16 @@ export default function RewardsPage() {
                                             </div>
 
                                             {/* Content Container */}
-                                            <div className="flex-1 flex flex-col items-center md:items-start justify-center w-full z-10 gap-2">
-                                                <div className="md:hidden w-10 h-10 rounded-full overflow-hidden border border-cyan-700/70 bg-black/40">
-                                                    <UserAvatar userData={student} className="w-full h-full" />
-                                                </div>
-
+                                            <div className="flex-1 flex flex-col items-center md:items-start justify-center w-full z-10 gap-1 md:gap-2">
                                                 <div className="text-center md:text-left w-full flex flex-col justify-center">
-                                                    <h3 className="text-white font-bold text-sm md:text-base leading-tight w-full px-0.5 break-words md:truncate">
+                                                    <h3 className="text-white font-bold text-[11px] sm:text-xs md:text-base leading-tight w-full px-0.5 break-words md:truncate">
                                                         {student.displayName || 'Cadet'}
                                                     </h3>
-                                                    <p className="text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
+                                                    <p className="hidden md:block text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
                                                         {rank?.name || 'Space Cadet'} • {student.xp || 0} XP
                                                     </p>
                                                     {isOneTapMode && oneTapBehavior && (
-                                                        <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-wide mt-1">
+                                                        <p className="text-[9px] md:text-[10px] text-emerald-300 font-bold uppercase tracking-wide mt-0.5 md:mt-1">
                                                             Tap: {oneTapBehavior.xp > 0 ? '+' : ''}{oneTapBehavior.xp}
                                                         </p>
                                                     )}
@@ -563,7 +559,7 @@ export default function RewardsPage() {
                                     className="fixed bottom-4 left-4 right-4 md:absolute md:bottom-4 md:left-4 md:right-4 bg-cyan-900/90 backdrop-blur-md border border-cyan-500/50 p-4 rounded-xl flex items-center justify-between shadow-2xl z-50 md:z-40"
                                  >
                                      <div className="flex items-center gap-4">
-                                         <div className="flex -space-x-2">
+                                         <div className="hidden md:flex -space-x-2">
                                              {Array.from(selectedIds).slice(0, 3).map(uid => {
                                                  const s = students.find(st => st.uid === uid);
                                                  return (
