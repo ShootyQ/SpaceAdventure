@@ -34,6 +34,7 @@ export interface PetUnlockAssignment {
     method: PetUnlockMethod;
     scope: PetUnlockScope;
     planetId?: string;
+    rarity?: RollablePetRarity;
 }
 
 const DEFAULT_PLANET_RARITY_CHANCES: Record<RollablePetRarity, number> = {
@@ -184,11 +185,19 @@ export const normalizePetUnlockAssignments = (raw?: Record<string, any> | null):
         const scope: PetUnlockScope = scopeRaw === "planet" ? "planet" : "any";
 
         const planetId = String((value as any)?.planetId || "").trim().toLowerCase();
+        const rarityRaw = String((value as any)?.rarity || "").trim().toLowerCase();
+        const rarity: RollablePetRarity = (
+            rarityRaw === "common" ||
+            rarityRaw === "uncommon" ||
+            rarityRaw === "rare" ||
+            rarityRaw === "extremely-rare"
+        ) ? rarityRaw : "common";
 
         normalized[normalizedPetId] = {
             method,
             scope,
             planetId: scope === "planet" ? planetId : undefined,
+            rarity: method === "chance" ? rarity : undefined,
         };
     });
 
@@ -298,12 +307,22 @@ export const rollPetUnlocksForXpEvent = ({
                 const effectiveMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
                 if (effectiveMethod !== "chance") return false;
 
+                const assignmentRarity = assignment?.rarity;
+                const effectiveRarity = (
+                    assignmentRarity === "common" ||
+                    assignmentRarity === "uncommon" ||
+                    assignmentRarity === "rare" ||
+                    assignmentRarity === "extremely-rare"
+                )
+                    ? assignmentRarity
+                    : pet.rarity;
+
                 const effectiveScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
                 const effectivePlanetId = effectiveScope === "planet"
                     ? (assignment?.planetId || pet.unlockPlanetId || "").toLowerCase()
                     : "";
 
-                return pet.rarity === rarity &&
+                return effectiveRarity === rarity &&
                     effectiveScope === "planet" &&
                     effectivePlanetId === normalizedPlanetId;
             })() &&
@@ -317,8 +336,18 @@ export const rollPetUnlocksForXpEvent = ({
                 const effectiveMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
                 if (effectiveMethod !== "chance") return false;
 
+                const assignmentRarity = assignment?.rarity;
+                const effectiveRarity = (
+                    assignmentRarity === "common" ||
+                    assignmentRarity === "uncommon" ||
+                    assignmentRarity === "rare" ||
+                    assignmentRarity === "extremely-rare"
+                )
+                    ? assignmentRarity
+                    : pet.rarity;
+
                 const effectiveScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
-                return pet.rarity === rarity && effectiveScope === "any";
+                return effectiveRarity === rarity && effectiveScope === "any";
             })() &&
             !pet.starter &&
             !unlocked.has(pet.id)

@@ -44,6 +44,7 @@ export default function PlanetManagementPage() {
     const [planets, setPlanets] = useState<PlanetState[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
+    const [saveStatusByPlanet, setSaveStatusByPlanet] = useState<Record<string, { type: "success" | "error"; message: string }>>({});
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
     const avatarCatalogIds = useMemo(() => new Set<string>(AVATAR_OPTIONS.map((avatar) => avatar.id)), []);
@@ -135,8 +136,19 @@ export default function PlanetManagementPage() {
     };
 
     const handleSave = async (planet: PlanetState) => {
-        if (!user) return;
+        if (!user) {
+            setSaveStatusByPlanet((prev) => ({
+                ...prev,
+                [planet.id]: { type: "error", message: "You are not signed in." },
+            }));
+            return;
+        }
         setSaving(planet.id);
+        setSaveStatusByPlanet((prev) => {
+            const next = { ...prev };
+            delete next[planet.id];
+            return next;
+        });
         try {
             const avatarUnlocks: Record<string, number> = {};
             Object.entries(planet.unlocks?.avatars || {}).forEach(([key, value]) => {
@@ -160,9 +172,19 @@ export default function PlanetManagementPage() {
                 unlocks: unlocksToSave,
                 teacherId: user.uid
             }, { merge: true });
-            setSaving(null);
+
+            setSaveStatusByPlanet((prev) => ({
+                ...prev,
+                [planet.id]: { type: "success", message: "Saved." },
+            }));
         } catch (e) {
             console.error("Error saving planet:", e);
+            const message = e instanceof Error ? e.message : "Save failed.";
+            setSaveStatusByPlanet((prev) => ({
+                ...prev,
+                [planet.id]: { type: "error", message },
+            }));
+        } finally {
             setSaving(null);
         }
     };
@@ -358,6 +380,7 @@ export default function PlanetManagementPage() {
                                      </div>
 
                                      <button 
+                                                     type="button"
                                         onClick={() => handleSave(planet)}
                                         disabled={saving === planet.id}
                                         className="w-full py-2 bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-700 hover:border-cyan-500 text-cyan-300 rounded uppercase text-xs font-bold tracking-widest flex items-center justify-center gap-2 transition-all mt-2"
@@ -365,6 +388,11 @@ export default function PlanetManagementPage() {
                                         {saving === planet.id ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                                         Save Configuration
                                      </button>
+                                                 {saveStatusByPlanet[planet.id] ? (
+                                                     <p className={`mt-2 text-[11px] ${saveStatusByPlanet[planet.id].type === "success" ? "text-emerald-300" : "text-rose-300"}`}>
+                                                          {saveStatusByPlanet[planet.id].message}
+                                                     </p>
+                                                 ) : null}
                                  </div>
                              </div>
                          ))}

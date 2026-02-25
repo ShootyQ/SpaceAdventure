@@ -22,6 +22,7 @@ import {
   normalizePetUnlockAssignments,
   normalizePetUnlockChanceConfig,
   PET_OPTIONS,
+  type RollablePetRarity,
   type PetUnlockAssignment,
   type PetUnlockChanceConfig,
   type PetUnlockMethod,
@@ -43,6 +44,7 @@ type ShopResponse = {
 type EarnMethod = "xp" | "chance" | "shop" | "starter" | "unassigned";
 type ScopeMode = "planet" | "any";
 type RowDomain = "ship" | "avatar" | "pet" | "shop";
+type ChanceRarity = RollablePetRarity;
 
 type EditableRow = {
   key: string;
@@ -67,6 +69,7 @@ const PET_METHOD_OPTIONS: EarnMethod[] = ["chance", "shop", "starter", "unassign
 const SHOP_METHOD_OPTIONS: EarnMethod[] = ["shop"];
 const UNLOCK_RULE_CHANNELS = new Set<UnlockChannel>(["xp", "chance", "shop"]);
 const DEFAULT_SHOP_PRICE = 100;
+const CHANCE_RARITY_OPTIONS: ChanceRarity[] = ["common", "uncommon", "rare", "extremely-rare"];
 
 const toIntMin = (value: unknown, minValue: number) => {
   const numeric = Number(value);
@@ -108,6 +111,14 @@ const getRuleForItem = (rules: UnlockRule[], itemId: string, kind: "ships" | "av
   });
 };
 
+const normalizeChanceRarity = (value?: string): ChanceRarity => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "common" || normalized === "uncommon" || normalized === "rare" || normalized === "extremely-rare") {
+    return normalized;
+  }
+  return "common";
+};
+
 const buildUnlockRows = (
   unlockConfig: UnlockConfig,
   shopPrices: Record<string, number>,
@@ -140,6 +151,7 @@ const buildUnlockRows = (
       method,
       scope,
       planetId: scope === "planet" ? normalizedPlanet : firstPlanetId,
+      rarity: method === "chance" ? normalizeChanceRarity(rule?.rarity) : undefined,
       price: method === "shop" ? shopPrice : undefined,
       assetPath: ship.assetPath,
       existingRuleId: rule?.id,
@@ -171,6 +183,7 @@ const buildUnlockRows = (
       method,
       scope,
       planetId: scope === "planet" ? normalizedPlanet : firstPlanetId,
+      rarity: method === "chance" ? normalizeChanceRarity(rule?.rarity) : undefined,
       price: method === "shop" ? shopPrice : undefined,
       assetPath: avatar.src,
       existingRuleId: rule?.id,
@@ -192,6 +205,7 @@ const buildPetRows = (
     const resolvedMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
     const resolvedScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
     const resolvedPlanetId = normalizePlanetValue(assignment?.planetId || pet.unlockPlanetId || firstPlanetId);
+    const resolvedChanceRarity = normalizeChanceRarity((assignment as any)?.rarity || pet.rarity);
     const shopItemId = toShopConfigItemId("pets", pet.id);
     const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
     const resolvedBaseName = String(petNameOverrides[pet.id] || pet.name || pet.id);
@@ -206,8 +220,8 @@ const buildPetRows = (
       method: resolvedMethod,
       scope: resolvedScope,
       planetId: resolvedScope === "planet" ? resolvedPlanetId : firstPlanetId,
+      rarity: resolvedMethod === "chance" ? resolvedChanceRarity : undefined,
       price: resolvedMethod === "shop" ? shopPrice : undefined,
-      rarity: pet.rarity,
       assetPath: pet.imageSrc,
     };
   });
@@ -396,6 +410,7 @@ export default function AdminUnlocksPage() {
     updateRow(key, (row) => {
       const method = row.lockedMethod ? row.method : nextMethod;
       const needsScope = method === "xp" || method === "chance";
+      const needsRarity = method === "chance";
       const shopItemId = getShopConfigIdForRow(row);
       const nextPrice = method === "shop"
         ? toIntMin(row.price ?? shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0)
@@ -405,6 +420,7 @@ export default function AdminUnlocksPage() {
         method,
         scope: needsScope ? row.scope : "any",
         planetId: needsScope ? row.planetId : firstPlanetId,
+        rarity: needsRarity ? normalizeChanceRarity(row.rarity) : undefined,
         price: nextPrice,
       };
     });
@@ -439,6 +455,7 @@ export default function AdminUnlocksPage() {
               planetId: channel === "xp" || channel === "chance" ? normalizedPlanet : "",
               unlockKey: row.id,
               channel,
+              rarity: channel === "chance" ? normalizeChanceRarity(row.rarity) : undefined,
             };
           });
       };
@@ -473,6 +490,7 @@ export default function AdminUnlocksPage() {
         const nextAssignment: PetUnlockAssignment = {
           method: nextMethod,
           scope: nextScope,
+          rarity: nextMethod === "chance" ? normalizeChanceRarity(row.rarity) : undefined,
         };
         if (nextScope === "planet") {
           nextAssignment.planetId = normalizePlanetValue(row.planetId);
@@ -652,6 +670,7 @@ export default function AdminUnlocksPage() {
 
                   const showScope = row.method === "xp" || row.method === "chance";
                   const showPlanet = showScope && row.scope === "planet";
+                  const showRarity = row.method === "chance";
                   const showPrice = row.domain === "shop" || row.method === "shop";
 
                   return (
@@ -675,7 +694,22 @@ export default function AdminUnlocksPage() {
                               title={`Name for ${row.id}`}
                               placeholder={row.sourceName}
                             />
-                            {row.rarity && <div className="mt-1 text-[10px] uppercase text-slate-500">{row.rarity}</div>}
+                            {showRarity ? (
+                              <div className="mt-2">
+                                <select
+                                  value={normalizeChanceRarity(row.rarity)}
+                                  onChange={(e) => updateRow(row.key, (prev) => ({ ...prev, rarity: normalizeChanceRarity(e.target.value) }))}
+                                  className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs uppercase text-slate-800 outline-none focus:border-blue-400"
+                                  aria-label={`Chance rarity for ${row.id}`}
+                                >
+                                  {CHANCE_RARITY_OPTIONS.map((rarity) => (
+                                    <option key={`${row.key}-rarity-${rarity}`} value={rarity}>
+                                      {rarity}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </td>
