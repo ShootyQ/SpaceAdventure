@@ -2324,7 +2324,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         initial={{ y: "100%" }}
                         animate={{ y: "0%" }}
                         transition={{ duration: 1, ease: "circOut" }}
-                        src={getAssetPath('/images/landingsurface/earthsurface.png')}
+                        src={getAssetPath('/images/landingsurface.png')}
+                        onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = getAssetPath('/images/landingsurface/earthsurface.png');
+                        }}
                         alt="Earth surface"
                         className="absolute bottom-0 left-0 w-full h-[46vh] object-cover object-top z-0"
                     />
