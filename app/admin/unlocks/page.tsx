@@ -490,8 +490,10 @@ export default function AdminUnlocksPage() {
         const nextAssignment: PetUnlockAssignment = {
           method: nextMethod,
           scope: nextScope,
-          rarity: nextMethod === "chance" ? normalizeChanceRarity(row.rarity) : undefined,
         };
+        if (nextMethod === "chance") {
+          nextAssignment.rarity = normalizeChanceRarity(row.rarity);
+        }
         if (nextScope === "planet") {
           nextAssignment.planetId = normalizePlanetValue(row.planetId);
         }

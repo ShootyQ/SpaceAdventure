@@ -23,6 +23,7 @@ import {
     PetUnlockChanceConfig,
     rollPetUnlocksForXpEvent,
 } from "@/lib/pets";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, type UnlockRule } from "@/lib/unlocks";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -143,6 +144,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
   const [className, setClassName] = useState("");
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const shipXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.ships));
+    const avatarXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.avatars));
+
+    const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
 
   useEffect(() => {
     if (!userData) return;
@@ -179,6 +185,19 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
         return () => unsub();
     }, []);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        shipXpUnlockRulesRef.current = getXpUnlockRules(unlockConfig.ships || []);
+        avatarXpUnlockRulesRef.current = getXpUnlockRules(unlockConfig.avatars || []);
+    }, [unlockConfig]);
 
   // Trigger Bonus Victory
   useEffect(() => {
@@ -532,6 +551,38 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const canRollPetUnlocks = userData.role === 'teacher' || userData.role === 'admin';
 
                     let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
+
+                    if (Boolean(planetId) && newPlanetXP > oldPlanetXP) {
+                        const dynamicPlanetData = dynamicPlanetsRef.current.get(planetId) || {};
+                        const planetShipThresholds = (dynamicPlanetData?.unlocks?.ships || {}) as Record<string, number>;
+                        const planetAvatarThresholds = (dynamicPlanetData?.unlocks?.avatars || {}) as Record<string, number>;
+
+                        const newlyUnlockedShips = shipXpUnlockRulesRef.current
+                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                            .filter((rule) => {
+                                const threshold = Number(planetShipThresholds?.[rule.unlockKey] || 0);
+                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                            })
+                            .map((rule) => String(rule.unlockKey || "").trim())
+                            .filter(Boolean);
+
+                        const newlyUnlockedAvatars = avatarXpUnlockRulesRef.current
+                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                            .filter((rule) => {
+                                const threshold = Number(planetAvatarThresholds?.[rule.unlockKey] || 0);
+                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                            })
+                            .map((rule) => String(rule.unlockKey || "").trim())
+                            .filter(Boolean);
+
+                        if (newlyUnlockedShips.length > 0 || newlyUnlockedAvatars.length > 0) {
+                            unlocks = {
+                                ...unlocks,
+                                ...(newlyUnlockedShips.length > 0 ? { ships: [...(unlocks?.ships || []), ...newlyUnlockedShips] } : {}),
+                                ...(newlyUnlockedAvatars.length > 0 ? { avatars: [...(unlocks?.avatars || []), ...newlyUnlockedAvatars] } : {}),
+                            };
+                        }
+                    }
 
                     if (canRollPetUnlocks && Boolean(planetId)) {
                         const unlockedPetIds = rollPetUnlocksForXpEvent({
