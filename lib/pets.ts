@@ -87,6 +87,11 @@ const PET_EMOJI_FALLBACKS: Record<string, string> = {
     rockcat: "🐈",
 };
 
+const PET_NAME_FALLBACKS: Record<string, string> = {
+    slimepet: "Nebula Goo",
+    skateboardsquirrell: "Kickflip Comet Squirrel",
+};
+
 type CatalogItem = {
     id: string;
     type: string;
@@ -399,7 +404,7 @@ export const getPetById = (petId?: string | null): PetOption => {
             .replace(/^-+|-+$/g, "");
 
         if (normalizedPetId) {
-            const dynamicName = normalizedPetId
+            const dynamicName = PET_NAME_FALLBACKS[normalizedPetId] || normalizedPetId
                 .replace(/[-_]+/g, " ")
                 .replace(/\s+/g, " ")
                 .trim()

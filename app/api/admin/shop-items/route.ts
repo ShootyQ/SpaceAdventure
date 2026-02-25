@@ -19,6 +19,11 @@ const SHOP_CONFIG_PATH = "game-config/shop";
 const DEFAULT_PRICE = 100;
 const SHOP_CATEGORIES = ["avatars", "objects", "pets", "ships"] as const;
 
+const FILE_NAME_NAME_OVERRIDES: Record<string, string> = {
+  slimepet: "Nebula Goo",
+  skateboardsquirrell: "Kickflip Comet Squirrel",
+};
+
 const toTitleCase = (value: string) =>
   value
     .split(" ")
@@ -28,6 +33,9 @@ const toTitleCase = (value: string) =>
 
 const normalizeNameFromFile = (fileName: string) => {
   const stem = fileName.replace(/\.[^.]+$/, "");
+  const normalizedStem = stem.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+  const override = FILE_NAME_NAME_OVERRIDES[normalizedStem];
+  if (override) return override;
   const spaced = stem.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   return toTitleCase(spaced) || "Unnamed Item";
 };

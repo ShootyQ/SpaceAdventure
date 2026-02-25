@@ -499,7 +499,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                                 onClick={() => setSelectedShipId(opt.id)}
                                 className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
                             >
-                                <img src={getAssetPath(resolveShipAssetPath(opt.id))} alt={opt.name} className="w-10 h-10 object-contain" />
+                                <img src={getAssetPath(resolveShipAssetPath(opt.id))} alt={opt.name} className="w-20 h-20 object-contain shrink-0" />
                                 <div className="min-w-0 flex-1">
                                     <span className={`block text-xs uppercase font-bold ${selectedShipId === opt.id ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
                                 </div>
