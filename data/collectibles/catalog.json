@@ -61,7 +61,7 @@
       "type": "pet",
       "rarity": "rare",
       "name": "Acidic Axolotl",
-      "asset": "/images/collectibles/pets/rare/venus.Acidic Axolotl.png",
+      "asset": "/images/collectibles/pets/rare/venus.acidic-axolotl.png",
       "active": true,
       "tags": ["pet"]
     },
