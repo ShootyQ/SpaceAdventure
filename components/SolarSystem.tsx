@@ -110,7 +110,7 @@ type PlanetDiscoveredUnlocks = {
 
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
-    const { activeTeacherId } = useTeacherScope();
+        const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
@@ -1263,6 +1263,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, []);
 
   const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+        const isEarthLanding = normalizePlanetId(selectedPlanet?.id) === 'earth';
     const visitorsForSelectedPlanet = selectedPlanet
         ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
         : [];
@@ -1622,8 +1623,30 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
        {userData?.role === 'teacher' && (
            <>
-               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none opacity-30">
-                   <h1 className="text-white font-mono text-xs tracking-widest uppercase">Classroom Sensor Feed // Live</h1>
+               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 opacity-70">
+                   <div className="text-white font-mono text-xs tracking-widest uppercase flex items-center gap-2">
+                        <span>Classroom Sensor Feed // </span>
+                        {!loadingTeacherOptions && teacherOptions.length > 1 ? (
+                            <select
+                                value={activeTeacherId || userData.uid}
+                                onChange={(event) => setActiveTeacherId(event.target.value)}
+                                aria-label="Select active class"
+                                title="Select active class"
+                                className="pointer-events-auto bg-transparent border border-cyan-400/40 text-cyan-300 rounded px-2 py-0.5 uppercase tracking-wider text-[11px] focus:outline-none focus:border-cyan-300"
+                            >
+                                {teacherOptions.map((option) => {
+                                    const label = option.schoolName || option.displayName || option.email || "Class";
+                                    return (
+                                        <option key={option.uid} value={option.uid} className="bg-slate-900 text-cyan-200">
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        ) : (
+                            <span>Live</span>
+                        )}
+                   </div>
                </div>
 
                 <Link href="/teacher/space" className="absolute top-6 left-6 z-40 bg-black/20 hover:bg-black/80 border border-white/10 hover:border-cyan-500 text-white/50 hover:text-cyan-400 px-6 py-3 rounded-full backdrop-blur-sm flex items-center gap-3 transition-all group">
@@ -2230,8 +2253,31 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 className="absolute inset-0 z-[200] bg-black flex flex-col items-center justify-end overflow-hidden"
             >
                 {/* Space Background */}
-                <div className="absolute inset-0 opacity-50">
-                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black to-black" />
+                <div className="absolute inset-0">
+                    {isEarthLanding ? (
+                        <>
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#0b1228] via-[#040812] to-black" />
+                            <div className="absolute inset-0 pointer-events-none">
+                                {stars.map(star => (
+                                    <div
+                                        key={`landing-star-${star.id}`}
+                                        className={`absolute bg-white rounded-full ${star.size} animate-pulse`}
+                                        style={{
+                                            top: star.top,
+                                            left: star.left,
+                                            opacity: Math.min(1, star.opacity + 0.2),
+                                            animationDuration: star.animationDuration
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black/30 to-black/80" />
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 opacity-50">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black to-black" />
+                        </div>
+                    )}
                 </div>
 
                 {/* Planet Info Header */}
@@ -2256,13 +2302,24 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 </div>
 
                 {/* Surface Horizon */}
-                <motion.div 
-                    initial={{ y: "100%" }}
-                    animate={{ y: "60%" }}
-                    transition={{ duration: 1, ease: "circOut" }}
-                    className={`absolute bottom-0 left-[-50%] right-[-50%] h-[100vh] rounded-[100%] ${selectedPlanet.color} shadow-[0_0_100px_rgba(0,0,0,0.5)] z-0`}
-                    style={{ filter: 'brightness(0.8)' }}
-                />
+                {isEarthLanding ? (
+                    <motion.img
+                        initial={{ y: "100%" }}
+                        animate={{ y: "0%" }}
+                        transition={{ duration: 1, ease: "circOut" }}
+                        src={getAssetPath('/images/landingsurface/earthsurface.png')}
+                        alt="Earth surface"
+                        className="absolute bottom-0 left-0 w-full h-[46vh] object-cover object-top z-0"
+                    />
+                ) : (
+                    <motion.div 
+                        initial={{ y: "100%" }}
+                        animate={{ y: "60%" }}
+                        transition={{ duration: 1, ease: "circOut" }}
+                        className={`absolute bottom-0 left-[-50%] right-[-50%] h-[100vh] rounded-[100%] ${selectedPlanet.color} shadow-[0_0_100px_rgba(0,0,0,0.5)] z-0`}
+                        style={{ filter: 'brightness(0.8)' }}
+                    />
+                )}
 
                 {/* Character & Flag Container */}
                 <div className="relative z-10 mb-20 flex items-end gap-8 pb-32">

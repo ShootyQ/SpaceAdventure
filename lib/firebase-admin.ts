@@ -6,13 +6,18 @@ let firebaseAdminInitError: string | null = null;
 if (!admin.apps.length) {
   // We check if the private key looks reasonably real to avoid "Too few bytes" parser errors
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   
-  if (privateKey && privateKey.length > 100) {
+  if (privateKey && privateKey.length > 100 && clientEmail && projectId) {
     try {
       admin.initializeApp({
         credential: admin.credential.cert({
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          projectId,
+          clientEmail,
           privateKey: privateKey,
         }),
       });
@@ -21,7 +26,11 @@ if (!admin.apps.length) {
       console.error('[FIREBASE_ADMIN] initializeApp failed:', firebaseAdminInitError);
     }
   } else {
-    firebaseAdminInitError = 'Missing or invalid FIREBASE_PRIVATE_KEY';
+    const missing: string[] = [];
+    if (!privateKey || privateKey.length <= 100) missing.push('FIREBASE_PRIVATE_KEY');
+    if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
+    if (!projectId) missing.push('FIREBASE_PROJECT_ID (or GOOGLE_CLOUD_PROJECT / NEXT_PUBLIC_FIREBASE_PROJECT_ID)');
+    firebaseAdminInitError = `Missing or invalid ${missing.join(', ')}`;
   }
 }
 

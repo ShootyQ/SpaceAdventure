@@ -20,7 +20,7 @@ interface ClassBonusConfig {
 
 export default function TeacherConsole() {
     const { logout, user, userData, loading } = useAuth();
-    const { activeTeacherId } = useTeacherScope();
+    const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const trialInfo = getTeacherTrialInfo(userData);
     const trialActive = isTeacherTrialActive(userData);
     const trialDaysRemaining = trialInfo?.trialDaysRemaining;
@@ -135,6 +135,25 @@ export default function TeacherConsole() {
                                 ? `Trial: ${trialDaysRemaining}d left`
                                 : "Access Paused - Billing"}
                         </Link>
+                    )}
+                    {!loadingTeacherOptions && teacherOptions.length > 1 && (
+                        <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-normal text-cyan-400">
+                            <span className="text-cyan-500/80">Viewing:</span>
+                            <select
+                                value={activeTeacherId || user?.uid || ""}
+                                onChange={(event) => setActiveTeacherId(event.target.value)}
+                                className="bg-black/50 border border-cyan-500/40 text-cyan-300 rounded px-2 py-0.5 text-[11px] normal-case tracking-normal focus:outline-none focus:border-cyan-300"
+                            >
+                                {teacherOptions.map((option) => {
+                                    const label = option.schoolName || option.displayName || option.email || "Class";
+                                    return (
+                                        <option key={option.uid} value={option.uid} className="bg-slate-900 text-cyan-200">
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </label>
                     )}
                 </h1>
                 {/* Optional Expiry Date Display (Mocked for layout as requested) */}
