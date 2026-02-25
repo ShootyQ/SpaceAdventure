@@ -8,6 +8,7 @@ import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star,
 import Link from 'next/link';
 import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
@@ -109,6 +110,7 @@ type PlanetDiscoveredUnlocks = {
 
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
+    const { activeTeacherId } = useTeacherScope();
     const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
@@ -149,10 +151,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     const avatarXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.avatars));
 
     const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+    const resolvedTeacherId = userData?.role === 'teacher' ? (activeTeacherId || userData.uid) : userData?.teacherId;
 
   useEffect(() => {
     if (!userData) return;
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId) return;
 
     // Fetch Class Bonus
@@ -161,18 +164,14 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
 
     // Fetch Class Name
-    if (userData.role === 'teacher') {
-        setClassName(userData.schoolName || "");
-    } else {
-        getDoc(doc(db, "users", teacherId)).then(snap => {
-            if(snap.exists()) {
-                 setClassName(snap.data().schoolName || "");
-            }
-        });
-    }
+    getDoc(doc(db, "users", teacherId)).then(snap => {
+        if(snap.exists()) {
+             setClassName((snap.data() as any).schoolName || "");
+        }
+    });
 
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
@@ -211,7 +210,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   useEffect(() => {
     if (!userData) return;
 
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId) return;
 
     // Use Teacher-Specific Asteroid Event ID
@@ -226,7 +225,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         }
     });
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   const [isSoundOn, setIsSoundOn] = useState(true); // Default on for Map View
   const toggleSound = () => {
@@ -268,7 +267,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Load Ranks Configuration
   useEffect(() => {
     if (!userData) return;
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId && userData.role !== 'admin') return;
 
     // Try teacher config in their user settings
@@ -286,14 +285,14 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         }
     });
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   // Load Behaviors
   useEffect(() => {
     if (!userData) return;
     
     // Determine the teacherId to follow
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId) return;
 
     // Listens to the teacher's 'behaviors' subcollection
@@ -305,11 +304,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         setBehaviors(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior)));
     });
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
     useEffect(() => {
         if (!userData) return;
-        const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
         if (!teacherId) return;
 
         const economyRef = doc(db, `users/${teacherId}/settings`, "economy");
@@ -319,7 +318,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         });
 
         return () => unsub();
-    }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   const zoomRef = useRef(zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -625,7 +624,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         if (unlocks.objects?.length) discoveredUpdates["discoveredUnlocks.objects"] = arrayUnion(...unlocks.objects);
 
                         if (Object.keys(discoveredUpdates).length > 0) {
-                            const ownerId = userData.role === 'student' ? userData.teacherId : userData.uid;
+                            const ownerId = resolvedTeacherId;
                             if (ownerId) {
                                 updateDoc(doc(db, `users/${ownerId}/planets`, planetId), discoveredUpdates).catch((err) => {
                                     console.error("Failed to persist discovered planet unlocks:", err);
@@ -679,7 +678,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         return () => unsubscribeOwn();
     }
 
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    const teacherId = resolvedTeacherId;
     if (!teacherId && userData.role !== 'admin') return;
 
     // Listen to users in this class
@@ -701,8 +700,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     // Or we execute two queries.
     // For now, let's just show the class (students).
     
-    if (userData.role === 'teacher') {
-         q = query(collection(db, "users"), where("teacherId", "==", userData.uid));
+        if (userData.role === 'teacher') {
+            q = query(collection(db, "users"), where("teacherId", "==", teacherId));
     } else if (userData.role === 'student' && userData.teacherId) {
          q = query(collection(db, "users"), where("teacherId", "==", userData.teacherId));
     } else {
@@ -723,7 +722,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments]);
+    }, [userData, resolvedTeacherId, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -788,7 +787,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Load Dynamic Planet Stats
   useEffect(() => {
      if (!userData) return;
-     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+      const teacherId = resolvedTeacherId;
      if (!teacherId) return;
 
      // Correctly query the teacher's subcollection for planets
@@ -804,7 +803,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
          setDynamicPlanets(d);
      });
      return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   // Helper: Get Planet Position at specific time
   const getPlanetPosition = (planetId: string, timestamp: number) => {
@@ -1183,11 +1182,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Auto-close Asteroid Event on Victory after 5 seconds
   useEffect(() => {
     // Only the teacher (owner of the event) performs the database write
-    if (isAsteroidDestroyed && asteroidEvent?.active && userData?.role === 'teacher') {
+        if (isAsteroidDestroyed && asteroidEvent?.active && userData?.role === 'teacher' && resolvedTeacherId) {
       const timer = setTimeout(async () => {
          try {
              // Derive event ID from teacher's UID
-             const eventId = `asteroidEvent_${userData.uid}`; 
+                         const eventId = `asteroidEvent_${resolvedTeacherId}`; 
              const eventRef = doc(db, 'game-config', eventId);
              await updateDoc(eventRef, { active: false, status: 'success' });
          } catch (err) {
@@ -1196,7 +1195,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       }, 5000); 
       return () => clearTimeout(timer);
     }
-  }, [isAsteroidDestroyed, asteroidEvent?.active, userData]);
+    }, [isAsteroidDestroyed, asteroidEvent?.active, userData, resolvedTeacherId]);
 
   // Handle mouse wheel zoom
     const handleWheel = (e: React.WheelEvent) => {

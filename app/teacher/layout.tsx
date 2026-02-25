@@ -3,8 +3,43 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { TeacherScopeProvider, useTeacherScope } from "@/context/TeacherScopeContext";
 import Link from "next/link";
 import { getTeacherTrialInfo, isTeacherAccessRestricted, isTeacherTrialActive } from "@/lib/subscription";
+
+function TeacherClassScopeBar() {
+  const { userData } = useAuth();
+  const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
+
+  if (!userData || userData.role !== "teacher") return null;
+  if (loadingTeacherOptions) return null;
+  if (teacherOptions.length <= 1) return null;
+
+  return (
+    <div className="sticky top-0 z-[55] border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Class</p>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <span className="whitespace-nowrap">Viewing:</span>
+          <select
+            value={activeTeacherId || userData.uid}
+            onChange={(event) => setActiveTeacherId(event.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800"
+          >
+            {teacherOptions.map((option) => {
+              const label = option.schoolName || option.displayName || option.email || "Class";
+              return (
+                <option key={option.uid} value={option.uid}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
 
 export default function TeacherLayout({
   children,
@@ -77,7 +112,7 @@ export default function TeacherLayout({
   }
 
   return (
-    <>
+    <TeacherScopeProvider>
       {showTrialNudge && (
         <div className={`sticky top-0 z-[60] border-b px-4 py-3 text-sm ${urgentTrialNudge ? "bg-amber-100 border-amber-300 text-amber-900" : "bg-blue-50 border-blue-200 text-blue-900"}`}>
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -95,8 +130,9 @@ export default function TeacherLayout({
           </div>
         </div>
       )}
+      <TeacherClassScopeBar />
       {children}
-    </>
+    </TeacherScopeProvider>
   );
 }
 

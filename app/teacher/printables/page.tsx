@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { UserData, Rank } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
@@ -27,6 +28,8 @@ const DEFAULT_RANKS: Rank[] = [
 
 export default function PrintablesPage() {
     const { user } = useAuth();
+    const { activeTeacherId } = useTeacherScope();
+    const teacherScopeId = activeTeacherId || user?.uid || null;
     const [students, setStudents] = useState<UserData[]>([]);
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [loading, setLoading] = useState(true);
@@ -35,7 +38,7 @@ export default function PrintablesPage() {
 
     // Fetch Data
     useEffect(() => {
-        if (!user) return;
+        if (!teacherScopeId) return;
         setLoading(true);
 
         // 1. Fetch Students
@@ -43,7 +46,7 @@ export default function PrintablesPage() {
             const q = query(
                 collection(db, "users"), 
                 where("role", "==", "student"),
-                where("teacherId", "==", user.uid)
+                where("teacherId", "==", teacherScopeId)
             );
             const snapshot = await getDocs(q);
             const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserData));
@@ -61,7 +64,7 @@ export default function PrintablesPage() {
         Promise.all([fetchStudents()]).then(() => setLoading(false));
 
         return () => unsubRanks();
-    }, [user]);
+    }, [teacherScopeId]);
 
     // Badge Sheet Helper (Repeats one badge 12 times or whatever fits)
     const renderBadgeSheet = (rank: Rank) => {
