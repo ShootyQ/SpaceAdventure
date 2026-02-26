@@ -1413,12 +1413,13 @@ function TeamView({ onNavigate }: { onNavigate: (view: string) => void }) {
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email || !userData?.uid) return;
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail || !userData?.uid) return;
         setLoading(true);
         setError(null);
         try {
             await updateDoc(doc(db, "users", userData.uid), {
-                coTeacherEmails: arrayUnion(email.trim())
+                coTeacherEmails: arrayUnion(normalizedEmail)
             });
             setEmail("");
         } catch (e: any) {
@@ -1429,10 +1430,12 @@ function TeamView({ onNavigate }: { onNavigate: (view: string) => void }) {
 
     const handleRemove = async (emailToRemove: string) => {
         if (!userData?.uid) return;
-        if (!confirm(`Revoke access for ${emailToRemove}?`)) return;
+        const normalizedEmail = String(emailToRemove || "").trim().toLowerCase();
+        if (!normalizedEmail) return;
+        if (!confirm(`Revoke access for ${normalizedEmail}?`)) return;
         try {
             await updateDoc(doc(db, "users", userData.uid), {
-                coTeacherEmails: arrayRemove(emailToRemove)
+                coTeacherEmails: arrayRemove(normalizedEmail)
             });
         } catch (e: any) {
             setError(e.message);

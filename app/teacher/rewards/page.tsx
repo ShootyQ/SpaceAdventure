@@ -4,25 +4,13 @@ import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { getAssetPath } from "@/lib/utils";
-import { resolveShipAssetPath } from "@/lib/ships";
 import { UserData, Rank } from "@/types";
 import { UserAvatar } from '@/components/UserAvatar';
-import { Star, Plus, Trash2, Save, X, Zap, Award, Check } from "lucide-react";
+import { Star, Trash2, X, Zap, Award, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-
-// Custom Rocket Icon
-const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => {
-    return (
-        <img 
-            src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
-            alt="Rocket"
-            className={`object-contain ${className}`}
-            style={{ width: size, height: size }}
-        />
-    );
-};
 
 interface Behavior {
     id: string;
@@ -40,12 +28,16 @@ export default function RewardsPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isAwarding, setIsAwarding] = useState(false);
     const [isManagingProtocols, setIsManagingProtocols] = useState(false);
+    const [isOneTapMode, setIsOneTapMode] = useState(false);
+    const [oneTapBehaviorId, setOneTapBehaviorId] = useState<string | null>(null);
     
     // Forms
     const [newLabel, setNewLabel] = useState("");
     const [newXpInput, setNewXpInput] = useState("50");
     const [creditsPerAward, setCreditsPerAward] = useState(1);
     const { user } = useAuth();
+    const { activeTeacherId } = useTeacherScope();
+    const teacherScopeId = activeTeacherId || user?.uid || null;
 
     // Helper for Multi-Select
     const toggleSelection = (uid: string) => {
@@ -81,24 +73,24 @@ export default function RewardsPage() {
     }, []);
 
     useEffect(() => {
-        if (!user) return;
+        if (!teacherScopeId || !user) return;
 
         // 1. Fetch Students
         const qStudents = query(
             collection(db, "users"), 
             where("role", "==", "student"), 
             where("status", "==", "active"),
-            where("teacherId", "==", user.uid)
+            where("teacherId", "==", teacherScopeId)
         );
         const unsubStudents = onSnapshot(qStudents, (snapshot) => {
             setStudents(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserData)));
         });
 
         // 2. Fetch Behaviors (Subcollection)
-        if (!user) return;
+        if (!teacherScopeId) return;
         
         const qBehaviors = query(
-            collection(db, `users/${user.uid}/behaviors`)
+            collection(db, `users/${teacherScopeId}/behaviors`)
         );
         const unsubBehaviors = onSnapshot(qBehaviors, (snapshot) => {
             const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior));
@@ -107,7 +99,7 @@ export default function RewardsPage() {
         });
 
         // 3. Fetch Ranks
-        const unsubRanks = onSnapshot(doc(db, `users/${user.uid}/settings`, "ranks"), async (d) => {
+        const unsubRanks = onSnapshot(doc(db, `users/${teacherScopeId}/settings`, "ranks"), async (d) => {
             if (d.exists() && d.data().list) {
                 setRanks(d.data().list);
             } else {
@@ -116,10 +108,10 @@ export default function RewardsPage() {
             }
         });
 
-        const economyRef = doc(db, `users/${user.uid}/settings`, "economy");
+        const economyRef = doc(db, `users/${teacherScopeId}/settings`, "economy");
         const unsubEconomy = onSnapshot(economyRef, async (snapshot) => {
             if (!snapshot.exists()) {
-                await setDoc(economyRef, { creditsPerAward: 1, teacherId: user.uid, updatedAt: serverTimestamp() }, { merge: true });
+                await setDoc(economyRef, { creditsPerAward: 1, teacherId: teacherScopeId, updatedAt: serverTimestamp() }, { merge: true });
                 setCreditsPerAward(1);
                 return;
             }
@@ -134,14 +126,26 @@ export default function RewardsPage() {
             unsubRanks();
             unsubEconomy();
         };
-    }, [user]);
+    }, [teacherScopeId, user]);
 
-    const handleAward = async (behavior: Behavior) => {
-        if (selectedIds.size === 0 || !user) return;
+    useEffect(() => {
+        if (behaviors.length === 0) {
+            setOneTapBehaviorId(null);
+            return;
+        }
+        if (!oneTapBehaviorId || !behaviors.some((b) => b.id === oneTapBehaviorId)) {
+            setOneTapBehaviorId(behaviors[0].id);
+        }
+    }, [behaviors, oneTapBehaviorId]);
+
+    const oneTapBehavior = behaviors.find((b) => b.id === oneTapBehaviorId) || null;
+
+    const awardStudents = async (behavior: Behavior, targetIds: string[], clearAfter = false) => {
+        if (targetIds.length === 0 || !user || !teacherScopeId) return;
         
         // Ensure atomic number handling
         const xpAmount = Number(behavior.xp);
-        const awardedStudents = selectedIds.size;
+        const awardedStudents = targetIds.length;
         const totalAwardedPoints = xpAmount * awardedStudents;
         const creditsAwardValue = Math.max(0, Math.round(Number(creditsPerAward) || 0));
 
@@ -155,7 +159,7 @@ export default function RewardsPage() {
 
         try {
             // Process all selected students
-            const promises = Array.from(selectedIds).map(async (uid) => {
+            const promises = targetIds.map(async (uid) => {
                 const studentRef = doc(db, "users", uid);
                 
                 // ATOMIC TRANSACTION: User + Planet
@@ -201,13 +205,13 @@ export default function RewardsPage() {
                          userUpdates[`planetXP.${planetId}`] = increment(xpAmount);
 
                          // Use subcollection for Planet Progress
-                         const planetRef = doc(db, `users/${user.uid}/planets`, planetId);
+                         const planetRef = doc(db, `users/${teacherScopeId}/planets`, planetId);
                          
                          // Use set with merge to ensure doc exists and update safely
                          transaction.set(planetRef, { 
                              currentXP: increment(xpAmount),
                              id: planetId,
-                             teacherId: user.uid
+                             teacherId: teacherScopeId
                          }, { merge: true });
                      }
 
@@ -231,12 +235,11 @@ export default function RewardsPage() {
                             );
                         }
 
-            console.log(`SUCCESS: Awarded ${xpAmount} XP to ${selectedIds.size} students.`);
-            setIsAwarding(false);
-            setNewLabel(""); // Reset just in case
-            // Optional: Clear selection after award? 
-            // Often teachers want to keep selection to award multiple things, but let's clear for safety/clarity.
-            setSelectedIds(new Set());
+            console.log(`SUCCESS: Awarded ${xpAmount} XP to ${targetIds.length} students.`);
+            if (clearAfter) {
+                setIsAwarding(false);
+                setSelectedIds(new Set());
+            }
             
         } catch (error) {
             console.error("Error awarding XP:", error);
@@ -244,9 +247,27 @@ export default function RewardsPage() {
         }
     };
 
+    const handleAward = async (behavior: Behavior) => {
+        if (selectedIds.size === 0) return;
+        await awardStudents(behavior, Array.from(selectedIds), true);
+    };
+
+    const handleCadetTap = async (uid: string) => {
+        if (isOneTapMode) {
+            if (!oneTapBehavior) {
+                alert("Choose a protocol first for One Tap Mode.");
+                return;
+            }
+            await awardStudents(oneTapBehavior, [uid], false);
+            return;
+        }
+
+        toggleSelection(uid);
+    };
+
     const handleAddBehavior = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user) return;
+        if (!user || !teacherScopeId) return;
         const parsedXp = Number(newXpInput);
         if (!Number.isInteger(parsedXp) || parsedXp < -1000 || parsedXp > 1000) {
             alert("XP must be an integer between -1000 and 1000.");
@@ -254,11 +275,11 @@ export default function RewardsPage() {
         }
         try {
             // Add to subcollection
-            await addDoc(collection(db, `users/${user.uid}/behaviors`), {
+            await addDoc(collection(db, `users/${teacherScopeId}/behaviors`), {
                 label: newLabel,
                 xp: parsedXp,
                 color: parsedXp > 0 ? "bg-green-600" : "bg-red-600",
-                teacherId: user.uid
+                teacherId: teacherScopeId
             });
             setNewLabel("");
             setNewXpInput("50");
@@ -270,21 +291,21 @@ export default function RewardsPage() {
 
     const handleDeleteBehavior = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!user || !confirm("Remove this behavior?")) return;
+        if (!teacherScopeId || !confirm("Remove this behavior?")) return;
         try {
-            await deleteDoc(doc(db, `users/${user.uid}/behaviors`, id));
+            await deleteDoc(doc(db, `users/${teacherScopeId}/behaviors`, id));
         } catch (e) { console.error(e); }
     };
 
     const handleSaveCreditsPerAward = async () => {
-        if (!user) return;
+        if (!teacherScopeId) return;
         const normalized = Math.max(0, Math.round(Number(creditsPerAward) || 0));
         try {
             await setDoc(
-                doc(db, `users/${user.uid}/settings`, "economy"),
+                doc(db, `users/${teacherScopeId}/settings`, "economy"),
                 {
                     creditsPerAward: normalized,
-                    teacherId: user.uid,
+                    teacherId: teacherScopeId,
                     updatedAt: serverTimestamp(),
                 },
                 { merge: true }
@@ -313,12 +334,14 @@ export default function RewardsPage() {
                     </div>
                     <div className="flex gap-2 w-full md:w-auto">
                         <div className="flex items-center gap-2 border border-cyan-800 rounded px-2 py-1 bg-black/30">
-                            <label className="text-[10px] uppercase tracking-wider text-cyan-500">Credits / Award</label>
+                            <label htmlFor="credits-per-award" className="text-[10px] uppercase tracking-wider text-cyan-500">Credits / Award</label>
                             <input
+                                id="credits-per-award"
                                 type="number"
                                 min={0}
                                 value={creditsPerAward}
                                 onChange={(e) => setCreditsPerAward(Math.max(0, Number(e.target.value) || 0))}
+                                title="Credits awarded per positive XP action"
                                 className="w-16 bg-black/50 border border-cyan-800 rounded px-2 py-1 text-white text-xs focus:border-cyan-400 outline-none"
                             />
                             <button
@@ -330,6 +353,17 @@ export default function RewardsPage() {
                             </button>
                         </div>
                          <button 
+                            onClick={() => {
+                                setIsOneTapMode((prev) => !prev);
+                                setIsAwarding(false);
+                                setSelectedIds(new Set());
+                            }}
+                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border transition-colors ${isOneTapMode ? 'bg-emerald-900/40 border-emerald-400 text-white' : 'border-emerald-800 text-emerald-500 hover:border-emerald-500'}`}
+                        >
+                            <Star size={16} className={isOneTapMode ? 'fill-emerald-300 text-emerald-300' : ''} />
+                            {isOneTapMode ? 'ONE TAP ON' : 'ONE TAP OFF'}
+                        </button>
+                        <button 
                             onClick={() => setIsManagingProtocols(!isManagingProtocols)}
                             className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border transition-colors ${isManagingProtocols ? 'bg-cyan-900/40 border-cyan-400 text-white' : 'border-cyan-800 text-cyan-500 hover:border-cyan-500'}`}
                         >
@@ -399,7 +433,7 @@ export default function RewardsPage() {
                                                     <div className="text-white text-sm font-bold">{b.label}</div>
                                                     <div className={`text-xs ${b.xp > 0 ? 'text-green-400' : 'text-red-400'}`}>{b.xp > 0 ? '+' : ''}{b.xp} XP</div>
                                                 </div>
-                                                <button onClick={(e) => handleDeleteBehavior(b.id, e)} className="p-2 text-red-500 hover:text-white hover:bg-red-500/20 rounded"><Trash2 size={16} /></button>
+                                                <button title="Delete protocol" aria-label="Delete protocol" onClick={(e) => handleDeleteBehavior(b.id, e)} className="p-2 text-red-500 hover:text-white hover:bg-red-500/20 rounded"><Trash2 size={16} /></button>
                                             </div>
                                         ))}
                                     </div>
@@ -410,6 +444,25 @@ export default function RewardsPage() {
 
                     {/* RIGHT: Cadet Grid */}
                     <div className="flex-1 bg-black/20 rounded-2xl p-2 md:p-4 overflow-hidden flex flex-col border border-white/5 relative">
+                        {isOneTapMode && (
+                            <div className="mb-3 p-2 md:p-3 rounded-xl border border-emerald-500/30 bg-emerald-900/20 shrink-0">
+                                <div className="text-[10px] md:text-xs uppercase tracking-widest text-emerald-300 font-bold mb-2">One Tap Protocol</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {behaviors.map((b) => (
+                                        <button
+                                            key={b.id}
+                                            onClick={() => setOneTapBehaviorId(b.id)}
+                                            className={`px-3 py-2 text-xs font-bold rounded border transition-colors ${oneTapBehaviorId === b.id ? 'bg-emerald-500/30 border-emerald-300 text-white' : 'bg-black/30 border-emerald-800 text-emerald-400 hover:border-emerald-500'}`}
+                                        >
+                                            {b.label} ({b.xp > 0 ? '+' : ''}{b.xp})
+                                        </button>
+                                    ))}
+                                </div>
+                                {behaviors.length === 0 && (
+                                    <p className="text-xs text-emerald-500/80 mt-2">Add at least one protocol to use One Tap Mode.</p>
+                                )}
+                            </div>
+                        )}
                          <div className="mb-4 flex items-center justify-between shrink-0 px-2">
                             <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-widest flex items-center gap-2">
                                 <Award className="text-cyan-400" size={20} />
@@ -437,26 +490,26 @@ export default function RewardsPage() {
                          ) : (
                              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-24">
                                 {/* Density adjustments for mobile: grid-cols-4, smaller gap */}
-                                <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4 auto-rows-fr">
+                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-4 auto-rows-fr">
                                     {students.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
                                         const isSelected = selectedIds.has(student.uid);
-                                        const selectedShipId = student.spaceship?.modelId || student.spaceship?.id || "finalship";
                                         return (
                                         <motion.button
                                             whileTap={{ scale: 0.95 }}
                                             key={student.uid}
-                                            onClick={() => toggleSelection(student.uid)}
+                                            onClick={() => handleCadetTap(student.uid)}
                                             className={`
-                                                relative w-full aspect-square md:aspect-square flex flex-col p-1 md:p-4 rounded-lg md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
+                                                relative w-full min-h-[66px] md:min-h-[136px] flex flex-col p-1.5 md:p-3 rounded-md md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
                                                 ${isSelected 
                                                     ? 'bg-cyan-900/60 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
                                                     : 'bg-black/40 border-cyan-900/50 hover:bg-cyan-900/40 hover:border-cyan-400'}
+                                                ${isOneTapMode ? 'ring-1 ring-emerald-500/30 hover:ring-emerald-400/60' : ''}
                                             `}
                                         >
                                             {/* CHECKMARK for Selection */}
-                                            <div className={`absolute top-1 left-1 md:top-2 md:left-2 z-20 w-4 h-4 md:w-6 md:h-6 rounded-full border md:border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
-                                                 {isSelected && <Check size={12} className="text-black stroke-[4] block md:hidden" />}
+                                                <div className={`absolute top-1 left-1 md:top-2 md:left-2 z-20 w-3.5 h-3.5 md:w-6 md:h-6 rounded-full border md:border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-cyan-500 border-cyan-500 scale-100' : 'border-white/20 scale-75 opacity-50'}`}>
+                                                    {isSelected && <Check size={10} className="text-black stroke-[4] block md:hidden" />}
                                                  {isSelected && <Check size={14} className="text-black stroke-[4] hidden md:block" />}
                                             </div>
 
@@ -475,31 +528,19 @@ export default function RewardsPage() {
                                             </div>
 
                                             {/* Content Container */}
-                                            <div className="flex-1 flex flex-col items-center justify-center w-full z-10 md:space-y-2 md:mt-4">
-                                                
-                                                {/* (Desktop Only) Avatar Circle */}
-                                                <div className="hidden md:flex w-28 h-28 rounded-full items-center justify-center bg-gradient-to-b from-white/10 to-transparent group-hover:from-cyan-500/20 transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 group-hover:border-cyan-400/30 overflow-hidden relative">
-                                                    <img 
-                                                        src={getAssetPath(resolveShipAssetPath(selectedShipId))}
-                                                        onError={(event) => {
-                                                            event.currentTarget.onerror = null;
-                                                            event.currentTarget.src = getAssetPath("/images/collectibles/ships/starter/finalship.png");
-                                                        }}
-                                                        className="w-full h-full object-contain relative z-20 scale-75"
-                                                        alt="Rocket"
-                                                    />
-                                                </div>
-
-                                                {/* Name Display */}
-                                                <div className="text-center w-full h-full flex flex-col justify-center md:block md:h-auto">
-                                                    <h3 className="text-white font-bold text-[10px] sm:text-xs md:text-lg leading-tight md:leading-normal w-full px-0.5 break-words md:truncate">
-                                                        {student.displayName?.split(' ')[0]} {/* Show first name mainly on mobile to save space, depends on preference, but helps fit */}
-                                                        <span className="md:hidden inline-block w-full">{student.displayName?.split(' ')[1]?.charAt(0)}</span> {/* Last initial mobile */}
-                                                        <span className="hidden md:inline">{student.displayName?.split(' ').slice(1).join(' ')}</span> {/* Full name desktop */}
+                                            <div className="flex-1 flex flex-col items-center md:items-start justify-center w-full z-10 gap-1 md:gap-2">
+                                                <div className="text-center md:text-left w-full flex flex-col justify-center">
+                                                    <h3 className="text-white font-bold text-[11px] sm:text-xs md:text-base leading-tight w-full px-0.5 break-words md:truncate">
+                                                        {student.displayName || 'Cadet'}
                                                     </h3>
                                                     <p className="hidden md:block text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
-                                                        {student.spaceship?.name || 'USS Unknown'}
+                                                        {rank?.name || 'Space Cadet'} • {student.xp || 0} XP
                                                     </p>
+                                                    {isOneTapMode && oneTapBehavior && (
+                                                        <p className="text-[9px] md:text-[10px] text-emerald-300 font-bold uppercase tracking-wide mt-0.5 md:mt-1">
+                                                            Tap: {oneTapBehavior.xp > 0 ? '+' : ''}{oneTapBehavior.xp}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </motion.button>
@@ -510,7 +551,7 @@ export default function RewardsPage() {
                          
                          {/* FLOATING ACTION BAR FOR SELECTION */}
                          <AnimatePresence>
-                             {selectedIds.size > 0 && (
+                             {selectedIds.size > 0 && !isOneTapMode && (
                                  <motion.div 
                                     initial={{ y: 200 }}
                                     animate={{ y: 0 }}
@@ -518,7 +559,7 @@ export default function RewardsPage() {
                                     className="fixed bottom-4 left-4 right-4 md:absolute md:bottom-4 md:left-4 md:right-4 bg-cyan-900/90 backdrop-blur-md border border-cyan-500/50 p-4 rounded-xl flex items-center justify-between shadow-2xl z-50 md:z-40"
                                  >
                                      <div className="flex items-center gap-4">
-                                         <div className="flex -space-x-2">
+                                         <div className="hidden md:flex -space-x-2">
                                              {Array.from(selectedIds).slice(0, 3).map(uid => {
                                                  const s = students.find(st => st.uid === uid);
                                                  return (
@@ -555,7 +596,7 @@ export default function RewardsPage() {
 
                 {/* AWARD MODAL */}
                 <AnimatePresence>
-                    {isAwarding && (
+                    {isAwarding && !isOneTapMode && (
                         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <motion.div 
                                 initial={{ y: "100%", opacity: 0 }}
@@ -565,6 +606,8 @@ export default function RewardsPage() {
                             >
                                 <button 
                                     onClick={() => setIsAwarding(false)}
+                                    title="Close award modal"
+                                    aria-label="Close award modal"
                                     className="absolute top-4 right-4 text-cyan-700 hover:text-white bg-black/50 p-2 rounded-full z-20"
                                 >
                                     <X size={24} />

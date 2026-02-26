@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { TeacherScopeProvider } from "@/context/TeacherScopeContext";
 import Link from "next/link";
 import { getTeacherTrialInfo, isTeacherAccessRestricted, isTeacherTrialActive } from "@/lib/subscription";
 
@@ -77,7 +78,7 @@ export default function TeacherLayout({
   }
 
   return (
-    <>
+    <TeacherScopeProvider>
       {showTrialNudge && (
         <div className={`sticky top-0 z-[60] border-b px-4 py-3 text-sm ${urgentTrialNudge ? "bg-amber-100 border-amber-300 text-amber-900" : "bg-blue-50 border-blue-200 text-blue-900"}`}>
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -96,7 +97,7 @@ export default function TeacherLayout({
         </div>
       )}
       {children}
-    </>
+    </TeacherScopeProvider>
   );
 }
 

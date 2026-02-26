@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useTeacherScope } from '@/context/TeacherScopeContext';
 import { getAssetPath } from '@/lib/utils';
 import { getTeacherTrialInfo, isTeacherTrialActive } from '@/lib/subscription';
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
@@ -19,6 +20,7 @@ interface ClassBonusConfig {
 
 export default function TeacherConsole() {
     const { logout, user, userData, loading } = useAuth();
+    const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const trialInfo = getTeacherTrialInfo(userData);
     const trialActive = isTeacherTrialActive(userData);
     const trialDaysRemaining = trialInfo?.trialDaysRemaining;
@@ -31,8 +33,9 @@ export default function TeacherConsole() {
   const [editBonusForm, setEditBonusForm] = useState<ClassBonusConfig>({ current: 0, target: 10000, reward: "" });
 
   useEffect(() => {
-        if (!user) return;
-        const bonusRef = doc(db, `users/${user.uid}/settings`, "classBonus");
+        const teacherScopeId = activeTeacherId || user?.uid;
+        if (!teacherScopeId) return;
+        const bonusRef = doc(db, `users/${teacherScopeId}/settings`, "classBonus");
         const unsubBonus = onSnapshot(bonusRef, (doc) => {
             if (doc.exists()) {
                 setBonusConfig(doc.data() as ClassBonusConfig);
@@ -41,7 +44,7 @@ export default function TeacherConsole() {
             }
         });
         return () => unsubBonus();
-  }, [user]);
+  }, [user, activeTeacherId]);
 
     useEffect(() => {
         if (loading) return;
@@ -84,9 +87,10 @@ export default function TeacherConsole() {
     }
 
   const handleSaveBonus = async () => {
-        if (!user) return;
+        const teacherScopeId = activeTeacherId || user?.uid;
+        if (!teacherScopeId) return;
         try {
-            await setDoc(doc(db, `users/${user.uid}/settings`, "classBonus"), {
+            await setDoc(doc(db, `users/${teacherScopeId}/settings`, "classBonus"), {
                 ...editBonusForm,
                 current: Number(editBonusForm.current),
                 target: Number(editBonusForm.target)
@@ -131,6 +135,25 @@ export default function TeacherConsole() {
                                 ? `Trial: ${trialDaysRemaining}d left`
                                 : "Access Paused - Billing"}
                         </Link>
+                    )}
+                    {!loadingTeacherOptions && teacherOptions.length > 1 && (
+                        <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-normal text-cyan-400">
+                            <span className="text-cyan-500/80">Viewing:</span>
+                            <select
+                                value={activeTeacherId || user?.uid || ""}
+                                onChange={(event) => setActiveTeacherId(event.target.value)}
+                                className="bg-black/50 border border-cyan-500/40 text-cyan-300 rounded px-2 py-0.5 text-[11px] normal-case tracking-normal focus:outline-none focus:border-cyan-300"
+                            >
+                                {teacherOptions.map((option) => {
+                                    const label = option.schoolName || option.displayName || option.email || "Class";
+                                    return (
+                                        <option key={option.uid} value={option.uid} className="bg-slate-900 text-cyan-200">
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </label>
                     )}
                 </h1>
                 {/* Optional Expiry Date Display (Mocked for layout as requested) */}

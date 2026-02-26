@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import { UserData, PLANETS, STUDENT_GRADES, StudentGrade } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
@@ -42,6 +43,12 @@ const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
 
 export default function RosterPage() {
   const { user, userData } = useAuth();
+    const { activeTeacherId, teacherOptions } = useTeacherScope();
+    const teacherScopeId = activeTeacherId || user?.uid || null;
+    const activeTeacherProfile = useMemo(
+        () => teacherOptions.find((teacher) => teacher.uid === teacherScopeId) || null,
+        [teacherOptions, teacherScopeId]
+    );
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,14 +89,14 @@ export default function RosterPage() {
 
 
   const fetchRoster = async () => {
-    if (!user) return;
+    if (!teacherScopeId) return;
     setLoading(true);
     try {
         // Fetch only students belonging to this teacher
         const q = query(
             collection(db, "users"), 
             where("role", "==", "student"),
-            where("teacherId", "==", user.uid)
+            where("teacherId", "==", teacherScopeId)
         );
         const snapshot = await getDocs(q);
         const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserData));
@@ -105,7 +112,7 @@ export default function RosterPage() {
 
   useEffect(() => {
     fetchRoster();
-  }, [user]);
+    }, [teacherScopeId]);
 
   useEffect(() => {
       const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
@@ -122,12 +129,12 @@ export default function RosterPage() {
   }, [STARTER_SHIP_IDS, selectedShipId, DEFAULT_STARTER_SHIP.id]);
 
   useEffect(() => {
-      if (!user) return;
+      if (!teacherScopeId) return;
       let cancelled = false;
 
       const fetchPlanetUnlocks = async () => {
           try {
-              const snapshot = await getDocs(collection(db, `users/${user.uid}/planets`));
+              const snapshot = await getDocs(collection(db, `users/${teacherScopeId}/planets`));
               const nextMap: Record<string, Record<string, number>> = {};
 
               snapshot.forEach((planetDoc) => {
@@ -153,7 +160,7 @@ export default function RosterPage() {
       return () => {
           cancelled = true;
       };
-  }, [user]);
+  }, [teacherScopeId]);
 
   const getUnlockedShipIdsForStudent = (student?: UserData) => {
       const unlocked = new Set<string>(STARTER_SHIP_IDS);
@@ -200,7 +207,7 @@ export default function RosterPage() {
           // 1. Generate Email
           // Format: username.classCode@spaceadventure.local
           const cleanUsername = newStudentData.username.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const classCode = userData?.classCode || 'default';
+          const classCode = activeTeacherProfile?.classCode || userData?.classCode || 'default';
           const email = `${cleanUsername}.${classCode}@spaceadventure.local`; 
           
           // 2. Create Auth User
@@ -219,7 +226,7 @@ export default function RosterPage() {
               displayName: safeDisplayName,
               photoURL: null,
               role: 'student',
-              teacherId: user!.uid,
+              teacherId: teacherScopeId || user!.uid,
               gradeLevel: newStudentGrade,
               classCode: classCode,
               status: 'active',

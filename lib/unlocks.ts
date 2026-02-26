@@ -75,15 +75,73 @@ export const getLegacyIdsForCanonical = (canonicalId: string, aliases?: Record<s
   return dedupeIds([normalizedCanonicalId, ...legacyIds]);
 };
 
+const getUnlockIdVariants = (id: string): string[] => {
+  const normalized = String(id || "").trim().toLowerCase();
+  if (!normalized) return [];
+
+  const variants = new Set<string>([normalized]);
+  const withoutCategoryPrefix = normalized.replace(/^(ship_|avatar_|pet_|object_)/, "");
+  if (withoutCategoryPrefix) variants.add(withoutCategoryPrefix);
+
+  if (normalized.startsWith("avatar_") || normalized.endsWith("_avatar")) {
+    const withoutPrefix = normalized.replace(/^avatar_/, "");
+    const withoutSuffix = normalized.replace(/_avatar$/, "");
+    const withoutBoth = withoutPrefix.replace(/_avatar$/, "");
+
+    if (withoutPrefix) variants.add(withoutPrefix);
+    if (withoutSuffix) variants.add(withoutSuffix);
+    if (withoutBoth) variants.add(withoutBoth);
+
+    if (withoutPrefix) variants.add(`avatar_${withoutPrefix}`);
+    if (withoutSuffix) variants.add(`avatar_${withoutSuffix}`);
+    if (withoutBoth) variants.add(`avatar_${withoutBoth}`);
+
+    if (withoutPrefix) variants.add(`${withoutPrefix}_avatar`);
+    if (withoutSuffix) variants.add(`${withoutSuffix}_avatar`);
+    if (withoutBoth) variants.add(`${withoutBoth}_avatar`);
+  }
+
+  if (normalized.startsWith("ship_")) {
+    const withoutShipPrefix = normalized.replace(/^ship_/, "");
+    if (withoutShipPrefix) variants.add(withoutShipPrefix);
+    if (withoutShipPrefix) variants.add(`ship_${withoutShipPrefix}`);
+  }
+
+  return Array.from(variants).filter(Boolean);
+};
+
 export const resolveRuntimeUnlockId = (
   id: string,
   aliases?: Record<string, string>,
   availableIds?: Set<string>
 ): string => {
-  const candidates = getLegacyIdsForCanonical(id, aliases);
-  if (candidates.length === 0) return String(id || "").trim();
-  if (!availableIds || availableIds.size === 0) return candidates[0];
-  return candidates.find((candidateId) => availableIds.has(candidateId)) || candidates[0];
+  const normalizedInput = String(id || "").trim().toLowerCase();
+  if (!normalizedInput) return "";
+
+  const candidates = new Set<string>();
+  const inputVariants = getUnlockIdVariants(normalizedInput);
+
+  inputVariants.forEach((variant) => {
+    candidates.add(variant);
+
+    const mappedCanonical = String((aliases || {})[variant] || "").trim().toLowerCase();
+    if (mappedCanonical) {
+      candidates.add(mappedCanonical);
+      getUnlockIdVariants(mappedCanonical).forEach((mappedVariant) => candidates.add(mappedVariant));
+      getLegacyIdsForCanonical(mappedCanonical, aliases).forEach((legacyId) => {
+        getUnlockIdVariants(String(legacyId || "")).forEach((legacyVariant) => candidates.add(legacyVariant));
+      });
+    }
+
+    getLegacyIdsForCanonical(variant, aliases).forEach((legacyId) => {
+      getUnlockIdVariants(String(legacyId || "")).forEach((legacyVariant) => candidates.add(legacyVariant));
+    });
+  });
+
+  const orderedCandidates = Array.from(candidates).filter(Boolean);
+  if (orderedCandidates.length === 0) return normalizedInput;
+  if (!availableIds || availableIds.size === 0) return orderedCandidates[0];
+  return orderedCandidates.find((candidateId) => availableIds.has(candidateId)) || orderedCandidates[0];
 };
 
 export const migrateRuleIdsToCanonical = (config: UnlockConfig): UnlockConfig => {

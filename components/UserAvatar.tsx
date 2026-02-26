@@ -23,9 +23,11 @@ export const AVATAR_OPTIONS = [
     { id: 'jovi', name: 'Jovi', src: '/images/collectibles/avatars/xp-unlocks/jovi.png' },
     { id: 'rusty', name: 'Rusty', src: '/images/collectibles/avatars/uncommon/rusty.png' },
     { id: 'vylaet', name: 'Vylaet', src: '/images/collectibles/avatars/rare/spacevylaet.png' },
+    { id: 'clockworkbeetle', name: 'Clockwork Beetle', src: '/images/collectibles/avatars/shop/clockworkbeetle_avatar.png' },
+    { id: 'kitedagon', name: 'Kitedagon', src: '/images/collectibles/avatars/shop/kitedagon_avatar.png' },
 ];
 
-export const SECRET_AVATAR_IDS = new Set(['jovi', 'rusty', 'vylaet']);
+export const SECRET_AVATAR_IDS = new Set(['jovi', 'rusty', 'vylaet', 'clockworkbeetle', 'kitedagon']);
 export const PUBLIC_AVATAR_OPTIONS = AVATAR_OPTIONS.filter(a => !SECRET_AVATAR_IDS.has(a.id));
 
 export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[] = [

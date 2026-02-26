@@ -449,7 +449,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                             event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
                         }}
                         alt="Ship"
-                        className="w-[280px] h-[280px] object-contain drop-shadow-[0_0_25px_currentColor]"
+                        className="w-[320px] h-[320px] md:w-[560px] md:h-[560px] object-contain drop-shadow-[0_0_25px_currentColor]"
                     />
                 </motion.div>
 

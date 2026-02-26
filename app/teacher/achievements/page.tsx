@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { PLANETS } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
@@ -112,18 +113,20 @@ function normalizeSettings(raw: any): AchievementSettings {
 
 export default function TeacherAchievementsSetupPage() {
     const { user, userData, loading } = useAuth();
+    const { activeTeacherId } = useTeacherScope();
+    const teacherScopeId = activeTeacherId || user?.uid || null;
     const [settings, setSettings] = useState<AchievementSettings>(buildDefaultSettings());
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
 
     useEffect(() => {
-        if (!user) {
+        if (!teacherScopeId) {
             setIsLoading(false);
             return;
         }
 
-        const ref = doc(db, `users/${user.uid}/settings`, "achievements");
+        const ref = doc(db, `users/${teacherScopeId}/settings`, "achievements");
         const unsub = onSnapshot(ref, async (snapshot) => {
             if (!snapshot.exists()) {
                 const defaults = buildDefaultSettings();
@@ -134,7 +137,7 @@ export default function TeacherAchievementsSetupPage() {
                     ref,
                     {
                         ...defaults,
-                        teacherId: user.uid,
+                        teacherId: teacherScopeId,
                         createdAt: serverTimestamp(),
                         updatedAt: serverTimestamp(),
                         fixedCatalogVersion: 1
@@ -149,7 +152,7 @@ export default function TeacherAchievementsSetupPage() {
         });
 
         return () => unsub();
-    }, [user]);
+    }, [teacherScopeId]);
 
     const validationErrors = useMemo(() => {
         const errors: Record<string, string> = {};
@@ -211,18 +214,18 @@ export default function TeacherAchievementsSetupPage() {
     };
 
     const handleSave = async () => {
-        if (!user || hasValidationErrors) return;
+        if (!teacherScopeId || hasValidationErrors) return;
 
         setIsSaving(true);
         setSaveStatus("idle");
 
         try {
-            const ref = doc(db, `users/${user.uid}/settings`, "achievements");
+            const ref = doc(db, `users/${teacherScopeId}/settings`, "achievements");
             await setDoc(
                 ref,
                 {
                     ...settings,
-                    teacherId: user.uid,
+                    teacherId: teacherScopeId,
                     updatedAt: serverTimestamp(),
                     fixedCatalogVersion: 1
                 },

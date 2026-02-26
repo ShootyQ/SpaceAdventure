@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { UserData } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
@@ -13,19 +14,22 @@ import { useRouter } from "next/navigation";
 
 export default function PrintRosterPage() {
     const { user, userData } = useAuth();
+    const { activeTeacherId, teacherOptions } = useTeacherScope();
+    const teacherScopeId = activeTeacherId || user?.uid || null;
+    const activeTeacherProfile = teacherOptions.find((teacher) => teacher.uid === teacherScopeId) || null;
     const [students, setStudents] = useState<UserData[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
         const fetchRoster = async () => {
-            if (!user) return;
+            if (!teacherScopeId) return;
             setLoading(true);
             try {
                 const q = query(
                     collection(db, "users"), 
                     where("role", "==", "student"),
-                    where("teacherId", "==", user.uid)
+                    where("teacherId", "==", teacherScopeId)
                 );
                 const snapshot = await getDocs(q);
                 const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserData));
@@ -37,7 +41,7 @@ export default function PrintRosterPage() {
             setLoading(false);
         };
         fetchRoster();
-    }, [user]);
+    }, [teacherScopeId]);
 
     if (loading) return <div className="p-10 text-white">Loading credentials...</div>;
 
@@ -75,7 +79,7 @@ export default function PrintRosterPage() {
                                 <div className="flex justify-between items-start mb-6 border-b border-gray-200 pb-4">
                                      <div>
                                          <h2 className="text-sm text-gray-500 uppercase tracking-widest font-bold">Class ID</h2>
-                                         <div className="text-2xl font-black text-gray-800">{student.classCode || userData?.classCode || "N/A"}</div>
+                                         <div className="text-2xl font-black text-gray-800">{student.classCode || activeTeacherProfile?.classCode || userData?.classCode || "N/A"}</div>
                                      </div>
                                      <img src={getAssetPath("/images/logo.png")} alt="Logo" className="h-8 opacity-50" />
                                 </div>
