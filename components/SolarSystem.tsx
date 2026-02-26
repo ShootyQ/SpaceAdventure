@@ -2281,21 +2281,23 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 </div>
 
                 {/* Planet in Sky */}
-                <motion.div
-                    initial={{ y: -40, opacity: 0, scale: 0.92 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.35, duration: 0.9, ease: "easeOut" }}
-                    className="absolute top-[13vh] left-1/2 -translate-x-1/2 z-[5]"
-                >
-                    <div className="relative w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56">
-                        <div className={`absolute inset-0 rounded-full ${selectedPlanet.color} blur-3xl opacity-40`} />
-                        <img
-                            src={getAssetPath(`/images/planetpng/${selectedPlanet.id}.png`)}
-                            alt={`${selectedPlanet.name} planet`}
-                            className="relative w-full h-full object-contain drop-shadow-[0_0_40px_rgba(255,255,255,0.35)]"
-                        />
-                    </div>
-                </motion.div>
+                {!isEarthLanding && (
+                    <motion.div
+                        initial={{ y: -40, opacity: 0, scale: 0.92 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.35, duration: 0.9, ease: "easeOut" }}
+                        className="absolute top-[13vh] left-1/2 -translate-x-1/2 z-[5]"
+                    >
+                        <div className="relative w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56">
+                            <div className={`absolute inset-0 rounded-full ${selectedPlanet.color} blur-3xl opacity-40`} />
+                            <img
+                                src={getAssetPath(`/images/planetpng/${selectedPlanet.id}.png`)}
+                                alt={`${selectedPlanet.name} planet`}
+                                className="relative w-full h-full object-contain drop-shadow-[0_0_40px_rgba(255,255,255,0.35)]"
+                            />
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Planet Info Header */}
                 <div className="absolute top-10 left-0 right-0 text-center z-10">
@@ -2347,7 +2349,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         transition={{ delay: 1.2, type: "spring" }}
                         className="origin-bottom-left"
                      >
-                         <div className="transform scale-[3] drop-shadow-2xl">
+                                 <div className="transform scale-[5.25] drop-shadow-2xl">
                             <TinyFlag config={(landingSubject as any).flag || buildFallbackFlag(landingSubject)} />
                          </div>
                      </motion.div>
@@ -2357,7 +2359,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                          initial={{ scale: 0 }}
                          animate={{ scale: 1 }}
                          transition={{ delay: 0.8, type: "spring" }}
-                         className="relative w-48 h-48"
+                         className="relative w-[21rem] h-[21rem]"
                      >
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">
