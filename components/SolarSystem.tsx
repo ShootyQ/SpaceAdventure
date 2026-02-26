@@ -2324,13 +2324,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         initial={{ y: "100%" }}
                         animate={{ y: "0%" }}
                         transition={{ duration: 1, ease: "circOut" }}
-                        src={getAssetPath('/images/landingsurface.png')}
-                        onError={(event) => {
-                            event.currentTarget.onerror = null;
-                            event.currentTarget.src = getAssetPath('/images/landingsurface/earthsurface.png');
-                        }}
+                        src={getAssetPath('/images/landingsurface/earthsurface.png')}
                         alt="Earth surface"
-                        className="absolute bottom-0 left-0 w-full h-[46vh] object-cover object-top z-0"
+                        className="absolute bottom-0 left-0 w-full h-[100vh] object-cover object-bottom z-0"
                     />
                 ) : (
                     <motion.div 
@@ -2343,7 +2339,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 )}
 
                      {/* Character & Flag Container */}
-                     <div className="absolute bottom-[16vh] left-1/2 -translate-x-1/2 z-10 flex items-end gap-8">
+                    <div className="absolute bottom-[18vh] left-1/2 -translate-x-1/2 z-10 flex items-end gap-8">
                      {/* Flag */}
                      <motion.div
                         initial={{ y: -200, opacity: 0, rotate: -20 }}
