@@ -155,6 +155,7 @@ export default function RewardsPage() {
                      const sfDoc = await transaction.get(studentRef);
                      if (!sfDoc.exists()) throw "Student document not found";
                      const data = sfDoc.data();
+                     const awardTimestamp = Date.now();
                      
                      // 2. Calculate User Updates (Fuel Logic)
                      const fuelLevel = data.upgrades?.fuel || 0;
@@ -179,7 +180,7 @@ export default function RewardsPage() {
                                 lastAward: {
                                     reason: behavior.label,
                                     xpGained: xpAmount,
-                                    timestamp: Date.now(),
+                                    timestamp: awardTimestamp,
                                 },
                                 lastXpReason: behavior.label
                             };
@@ -208,6 +209,17 @@ export default function RewardsPage() {
                              teacherId: teacherScopeId
                          }, { merge: true });
                      }
+
+                     const xpEventRef = doc(collection(db, "xpEvents"));
+                     transaction.set(xpEventRef, {
+                         teacherId: teacherScopeId,
+                         studentId: uid,
+                         gradeLevel: data.gradeLevel || null,
+                         xpDelta: xpAmount,
+                         reason: behavior.label,
+                         source: "teacher_rewards",
+                         timestamp: awardTimestamp,
+                     });
 
                      transaction.update(studentRef, userUpdates);
                 });

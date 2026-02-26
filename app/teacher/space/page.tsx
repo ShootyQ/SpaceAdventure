@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer } from 'lucide-react';
+import { Users, Map, Target, Award, Settings, Power, Shield, Activity, Radio, ExternalLink, SlidersHorizontal, Zap, Globe, Edit2, Save, X, Rocket, LayoutGrid, CreditCard, AlertTriangle, UserPlus, FileText, Printer, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTeacherScope } from '@/context/TeacherScopeContext';
 import { getAssetPath } from '@/lib/utils';
@@ -379,6 +379,16 @@ export default function TeacherConsole() {
                         href="/teacher/planets"
                         color="text-teal-400"
                         borderColor="border-teal-500/30"
+                    />
+                </div>
+                <div id="tile-analytics">
+                    <QuickAction
+                        title="Analytics"
+                        icon={<TrendingUp size={28} />}
+                        desc="XP Trends & Insights"
+                        href="/teacher/analytics"
+                        color="text-amber-400"
+                        borderColor="border-amber-500/30"
                     />
                 </div>
                 <div id="tile-asteroids">

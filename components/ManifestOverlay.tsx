@@ -4,7 +4,7 @@ import React, { memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutGrid, Check, Crown } from "lucide-react";
 import { Ship, Rank, Behavior } from "@/types";
-import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
+import { updateDoc, doc, runTransaction, increment, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
 import { resolveShipAssetPath } from "@/lib/ships";
@@ -312,6 +312,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, cre
                                                     if (!sfDoc.exists()) return; // Skip if user deleted
                                                     
                                                     const data = sfDoc.data();
+                                                    const awardTimestamp = Date.now();
                                                     
                                                     // 1. Calculate Fuel Logic
                                                     const fuelLevel = data.upgrades?.fuel || 0;
@@ -329,7 +330,7 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, cre
                                                         lastAward: {
                                                             reason: reasonInput,
                                                             xpGained: xpInput,
-                                                            timestamp: Date.now()
+                                                            timestamp: awardTimestamp
                                                         },
                                                         // Ensure legacy field is updated too for compatibility
                                                         lastXpReason: reasonInput
@@ -367,6 +368,17 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, cre
                                                             id: planetId 
                                                         }, { merge: true });
                                                     }
+
+                                                    const xpEventRef = doc(collection(db, "xpEvents"));
+                                                    transaction.set(xpEventRef, {
+                                                        teacherId: data.teacherId || null,
+                                                        studentId: id,
+                                                        gradeLevel: data.gradeLevel || null,
+                                                        xpDelta: xpInput,
+                                                        reason: reasonInput,
+                                                        source: "manifest_overlay",
+                                                        timestamp: awardTimestamp,
+                                                    });
 
                                                     transaction.update(studentRef, userUpdates);
                                                 });

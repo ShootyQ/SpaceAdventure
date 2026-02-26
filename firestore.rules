@@ -25,6 +25,28 @@ service cloud.firestore {
       allow write: if docId == "landing" && request.auth != null;
     }
 
+    match /xpEvents/{eventId} {
+      allow read: if request.auth != null && (
+        resource.data.teacherId == request.auth.uid ||
+        (resource.data.teacherId != null && isCoTeacher(resource.data.teacherId)) ||
+        resource.data.studentId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if request.auth != null && (
+        request.resource.data.teacherId == request.auth.uid ||
+        (request.resource.data.teacherId != null && isCoTeacher(request.resource.data.teacherId)) ||
+        request.resource.data.studentId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow update, delete: if request.auth != null && (
+        resource.data.teacherId == request.auth.uid ||
+        (resource.data.teacherId != null && isCoTeacher(resource.data.teacherId)) ||
+        isAdmin()
+      );
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && (
         request.auth.uid == userId || 

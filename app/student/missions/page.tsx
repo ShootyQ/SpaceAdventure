@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp, getDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy, Coins } from "lucide-react";
@@ -475,6 +475,18 @@ export default function StudentMissions() {
                         [`missionProgress.${activeMission.id}.completedCount`]: nextCompletedCount,
                         ...progressPayload,
                     });
+
+                    if (xpReward !== 0 && userData?.teacherId) {
+                        await addDoc(collection(db, "xpEvents"), {
+                            teacherId: userData.teacherId,
+                            studentId: user.uid,
+                            gradeLevel: userData.gradeLevel || null,
+                            xpDelta: xpReward,
+                            reason: `Mission completed: ${activeMission.title}`,
+                            source: "mission_completion",
+                            timestamp: now,
+                        });
+                    }
 
                     if (xpReward > 0) {
                         try {
