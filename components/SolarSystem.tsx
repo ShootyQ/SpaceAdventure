@@ -133,6 +133,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     const [activeUnlockReveal, setActiveUnlockReveal] = useState<AwardEvent | null>(null);
         const pendingAwardEventsRef = useRef<Map<string, AwardEvent>>(new Map());
         const pendingAwardFlushTimerRef = useRef<NodeJS.Timeout | null>(null);
+        const awardBurstStartedAtRef = useRef<number | null>(null);
+        const lastAwardSoundAtRef = useRef(0);
     const scheduledUnlockRevealAwardIdsRef = useRef<Set<string>>(new Set());
     const unlockRevealTimerMapRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
@@ -275,6 +277,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       pendingAwardFlushTimerRef.current = null;
       const pendingEvents = Array.from(pendingAwardEventsRef.current.values());
       if (pendingEvents.length === 0) return;
+      awardBurstStartedAtRef.current = null;
 
       pendingAwardEventsRef.current.clear();
 
@@ -287,22 +290,34 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
       if (isSoundOnRef.current) {
           const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
-          if (audioElement) {
+          const nowMs = Date.now();
+          if (audioElement && nowMs - lastAwardSoundAtRef.current >= 2200) {
+              audioElement.pause();
               audioElement.currentTime = 0;
               audioElement.volume = 0.5;
               audioElement.play().catch(() => {});
+              lastAwardSoundAtRef.current = nowMs;
           }
       }
   }, []);
 
   const schedulePendingAwardFlush = useCallback(() => {
+      const nowMs = Date.now();
+      if (awardBurstStartedAtRef.current === null) {
+          awardBurstStartedAtRef.current = nowMs;
+      }
+
       if (pendingAwardFlushTimerRef.current) {
           clearTimeout(pendingAwardFlushTimerRef.current);
       }
 
+      const elapsedMs = nowMs - awardBurstStartedAtRef.current;
+      const maxWaitRemainingMs = Math.max(0, 2400 - elapsedMs);
+      const flushDelayMs = maxWaitRemainingMs === 0 ? 0 : Math.min(900, maxWaitRemainingMs);
+
       pendingAwardFlushTimerRef.current = setTimeout(() => {
           flushPendingAwardEvents();
-      }, 320);
+      }, flushDelayMs);
   }, [flushPendingAwardEvents]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -469,6 +484,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
               clearTimeout(pendingAwardFlushTimerRef.current);
               pendingAwardFlushTimerRef.current = null;
           }
+          awardBurstStartedAtRef.current = null;
       };
   }, []);
 
@@ -2041,20 +2057,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 {/* Multiple Awards Container */}
                 {(() => {
                     const awardCount = awardQueue.length;
-                    const overlayScale = awardCount > 20 ? 0.58 : awardCount > 16 ? 0.66 : awardCount > 12 ? 0.76 : awardCount > 8 ? 0.86 : 1;
+                    const overlayScale = awardCount > 20 ? 0.42 : awardCount > 16 ? 0.5 : awardCount > 12 ? 0.6 : awardCount > 8 ? 0.72 : awardCount > 6 ? 0.82 : 1;
                     const isUltraDense = awardCount > 20;
                     const isSuperDense = awardCount > 16;
 
                     return (
                 <div
-                    className={`flex flex-wrap items-center justify-center ${awardQueue.length > 16 ? 'gap-1 p-1' : awardQueue.length > 12 ? 'gap-1.5 p-2' : awardQueue.length > 6 ? 'gap-4 p-6' : 'gap-8 p-12'} h-[calc(100vh-2rem)] overflow-hidden cursor-default origin-center`}
+                    className={`flex flex-wrap items-center justify-center ${awardQueue.length > 16 ? 'gap-1 p-1' : awardQueue.length > 10 ? 'gap-1.5 p-1.5' : awardQueue.length > 6 ? 'gap-2 p-2' : 'gap-6 p-8'} h-[100dvh] overflow-hidden cursor-default origin-center`}
                     style={{ transform: `scale(${overlayScale})` }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {awardQueue.map((award, index) => {
                         const isCompactAward = awardQueue.length > 2;
-                        const isDenseAward = awardQueue.length > 8;
-                        const isUltraDenseAward = awardQueue.length > 14;
+                        const isDenseAward = awardQueue.length > 6;
+                        const isUltraDenseAward = awardQueue.length > 10;
                         const selectedPet = getPetById(award.ship.selectedPetId);
                         return (
                         <motion.div
@@ -2069,7 +2085,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 delay: 0
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isSuperDense ? 'w-[150px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[170px] p-2.5 rounded-xl' : isDenseAward ? 'w-[220px] p-4 rounded-2xl' : isCompactAward ? 'w-[300px] aspect-auto p-5' : 'w-[500px] aspect-square p-8'}
+                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : 'w-[420px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
