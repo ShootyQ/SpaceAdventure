@@ -451,6 +451,9 @@ export default function StudentMissions() {
                     const nextXP = previousXP + Number(activeMission.xpReward || 0);
                     const xpReward = Number(activeMission.xpReward || 0);
                     const creditsReward = Math.max(0, Number(activeMission.creditsReward || 0));
+                    const dayKey = new Date(now).toISOString().slice(0, 10);
+                    const positiveDelta = Math.max(0, xpReward);
+                    const negativeDelta = Math.max(0, Math.abs(Math.min(0, xpReward)));
                     const sortedRanks = [...DEFAULT_RANKS].sort((a, b) => b.minXP - a.minXP);
                     const oldRank = sortedRanks.find((rank) => previousXP >= rank.minXP);
                     const newRank = sortedRanks.find((rank) => nextXP >= rank.minXP);
@@ -466,6 +469,9 @@ export default function StudentMissions() {
                         xp: increment(xpReward),
                         ...(creditsReward > 0 ? { galacticCredits: increment(creditsReward) } : {}),
                         ...(planetXpKey && xpReward > 0 ? { [planetXpKey]: increment(xpReward) } : {}),
+                        [`xpDaily.${dayKey}.net`]: increment(xpReward),
+                        ...(positiveDelta > 0 ? { [`xpDaily.${dayKey}.positive`]: increment(positiveDelta) } : {}),
+                        ...(negativeDelta > 0 ? { [`xpDaily.${dayKey}.negative`]: increment(negativeDelta) } : {}),
                         lastAward: {
                             reason: `Mission completed: ${activeMission.title}`,
                             xpGained: xpReward,

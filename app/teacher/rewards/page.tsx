@@ -156,6 +156,9 @@ export default function RewardsPage() {
                      if (!sfDoc.exists()) throw "Student document not found";
                      const data = sfDoc.data();
                      const awardTimestamp = Date.now();
+                     const dayKey = new Date(awardTimestamp).toISOString().slice(0, 10);
+                     const positiveDelta = Math.max(0, xpAmount);
+                     const negativeDelta = Math.max(0, Math.abs(Math.min(0, xpAmount)));
                      
                      // 2. Calculate User Updates (Fuel Logic)
                      const fuelLevel = data.upgrades?.fuel || 0;
@@ -182,7 +185,10 @@ export default function RewardsPage() {
                                     xpGained: xpAmount,
                                     timestamp: awardTimestamp,
                                 },
-                                lastXpReason: behavior.label
+                                lastXpReason: behavior.label,
+                                [`xpDaily.${dayKey}.net`]: increment(xpAmount),
+                                ...(positiveDelta > 0 ? { [`xpDaily.${dayKey}.positive`]: increment(positiveDelta) } : {}),
+                                ...(negativeDelta > 0 ? { [`xpDaily.${dayKey}.negative`]: increment(negativeDelta) } : {}),
                             };
 
                      if (xpAmount > 0 && creditsAwardValue > 0) {

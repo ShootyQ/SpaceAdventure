@@ -146,25 +146,66 @@ export default function TeacherAnalyticsPage() {
     }, [xpEvents, since30, visibleStudentIds]);
 
     const fallbackEvents30 = useMemo<XPEvent[]>(() => {
-        return visibleStudents
-            .map((student): XPEvent | null => {
+        const synthesized: XPEvent[] = [];
+
+        visibleStudents.forEach((student) => {
+            const daily = ((student as any)?.xpDaily || {}) as Record<string, { positive?: number; negative?: number; net?: number }>;
+            const entries = Object.entries(daily || {});
+
+            entries.forEach(([dayKey, stats]) => {
+                const dayTimestamp = new Date(`${dayKey}T00:00:00`).getTime();
+                if (!Number.isFinite(dayTimestamp) || dayTimestamp < since30) return;
+
+                const positive = toNumber((stats as any)?.positive);
+                const negative = toNumber((stats as any)?.negative);
+
+                if (positive > 0) {
+                    synthesized.push({
+                        id: `fallback-pos-${student.uid}-${dayKey}`,
+                        teacherId: teacherScopeId || "",
+                        studentId: student.uid,
+                        gradeLevel: student.gradeLevel ? String(student.gradeLevel) : undefined,
+                        xpDelta: positive,
+                        reason: `Daily positive aggregate (${dayKey})`,
+                        source: "xpDaily_fallback",
+                        timestamp: dayTimestamp,
+                    });
+                }
+
+                if (negative > 0) {
+                    synthesized.push({
+                        id: `fallback-neg-${student.uid}-${dayKey}`,
+                        teacherId: teacherScopeId || "",
+                        studentId: student.uid,
+                        gradeLevel: student.gradeLevel ? String(student.gradeLevel) : undefined,
+                        xpDelta: -negative,
+                        reason: `Daily negative aggregate (${dayKey})`,
+                        source: "xpDaily_fallback",
+                        timestamp: dayTimestamp,
+                    });
+                }
+            });
+
+            if (entries.length === 0) {
                 const award = student.lastAward as any;
                 const timestamp = toNumber(award?.timestamp);
                 const xpDelta = toNumber(award?.xpGained);
-                if (!timestamp || timestamp < since30 || xpDelta === 0) return null;
+                if (timestamp && timestamp >= since30 && xpDelta !== 0) {
+                    synthesized.push({
+                        id: `fallback-last-${student.uid}-${timestamp}`,
+                        teacherId: teacherScopeId || "",
+                        studentId: student.uid,
+                        gradeLevel: student.gradeLevel ? String(student.gradeLevel) : undefined,
+                        xpDelta,
+                        reason: typeof award?.reason === "string" ? award.reason : "Recent award",
+                        source: "lastAward_fallback",
+                        timestamp,
+                    });
+                }
+            }
+        });
 
-                return {
-                    id: `fallback-${student.uid}-${timestamp}`,
-                    teacherId: teacherScopeId || "",
-                    studentId: student.uid,
-                    gradeLevel: student.gradeLevel ? String(student.gradeLevel) : undefined,
-                    xpDelta,
-                    reason: typeof award?.reason === "string" ? award.reason : "Recent award",
-                    source: "lastAward_fallback",
-                    timestamp,
-                } satisfies XPEvent;
-            })
-            .filter((event): event is XPEvent => event !== null);
+        return synthesized;
     }, [visibleStudents, since30, teacherScopeId]);
 
     const usingFallbackEvents = events30.length === 0 && fallbackEvents30.length > 0;

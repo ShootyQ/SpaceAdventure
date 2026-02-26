@@ -313,6 +313,9 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, cre
                                                     
                                                     const data = sfDoc.data();
                                                     const awardTimestamp = Date.now();
+                                                    const dayKey = new Date(awardTimestamp).toISOString().slice(0, 10);
+                                                    const positiveDelta = Math.max(0, xpInput);
+                                                    const negativeDelta = Math.max(0, Math.abs(Math.min(0, xpInput)));
                                                     
                                                     // 1. Calculate Fuel Logic
                                                     const fuelLevel = data.upgrades?.fuel || 0;
@@ -333,7 +336,10 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, cre
                                                             timestamp: awardTimestamp
                                                         },
                                                         // Ensure legacy field is updated too for compatibility
-                                                        lastXpReason: reasonInput
+                                                        lastXpReason: reasonInput,
+                                                        [`xpDaily.${dayKey}.net`]: increment(xpInput),
+                                                        ...(positiveDelta > 0 ? { [`xpDaily.${dayKey}.positive`]: increment(positiveDelta) } : {}),
+                                                        ...(negativeDelta > 0 ? { [`xpDaily.${dayKey}.negative`]: increment(negativeDelta) } : {}),
                                                     };
 
                                                     if (xpInput > 0 && creditsPerAward > 0) {
