@@ -341,10 +341,10 @@ export default function TeacherConsole() {
                 </div>
                 <div id="tile-rewards">
                     <QuickAction 
-                        title="Behavior Settings" 
+                        title="Protocols" 
                         icon={<Zap size={28} />} 
-                        desc="Edit Protocols"
-                        href="/teacher/rewards"
+                        desc="Edit Behaviors"
+                        href="/teacher/protocols"
                         color="text-white"
                         borderColor="border-yellow-500/30"
                     />
@@ -424,9 +424,9 @@ export default function TeacherConsole() {
                 </div>
                 <div id="tile-award">
                     <QuickAction 
-                        title="Award Points" 
+                        title="Rewards Command" 
                         icon={<Zap size={28} />} 
-                        desc="Mobile Tool"
+                        desc="Award XP"
                         href="/teacher/rewards"
                         color="text-yellow-400"
                         borderColor="border-yellow-500/30"
