@@ -178,6 +178,13 @@ export default function RewardsPage() {
                      if (newFuel > maxFuel) newFuel = maxFuel;
                      if (newFuel < 0) newFuel = 0;
 
+                     if (xpAmount > 0) {
+                         const classBonusRef = doc(db, `users/${data.teacherId || user.uid}/settings`, "classBonus");
+                         transaction.set(classBonusRef, {
+                             current: increment(xpAmount)
+                         }, { merge: true });
+                     }
+
                             // 3. Queue User Update
                             const userUpdates: Record<string, any> = {
                                 xp: increment(xpAmount),
