@@ -1,40 +1,75 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy } from "firebase/firestore";
+import { useState, useEffect, useMemo } from "react";
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X, User as UserIcon, Loader2, Plus, UserPlus, Pencil, Save, Fuel, MapPin, Trophy, Printer } from "lucide-react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { UserData, PLANETS, SpaceshipConfig, STUDENT_GRADES, StudentGrade } from "@/types";
+import { UserData, PLANETS, STUDENT_GRADES, StudentGrade } from "@/types";
 
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { createStudentAuthAccount } from "@/lib/student-auth";
 import { UserAvatar, PUBLIC_AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
-import { getTeacherStudentLimit, isSubscriptionActive } from "@/lib/subscription";
+import { getTeacherStudentLimit, isSubscriptionActive, isTeacherTrialActive } from "@/lib/subscription";
 import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
+import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId } from "@/lib/unlocks";
 
-const SHIP_OPTIONS: { id: string, name: string, src: string, type: SpaceshipConfig['type'] }[] = [
-    { id: 'finalship', name: 'Standard Interceptor', src: '/images/ships/finalship.png', type: 'fighter' },
-    { id: 'alienship', name: 'Alien Scout', src: '/images/ships/alienship.png', type: 'scout' },
-    { id: 'jellyalienship', name: 'Bio-Cruiser', src: '/images/ships/jellyalienship.png', type: 'cruiser' },
-    { id: 'coconutship', name: 'Tropical Drifter', src: '/images/ships/coconutship.png', type: 'cruiser' },
-    { id: 'dragoneggship', name: 'Dragon Scale Pod', src: '/images/ships/dragoneggship.png', type: 'scout' },
-];
+const STARTER_PET_OPTIONS = PET_OPTIONS.filter((pet) => STARTER_PET_IDS.includes(pet.id));
+const DEFAULT_STARTER_PET = STARTER_PET_OPTIONS[0]?.id || DEFAULT_PET_ID;
+
+const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+
+const readPlanetXpValue = (planetXP: Record<string, number> | undefined, planetId: string) => {
+    const normalizedPlanetId = normalizePlanetId(planetId);
+    if (!normalizedPlanetId) return 0;
+
+    const exact = Number(planetXP?.[normalizedPlanetId] || 0);
+    if (exact > 0) return exact;
+
+    const fallbackEntry = Object.entries(planetXP || {}).find(([key]) => normalizePlanetId(key) === normalizedPlanetId);
+    return Number(fallbackEntry?.[1] || 0);
+};
+
+const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
+    return (purchasedShopItemIds || [])
+        .filter((itemId) => String(itemId || "").toLowerCase().startsWith("ships/"))
+        .map((itemId) => String(itemId || "").split("/").pop() || "")
+        .filter(Boolean);
+};
 
 export default function RosterPage() {
   const { user, userData } = useAuth();
+    const { activeTeacherId, teacherOptions } = useTeacherScope();
+    const teacherScopeId = activeTeacherId || user?.uid || null;
+    const activeTeacherProfile = useMemo(
+        () => teacherOptions.find((teacher) => teacher.uid === teacherScopeId) || null,
+        [teacherOptions, teacherScopeId]
+    );
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+
+    const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
+    const STARTER_SHIP_IDS: string[] = useMemo(() => {
+        const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
+        const resolved = starters.map((id) => resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds));
+        return Array.from(new Set<string>(resolved.filter(Boolean)));
+    }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
+    const STARTER_SHIP_OPTIONS = SHIP_OPTIONS.filter((ship) => STARTER_SHIP_IDS.includes(ship.id));
+    const DEFAULT_STARTER_SHIP = STARTER_SHIP_OPTIONS[0] || SHIP_OPTIONS[0];
+    const SHIP_XP_UNLOCK_RULES: Array<{ id: string; planetId: string; unlockKey: string }> = getXpUnlockRules(unlockConfig.ships);
   
   // Student Creation State
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: "", username: "", password: "" });
     const [newStudentGrade, setNewStudentGrade] = useState<StudentGrade>("3");
     const [selectedAvatarId, setSelectedAvatarId] = useState(PUBLIC_AVATAR_OPTIONS[0].id);
-  const [selectedShipId, setSelectedShipId] = useState(SHIP_OPTIONS[0].id);
-    const [selectedPetId, setSelectedPetId] = useState(DEFAULT_PET_ID);
+    const [selectedShipId, setSelectedShipId] = useState("finalship");
+        const [selectedPetId, setSelectedPetId] = useState(DEFAULT_STARTER_PET);
   const [creationError, setCreationError] = useState("");
   const [creationLoading, setCreationLoading] = useState(false);
 
@@ -44,22 +79,24 @@ export default function RosterPage() {
   const [showEditVisuals, setShowEditVisuals] = useState(false); // Toggle for full editor within row
     const [editPassword, setEditPassword] = useState("");
     const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+    const [teacherPlanetShipUnlocks, setTeacherPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
 
     const hasActiveSubscription = isSubscriptionActive(userData);
+    const hasTrialAccess = isTeacherTrialActive(userData);
     const studentLimit = getTeacherStudentLimit(userData);
     const isOverStudentLimit = students.length > studentLimit;
     const isAtStudentLimit = students.length >= studentLimit;
 
 
   const fetchRoster = async () => {
-    if (!user) return;
+    if (!teacherScopeId) return;
     setLoading(true);
     try {
         // Fetch only students belonging to this teacher
         const q = query(
             collection(db, "users"), 
             where("role", "==", "student"),
-            where("teacherId", "==", user.uid)
+            where("teacherId", "==", teacherScopeId)
         );
         const snapshot = await getDocs(q);
         const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserData));
@@ -75,7 +112,83 @@ export default function RosterPage() {
 
   useEffect(() => {
     fetchRoster();
-  }, [user]);
+    }, [teacherScopeId]);
+
+  useEffect(() => {
+      const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+          setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+      });
+
+      return () => unsub();
+  }, []);
+
+  useEffect(() => {
+      if (!STARTER_SHIP_IDS.includes(selectedShipId)) {
+          setSelectedShipId(DEFAULT_STARTER_SHIP.id);
+      }
+  }, [STARTER_SHIP_IDS, selectedShipId, DEFAULT_STARTER_SHIP.id]);
+
+  useEffect(() => {
+      if (!teacherScopeId) return;
+      let cancelled = false;
+
+      const fetchPlanetUnlocks = async () => {
+          try {
+              const snapshot = await getDocs(collection(db, `users/${teacherScopeId}/planets`));
+              const nextMap: Record<string, Record<string, number>> = {};
+
+              snapshot.forEach((planetDoc) => {
+                  const rawUnlocks = (planetDoc.data() as any)?.unlocks?.ships || {};
+                  const normalized: Record<string, number> = {};
+
+                  Object.keys(rawUnlocks).forEach((key) => {
+                      const threshold = Number(rawUnlocks[key] || 0);
+                      if (threshold > 0) normalized[key] = threshold;
+                  });
+
+                  nextMap[normalizePlanetId(planetDoc.id)] = normalized;
+              });
+
+              if (!cancelled) setTeacherPlanetShipUnlocks(nextMap);
+          } catch (error) {
+              console.error("Error fetching teacher planet ship unlocks:", error);
+          }
+      };
+
+      fetchPlanetUnlocks();
+
+      return () => {
+          cancelled = true;
+      };
+  }, [teacherScopeId]);
+
+  const getUnlockedShipIdsForStudent = (student?: UserData) => {
+      const unlocked = new Set<string>(STARTER_SHIP_IDS);
+
+      const shopUnlockedShipIds = (student?.shopUnlockedShipIds || []).map((id) =>
+          resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds)
+      );
+      const purchasedShopShipIds = getPurchasedShopShipIds(student?.purchasedShopItemIds).map((id) =>
+          resolveRuntimeUnlockId(id, unlockConfig.idAliases, shipCatalogIds)
+      );
+      shopUnlockedShipIds.forEach((id) => unlocked.add(id));
+      purchasedShopShipIds.forEach((id) => unlocked.add(id));
+
+      const currentShipId = student?.spaceship?.modelId || student?.spaceship?.id;
+      if (currentShipId) unlocked.add(String(currentShipId));
+
+      const planetXP = (student?.planetXP || {}) as Record<string, number>;
+      SHIP_XP_UNLOCK_RULES.forEach((rule) => {
+          const normalizedPlanetId = normalizePlanetId(rule.planetId);
+          const requiredXP = Number(teacherPlanetShipUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
+          const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
+          if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+              unlocked.add(resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, shipCatalogIds));
+          }
+      });
+
+      return unlocked;
+  };
 
   const handleAddStudent = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -94,14 +207,14 @@ export default function RosterPage() {
           // 1. Generate Email
           // Format: username.classCode@spaceadventure.local
           const cleanUsername = newStudentData.username.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const classCode = userData?.classCode || 'default';
+          const classCode = activeTeacherProfile?.classCode || userData?.classCode || 'default';
           const email = `${cleanUsername}.${classCode}@spaceadventure.local`; 
           
           // 2. Create Auth User
           const uid = await createStudentAuthAccount(email, newStudentData.password);
 
           // Get the selected configs
-          const selectedShip = SHIP_OPTIONS.find(s => s.id === selectedShipId) || SHIP_OPTIONS[0];
+          const selectedShip = STARTER_SHIP_OPTIONS.find(s => s.id === selectedShipId) || DEFAULT_STARTER_SHIP;
           
           // 3. Create Firestore Document
           const safeDisplayName = sanitizeName(newStudentData.name);
@@ -113,11 +226,12 @@ export default function RosterPage() {
               displayName: safeDisplayName,
               photoURL: null,
               role: 'student',
-              teacherId: user!.uid,
+              teacherId: teacherScopeId || user!.uid,
               gradeLevel: newStudentGrade,
               classCode: classCode,
               status: 'active',
               xp: 0,
+              galacticCredits: 0,
               level: 1,
               location: 'earth',
               fuel: 500,
@@ -152,8 +266,8 @@ export default function RosterPage() {
           setNewStudentData({ name: "", username: "", password: "" });
           setNewStudentGrade("3");
           setSelectedAvatarId(PUBLIC_AVATAR_OPTIONS[0].id);
-          setSelectedShipId(SHIP_OPTIONS[0].id);
-          setSelectedPetId(DEFAULT_PET_ID);
+          setSelectedShipId(DEFAULT_STARTER_SHIP.id);
+          setSelectedPetId(DEFAULT_STARTER_PET);
           setIsAddingStudent(false);
       } catch (e: any) {
           console.error("Error creating student:", e);
@@ -207,13 +321,27 @@ export default function RosterPage() {
   const saveEdit = async () => {
       if (!editingId) return;
       try {
+          const editingStudent = students.find((student) => student.uid === editingId);
+          const unlockedShipIds = getUnlockedShipIdsForStudent(editingStudent);
+          const currentShipId = editingStudent?.spaceship?.modelId || editingStudent?.spaceship?.id || DEFAULT_STARTER_SHIP.id;
+          const requestedShipId = editForm.spaceship?.modelId || editForm.spaceship?.id || currentShipId;
+          const safeShipId = unlockedShipIds.has(String(requestedShipId))
+              ? String(requestedShipId)
+              : unlockedShipIds.has(String(currentShipId))
+                  ? String(currentShipId)
+                  : DEFAULT_STARTER_SHIP.id;
+          const safeShipOption = SHIP_OPTIONS.find((ship) => ship.id === safeShipId);
+
           const normalizedEditForm: Partial<UserData> = {
               ...editForm,
               displayName: sanitizeName(String(editForm.displayName || '')),
               spaceship: editForm.spaceship
                   ? {
                         ...editForm.spaceship,
-                        name: sanitizeName(String(editForm.spaceship.name || ''))
+                        name: sanitizeName(String(editForm.spaceship.name || '')),
+                        id: safeShipId,
+                        modelId: safeShipId,
+                        type: safeShipOption?.type || editForm.spaceship.type
                     }
                   : editForm.spaceship
           };
@@ -248,9 +376,11 @@ export default function RosterPage() {
 
   const handleUpdateShip = (shipId: string) => {
       if (!editForm.spaceship) return;
+      const nextShip = SHIP_OPTIONS.find((ship) => ship.id === shipId);
+      if (!nextShip) return;
       setEditForm(prev => ({
           ...prev,
-          spaceship: { ...prev.spaceship!, id: shipId, modelId: shipId }
+          spaceship: { ...prev.spaceship!, id: shipId, modelId: shipId, type: nextShip.type }
       }));
   };
 
@@ -288,6 +418,10 @@ export default function RosterPage() {
           console.error("Error approving:", e);
       }
   };
+
+    const editingStudent = editingId ? students.find((student) => student.uid === editingId) : undefined;
+    const editableShipIds = getUnlockedShipIdsForStudent(editingStudent);
+    const editableShipOptions = SHIP_OPTIONS.filter((ship) => editableShipIds.has(ship.id));
 
   return (
     <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">
@@ -331,9 +465,11 @@ export default function RosterPage() {
             <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${isOverStudentLimit ? 'bg-amber-900/20 border-amber-500/50 text-amber-200' : 'bg-cyan-950/30 border-cyan-500/20 text-cyan-300'}`}>
                 {hasActiveSubscription ? (
                     <span>Active subscription: {students.length}/{studentLimit} students used.</span>
+                ) : hasTrialAccess ? (
+                    <span>Free trial (full access): {students.length}/{studentLimit} students used.</span>
                 ) : (
                     <span>
-                        Trial/inactive plan: {students.length}/{studentLimit} students used.
+                        Access paused: {students.length}/{studentLimit} students used.
                         {isOverStudentLimit ? ' Existing students stay enrolled, but new students are disabled until billing is active again.' : ''}
                     </span>
                 )}
@@ -436,7 +572,7 @@ export default function RosterPage() {
                             <div>
                                 <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Vessel</label>
                                 <div className="grid grid-cols-3 gap-2">
-                                    {SHIP_OPTIONS.map((ship) => (
+                                    {STARTER_SHIP_OPTIONS.map((ship) => (
                                         <button
                                             key={ship.id}
                                             type="button"
@@ -448,7 +584,7 @@ export default function RosterPage() {
                                         >
                                             <div className="w-12 h-12 relative flex items-center justify-center">
                                                 <img 
-                                                    src={getAssetPath(ship.src)} 
+                                                    src={getAssetPath(resolveShipAssetPath(ship.id))} 
                                                     alt={ship.name}
                                                     className="object-contain max-w-full max-h-full"
                                                 />
@@ -464,7 +600,7 @@ export default function RosterPage() {
                             <div>
                                 <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">Select Pet</label>
                                 <div className="grid grid-cols-4 gap-2">
-                                    {PET_OPTIONS.map((pet) => (
+                                    {STARTER_PET_OPTIONS.map((pet) => (
                                         <button
                                             key={pet.id}
                                             type="button"
@@ -580,13 +716,13 @@ export default function RosterPage() {
                                                 <div>
                                                     <h4 className="text-xs text-white uppercase font-bold mb-2">Spaceship</h4>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {SHIP_OPTIONS.map(ship => (
+                                                        {editableShipOptions.map(ship => (
                                                              <button
                                                                 key={ship.id}
                                                                 onClick={() => handleUpdateShip(ship.id)}
                                                                 className={`p-1 rounded border flex flex-col items-center justify-center ${ (editForm.spaceship?.modelId || editForm.spaceship?.id) === ship.id ? 'border-cyan-400 bg-cyan-900/20' : 'border-white/10 opacity-50 hover:opacity-100'}`}
                                                              >
-                                                                 <img src={getAssetPath(ship.src)} className="w-8 h-8 object-contain" />
+                                                                 <img src={getAssetPath(resolveShipAssetPath(ship.id))} className="w-8 h-8 object-contain" />
                                                                  <span className="text-[8px] uppercase mt-1 text-center">{ship.name}</span>
                                                              </button>
                                                         ))}

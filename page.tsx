@@ -19,7 +19,7 @@ export default function Home() {
             <div className="relative">
                 <div className="absolute -inset-1 rounded-full bg-blue-500 opacity-25 blur-xl animate-pulse"></div>
                 <img 
-                    src="/images/ships/finalship.png" 
+                    src="/images/collectibles/ships/starter/finalship.png" 
                     alt="Space Adventure" 
                     className="w-24 h-24 object-contain relative z-10 transform -rotate-45" 
                 />
@@ -39,7 +39,7 @@ export default function Home() {
             <Link href="/student" className="group">
                 <div className="border border-blue-500/30 bg-blue-900/20 backdrop-blur-sm p-8 rounded-2xl transition-all duration-300 hover:bg-blue-900/40 hover:border-blue-400 hover:scale-105 hover:shadow-[0_0_30px_rgba(59,130,246,0.2)] flex flex-col items-center cursor-pointer">
                     <div className="bg-blue-600/20 p-4 rounded-full mb-4 group-hover:bg-blue-600/40 transition-colors">
-                         <img src="/images/ships/finalship.png" className="w-8 h-8 object-contain" alt="Rocket" />
+                         <img src="/images/collectibles/ships/starter/finalship.png" className="w-8 h-8 object-contain" alt="Rocket" />
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2">Student Portal</h2>
                     <p className="text-blue-200/80">Check your rank, view missions, and customize your ship.</p>

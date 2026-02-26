@@ -1,0 +1,39 @@
+name: Validate Collectibles Wiring
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+jobs:
+  wiring-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate wiring report
+        run: npm run validate:wiring:report
+
+      - name: Run strict wiring validation
+        run: npm run validate:wiring:strict
+
+      - name: Upload wiring report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collectibles-wiring-report
+          path: reports/collectibles-wiring-report.json
+          if-no-files-found: warn

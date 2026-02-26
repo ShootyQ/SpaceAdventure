@@ -11,21 +11,23 @@ export interface AvatarConfig {
 }
 
 export const AVATAR_OPTIONS = [
-    { id: 'bunny', name: 'Space Bunny', src: '/images/avatar/spacebunny.png' },
-    { id: 'cat', name: 'Cosmic Cat', src: '/images/avatar/spacecat.png' },
-    { id: 'raccoon', name: 'Rocket Raccoon', src: '/images/avatar/spaceraccoon.png' },
-    { id: 'otter', name: 'Orbit Otter', src: '/images/avatar/spaceotter.png' },
-    { id: 'pup', name: 'Pluto Pup', src: '/images/avatar/spacepup.png' },
-    { id: 'hamster', name: 'Hyper Hamster', src: '/images/avatar/spacehamster.png' },
-    { id: 'owl', name: 'Omega Owl', src: '/images/avatar/spaceowl.png' },
-    { id: 'penguin', name: 'Power Penguin', src: '/images/avatar/spacepenguin.png' },
-    { id: 'turtle', name: 'Turbo Turtle', src: '/images/avatar/spaceturtle.png' },
-    { id: 'jovi', name: 'Jovi', src: '/images/avatar/JUPITER/jovi.png' },
-    { id: 'rusty', name: 'Rusty', src: '/images/avatar/MARS/rusty.png' },
-    { id: 'vylaet', name: 'Vylaet', src: '/images/avatar/SECRET%20UNLOCKS/spacevylaet.png' },
+    { id: 'bunny', name: 'Space Bunny', src: '/images/collectibles/avatars/starter/spacebunny.png' },
+    { id: 'cat', name: 'Cosmic Cat', src: '/images/collectibles/avatars/starter/spacecat.png' },
+    { id: 'raccoon', name: 'Rocket Raccoon', src: '/images/collectibles/avatars/starter/spaceraccoon.png' },
+    { id: 'otter', name: 'Orbit Otter', src: '/images/collectibles/avatars/starter/spaceotter.png' },
+    { id: 'pup', name: 'Pluto Pup', src: '/images/collectibles/avatars/starter/spacepup.png' },
+    { id: 'hamster', name: 'Hyper Hamster', src: '/images/collectibles/avatars/starter/spacehamster.png' },
+    { id: 'owl', name: 'Omega Owl', src: '/images/collectibles/avatars/starter/spaceowl.png' },
+    { id: 'penguin', name: 'Power Penguin', src: '/images/collectibles/avatars/starter/spacepenguin.png' },
+    { id: 'turtle', name: 'Turbo Turtle', src: '/images/collectibles/avatars/starter/spaceturtle.png' },
+    { id: 'jovi', name: 'Jovi', src: '/images/collectibles/avatars/xp-unlocks/jovi.png' },
+    { id: 'rusty', name: 'Rusty', src: '/images/collectibles/avatars/uncommon/rusty.png' },
+    { id: 'vylaet', name: 'Vylaet', src: '/images/collectibles/avatars/rare/spacevylaet.png' },
+    { id: 'clockworkbeetle', name: 'Clockwork Beetle', src: '/images/collectibles/avatars/shop/clockworkbeetle_avatar.png' },
+    { id: 'kitedagon', name: 'Kitedagon', src: '/images/collectibles/avatars/shop/kitedagon_avatar.png' },
 ];
 
-export const SECRET_AVATAR_IDS = new Set(['jovi', 'rusty', 'vylaet']);
+export const SECRET_AVATAR_IDS = new Set(['jovi', 'rusty', 'vylaet', 'clockworkbeetle', 'kitedagon']);
 export const PUBLIC_AVATAR_OPTIONS = AVATAR_OPTIONS.filter(a => !SECRET_AVATAR_IDS.has(a.id));
 
 export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[] = [
@@ -34,9 +36,9 @@ export const AVATAR_PRESETS: { id: string, name: string, config: AvatarConfig }[
     { id: 'p3', name: 'Forest Ranger', config: { hue: 120, skinHue: 100, bgHue: 120, bgSat: 50, bgLight: 60, activeHat: 'none', avatarId: 'raccoon' } },
     { id: 'p4', name: 'Solar Pilot', config: { hue: 45, skinHue: 60, bgHue: 40, bgSat: 90, bgLight: 70, activeHat: 'none', avatarId: 'otter' } },
     { id: 'p5', name: 'Void Walker', config: { hue: 270, skinHue: 260, bgHue: 280, bgSat: 40, bgLight: 20, activeHat: 'none', avatarId: 'pup' } },
-    { id: 'p6', name: 'Neon Scout', config: { hue: 180, skinHue: 300, bgHue: 320, bgSat: 100, bgLight: 50, activeHat: 'none', avatarId: 'cat' } },
-    { id: 'p7', name: 'Rusty Mechanic', config: { hue: 25, skinHue: 30, bgHue: 15, bgSat: 50, bgLight: 40, activeHat: 'none', avatarId: 'raccoon' } },
-    { id: 'p8', name: 'Ice Specialist', config: { hue: 190, skinHue: 180, bgHue: 200, bgSat: 70, bgLight: 90, activeHat: 'none', avatarId: 'bunny' } },
+    { id: 'p6', name: 'Neon Scout', config: { hue: 180, skinHue: 300, bgHue: 320, bgSat: 100, bgLight: 50, activeHat: 'none', avatarId: 'owl' } },
+    { id: 'p7', name: 'Rusty Mechanic', config: { hue: 25, skinHue: 30, bgHue: 15, bgSat: 50, bgLight: 40, activeHat: 'none', avatarId: 'turtle' } },
+    { id: 'p8', name: 'Ice Specialist', config: { hue: 190, skinHue: 180, bgHue: 200, bgSat: 70, bgLight: 90, activeHat: 'none', avatarId: 'penguin' } },
 ];
 
 export const HAT_OPTIONS = [

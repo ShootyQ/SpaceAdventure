@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, getDocs, orderBy, where } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, where, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -24,6 +24,7 @@ export interface Mission {
     contentText?: string; // For reading
     questions: Question[];
     xpReward: number;
+    creditsReward?: number;
     createdAt: any;
 }
 
@@ -40,6 +41,7 @@ export default function MissionsPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [students, setStudents] = useState<StudentProgress[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchMissions = async () => {
@@ -148,6 +150,23 @@ export default function MissionsPage() {
         ? Math.round((totalCompleted / totalPossibleCompletions) * 100)
         : 0;
 
+    const handleDeleteMission = async (mission: Mission) => {
+        if (!user) return;
+        const confirmed = window.confirm(`Delete assignment "${mission.title}"? This cannot be undone.`);
+        if (!confirmed) return;
+
+        setDeletingMissionId(mission.id);
+        try {
+            await deleteDoc(doc(db, `users/${user.uid}/missions`, mission.id));
+            setMissions((prev) => prev.filter((item) => item.id !== mission.id));
+        } catch (error) {
+            console.error("Failed to delete mission:", error);
+            window.alert("Failed to delete assignment. Please try again.");
+        } finally {
+            setDeletingMissionId(null);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">
             <div className="max-w-6xl mx-auto">
@@ -198,7 +217,10 @@ export default function MissionsPage() {
                                         <div className={`p-3 rounded-lg ${mission.type === 'watch' ? 'bg-purple-900/20 text-purple-400' : mission.type === 'practice' ? 'bg-emerald-900/20 text-emerald-400' : 'bg-blue-900/20 text-blue-400'}`}>
                                             {mission.type === 'watch' ? <Video size={24} /> : mission.type === 'practice' ? <Brain size={24} /> : <BookOpen size={24} />}
                                         </div>
-                                        <span className="text-xs font-bold bg-cyan-950/50 text-cyan-300 px-2 py-1 rounded border border-cyan-900">{mission.xpReward} XP</span>
+                                        <div className="flex flex-col gap-1 items-end">
+                                            <span className="text-xs font-bold bg-cyan-950/50 text-cyan-300 px-2 py-1 rounded border border-cyan-900">{mission.xpReward} XP</span>
+                                            <span className="text-xs font-bold bg-yellow-950/50 text-yellow-300 px-2 py-1 rounded border border-yellow-900">{Math.max(0, Number(mission.creditsReward || 0))} GC</span>
+                                        </div>
                                     </div>
                                     
                                     <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{mission.title}</h3>
@@ -245,11 +267,13 @@ export default function MissionsPage() {
                                             </span>
                                         </Link>
                                         <button
+                                            onClick={() => handleDeleteMission(mission)}
+                                            disabled={deletingMissionId === mission.id}
                                             className="p-2 rounded bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors"
                                             aria-label="Delete mission"
                                             title="Delete mission"
                                         >
-                                            <Trash2 size={18} />
+                                            {deletingMissionId === mission.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                                         </button>
                                     </div>
                                 </div>

@@ -87,7 +87,8 @@ export interface PracticeAssignmentConfig {
     denominatorMin?: number;
     denominatorMax?: number;
     decimalPlaces?: 0 | 1 | 2 | 3;
-    attemptPolicy: "once" | "unlimited";
+    attemptPolicy: "once" | "limited" | "unlimited";
+    maxCompletions?: number;
 }
 
 export interface AvatarConfig {
@@ -99,6 +100,7 @@ export interface AvatarConfig {
     activeHat?: string;
     hat?: string; // Legacy support if needed
     avatarId?: string;
+    name?: string;
 }
 
 export interface UserData {
@@ -117,6 +119,7 @@ export interface UserData {
     avatar?: AvatarConfig;
     location?: string; // Planet ID
     xp?: number;
+    galacticCredits?: number;
     fuel?: number; // Renewable Resource
     level?: number;
     upgrades?: {
@@ -137,7 +140,11 @@ export interface UserData {
     completedMissions?: string[];
     missionProgress?: Record<string, MissionProgress>;
     selectedPetId?: string;
+    selectedPetName?: string;
     unlockedPetIds?: string[];
+    purchasedShopItemIds?: string[];
+    shopUnlockedShipIds?: string[];
+    shopUnlockedAvatarIds?: string[];
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)
@@ -148,6 +155,9 @@ export interface UserData {
     coTeacherEmails?: string[];
 
     createdAt?: any;
+    trialStartedAt?: any;
+    trialEndsAt?: any;
+    trialAccessLockedAt?: any;
     stripeSubscriptionId?: string;
     stripeCustomerId?: string;
     stripePriceId?: string;

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Settings, Power, Star } from 'lucide-react';
+import { Settings, Power, Star, Coins } from 'lucide-react';
 import { getAssetPath } from '@/lib/utils';
+import { resolveShipAssetPath } from '@/lib/ships';
 import { Rank } from '@/types';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -28,7 +29,7 @@ const DEFAULT_RANKS: Rank[] = [
 // Custom Icon
 const Rocket = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
     <img 
-        src={getAssetPath("/images/ships/finalship.png")}
+        src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
         alt="Rocket"
         className={`object-contain ${className}`}
         style={{ width: size, height: size }}
@@ -74,6 +75,7 @@ export default function StudentConsole() {
     const selectedAvatar = AVATAR_OPTIONS.find((avatar) => avatar.id === selectedAvatarId) || AVATAR_OPTIONS[0];
     const selectedPetId = getResolvedSelectedPetId(userData);
     const selectedPet = getPetById(selectedPetId);
+    const galacticCredits = Number(userData?.galacticCredits || 0);
 
     const zoneStyle = (zone?: { x: number; y: number; w: number; h: number; z?: number }) => {
         if (!zone) return undefined;
@@ -109,6 +111,11 @@ export default function StudentConsole() {
                      <Star size={16} className="text-yellow-400" />
                  )}
                  <span className="font-bold text-yellow-100">{currentRank.name}</span>
+             </div>
+
+             <div className="flex items-center gap-2 px-4 py-2 border border-amber-500/30 bg-amber-900/10 rounded-full">
+                 <Coins size={16} className="text-amber-300" />
+                 <span className="font-bold text-amber-100">{galacticCredits} GC</span>
              </div>
              
              <button 
@@ -160,7 +167,11 @@ export default function StudentConsole() {
                             {shipZone && (
                                 <div className="absolute p-1" style={zoneStyle(shipZone)}>
                                     <img
-                                        src={getAssetPath(`/images/ships/${selectedShipId}.png`)}
+                                        src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                                        onError={(event) => {
+                                            event.currentTarget.onerror = null;
+                                            event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                        }}
                                         alt="Current Ship"
                                         className="w-full h-full object-contain drop-shadow-[0_0_16px_rgba(34,211,238,0.35)]"
                                     />
@@ -190,7 +201,7 @@ export default function StudentConsole() {
 
                     {/* Overlay Controls for Student */}
                     <div className="absolute top-6 left-6 z-30">
-                        <Link href="/student/settings" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
+                        <Link href="/student/studentnavigation" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
                             <Settings size={20} />
                             <span className="hidden md:inline font-bold">Back to Cockpit</span>
                         </Link>

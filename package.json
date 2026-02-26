@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "validate:wiring": "node scripts/validate_collectibles_wiring.js",
+    "validate:wiring:strict": "node scripts/validate_collectibles_wiring.js --strict",
+    "validate:wiring:report": "node scripts/validate_collectibles_wiring.js --report reports/collectibles-wiring-report.json"
   },
   "dependencies": {
     "@types/canvas-confetti": "^1.9.0",

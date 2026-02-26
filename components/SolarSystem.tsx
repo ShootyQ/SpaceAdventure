@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveShipAssetPath } from "@/lib/ships";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -7,6 +8,7 @@ import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star,
 import Link from 'next/link';
 import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
+import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
@@ -16,10 +18,13 @@ import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, Asteroid
 import {
     DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
     getPetById,
+    normalizePetUnlockAssignments,
     normalizePetUnlockChanceConfig,
+    PetUnlockAssignment,
     PetUnlockChanceConfig,
     rollPetUnlocksForXpEvent,
 } from "@/lib/pets";
+import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, type UnlockRule } from "@/lib/unlocks";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -105,6 +110,7 @@ type PlanetDiscoveredUnlocks = {
 
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
+        const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const isStudentPersonalView = studentView && userData?.role === 'student';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
@@ -135,14 +141,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
     const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+    const [petUnlockAssignments, setPetUnlockAssignments] = useState<Record<string, PetUnlockAssignment>>({});
   const [bonusConfig, setBonusConfig] = useState<ClassBonusConfig | null>(null);
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
   const [className, setClassName] = useState("");
+    const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
+    const shipXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.ships));
+    const avatarXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.avatars));
+
+    const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+    const resolvedTeacherId = userData?.role === 'teacher' ? (activeTeacherId || userData.uid) : userData?.teacherId;
 
   useEffect(() => {
     if (!userData) return;
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId) return;
 
     // Fetch Class Bonus
@@ -151,27 +164,39 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
 
     // Fetch Class Name
-    if (userData.role === 'teacher') {
-        setClassName(userData.schoolName || "");
-    } else {
-        getDoc(doc(db, "users", teacherId)).then(snap => {
-            if(snap.exists()) {
-                 setClassName(snap.data().schoolName || "");
-            }
-        });
-    }
+    getDoc(doc(db, "users", teacherId)).then(snap => {
+        if(snap.exists()) {
+             setClassName((snap.data() as any).schoolName || "");
+        }
+    });
 
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
-            const rawConfig = (snapshot.data() as any)?.petUnlockChances;
+            const rawSnapshot = (snapshot.data() as any) || {};
+            const rawConfig = rawSnapshot?.petUnlockChances;
+            const rawAssignments = rawSnapshot?.petUnlockAssignments;
             setPetUnlockChanceConfig(normalizePetUnlockChanceConfig(rawConfig));
+            setPetUnlockAssignments(normalizePetUnlockAssignments(rawAssignments));
         });
 
         return () => unsub();
     }, []);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
+            setUnlockConfig(normalizeUnlockConfig((snapshot.data() as any) || null));
+        });
+
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        shipXpUnlockRulesRef.current = getXpUnlockRules(unlockConfig.ships || []);
+        avatarXpUnlockRulesRef.current = getXpUnlockRules(unlockConfig.avatars || []);
+    }, [unlockConfig]);
 
   // Trigger Bonus Victory
   useEffect(() => {
@@ -185,7 +210,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   useEffect(() => {
     if (!userData) return;
 
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId) return;
 
     // Use Teacher-Specific Asteroid Event ID
@@ -200,7 +225,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         }
     });
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   const [isSoundOn, setIsSoundOn] = useState(true); // Default on for Map View
   const toggleSound = () => {
@@ -227,6 +252,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
+    const [creditsPerAward, setCreditsPerAward] = useState(1);
   const previousXPRef = useRef<Map<string, number>>(new Map());
   const isFirstLoad = useRef(true);
 
@@ -241,7 +267,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Load Ranks Configuration
   useEffect(() => {
     if (!userData) return;
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId && userData.role !== 'admin') return;
 
     // Try teacher config in their user settings
@@ -259,14 +285,14 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         }
     });
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   // Load Behaviors
   useEffect(() => {
     if (!userData) return;
     
     // Determine the teacherId to follow
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+        const teacherId = resolvedTeacherId;
     if (!teacherId) return;
 
     // Listens to the teacher's 'behaviors' subcollection
@@ -278,7 +304,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         setBehaviors(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Behavior)));
     });
     return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
+
+    useEffect(() => {
+        if (!userData) return;
+        const teacherId = resolvedTeacherId;
+        if (!teacherId) return;
+
+        const economyRef = doc(db, `users/${teacherId}/settings`, "economy");
+        const unsub = onSnapshot(economyRef, (snapshot) => {
+            const value = Number((snapshot.data() as any)?.creditsPerAward || 1);
+            setCreditsPerAward(Number.isFinite(value) ? Math.max(0, Math.round(value)) : 1);
+        });
+
+        return () => unsub();
+    }, [userData, resolvedTeacherId]);
 
   const zoomRef = useRef(zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -499,7 +539,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
                     const planetId = (shipData.locationId || '').toLowerCase();
-                    const unlockConfig = (dynamicPlanetsRef.current.get(planetId) as any)?.unlocks;
                     const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
                     const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
                     const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
@@ -511,13 +550,35 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const canRollPetUnlocks = userData.role === 'teacher' || userData.role === 'admin';
 
                     let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
-                    if (planetId === 'jupiter' && unlockConfig && newPlanetXP > oldPlanetXP) {
-                        const joviThreshold = Number(unlockConfig?.avatars?.jovi || 0);
-                        const joviUnlockedNow = joviThreshold > 0 && oldPlanetXP < joviThreshold && newPlanetXP >= joviThreshold;
 
-                        if (joviUnlockedNow) {
+                    if (Boolean(planetId) && newPlanetXP > oldPlanetXP) {
+                        const dynamicPlanetData = dynamicPlanetsRef.current.get(planetId) || {};
+                        const planetShipThresholds = (dynamicPlanetData?.unlocks?.ships || {}) as Record<string, number>;
+                        const planetAvatarThresholds = (dynamicPlanetData?.unlocks?.avatars || {}) as Record<string, number>;
+
+                        const newlyUnlockedShips = shipXpUnlockRulesRef.current
+                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                            .filter((rule) => {
+                                const threshold = Number(planetShipThresholds?.[rule.unlockKey] || 0);
+                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                            })
+                            .map((rule) => String(rule.unlockKey || "").trim())
+                            .filter(Boolean);
+
+                        const newlyUnlockedAvatars = avatarXpUnlockRulesRef.current
+                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                            .filter((rule) => {
+                                const threshold = Number(planetAvatarThresholds?.[rule.unlockKey] || 0);
+                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                            })
+                            .map((rule) => String(rule.unlockKey || "").trim())
+                            .filter(Boolean);
+
+                        if (newlyUnlockedShips.length > 0 || newlyUnlockedAvatars.length > 0) {
                             unlocks = {
-                                avatars: ['jovi'],
+                                ...unlocks,
+                                ...(newlyUnlockedShips.length > 0 ? { ships: [...(unlocks?.ships || []), ...newlyUnlockedShips] } : {}),
+                                ...(newlyUnlockedAvatars.length > 0 ? { avatars: [...(unlocks?.avatars || []), ...newlyUnlockedAvatars] } : {}),
                             };
                         }
                     }
@@ -527,6 +588,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             planetId,
                             currentlyUnlockedPetIds: effectiveUnlockedPets,
                             chanceConfig: petUnlockChanceConfig,
+                            assignmentOverrides: petUnlockAssignments,
                         });
 
                         if (unlockedPetIds.length > 0) {
@@ -562,7 +624,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         if (unlocks.objects?.length) discoveredUpdates["discoveredUnlocks.objects"] = arrayUnion(...unlocks.objects);
 
                         if (Object.keys(discoveredUpdates).length > 0) {
-                            const ownerId = userData.role === 'student' ? userData.teacherId : userData.uid;
+                            const ownerId = resolvedTeacherId;
                             if (ownerId) {
                                 updateDoc(doc(db, `users/${ownerId}/planets`, planetId), discoveredUpdates).catch((err) => {
                                     console.error("Failed to persist discovered planet unlocks:", err);
@@ -616,7 +678,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         return () => unsubscribeOwn();
     }
 
-    const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+    const teacherId = resolvedTeacherId;
     if (!teacherId && userData.role !== 'admin') return;
 
     // Listen to users in this class
@@ -638,8 +700,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     // Or we execute two queries.
     // For now, let's just show the class (students).
     
-    if (userData.role === 'teacher') {
-         q = query(collection(db, "users"), where("teacherId", "==", userData.uid));
+        if (userData.role === 'teacher') {
+            q = query(collection(db, "users"), where("teacherId", "==", teacherId));
     } else if (userData.role === 'student' && userData.teacherId) {
          q = query(collection(db, "users"), where("teacherId", "==", userData.teacherId));
     } else {
@@ -660,7 +722,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, isStudentPersonalView, petUnlockChanceConfig]);
+    }, [userData, resolvedTeacherId, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -725,7 +787,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Load Dynamic Planet Stats
   useEffect(() => {
      if (!userData) return;
-     const teacherId = userData.role === 'student' ? userData.teacherId : userData.uid;
+      const teacherId = resolvedTeacherId;
      if (!teacherId) return;
 
      // Correctly query the teacher's subcollection for planets
@@ -741,7 +803,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
          setDynamicPlanets(d);
      });
      return () => unsub();
-  }, [userData]);
+    }, [userData, resolvedTeacherId]);
 
   // Helper: Get Planet Position at specific time
   const getPlanetPosition = (planetId: string, timestamp: number) => {
@@ -1120,11 +1182,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Auto-close Asteroid Event on Victory after 5 seconds
   useEffect(() => {
     // Only the teacher (owner of the event) performs the database write
-    if (isAsteroidDestroyed && asteroidEvent?.active && userData?.role === 'teacher') {
+        if (isAsteroidDestroyed && asteroidEvent?.active && userData?.role === 'teacher' && resolvedTeacherId) {
       const timer = setTimeout(async () => {
          try {
              // Derive event ID from teacher's UID
-             const eventId = `asteroidEvent_${userData.uid}`; 
+                         const eventId = `asteroidEvent_${resolvedTeacherId}`; 
              const eventRef = doc(db, 'game-config', eventId);
              await updateDoc(eventRef, { active: false, status: 'success' });
          } catch (err) {
@@ -1133,7 +1195,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       }, 5000); 
       return () => clearTimeout(timer);
     }
-  }, [isAsteroidDestroyed, asteroidEvent?.active, userData]);
+    }, [isAsteroidDestroyed, asteroidEvent?.active, userData, resolvedTeacherId]);
 
   // Handle mouse wheel zoom
     const handleWheel = (e: React.WheelEvent) => {
@@ -1201,6 +1263,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, []);
 
   const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+    const landingPlanetId = normalizePlanetId(selectedPlanet?.id);
+    const isEarthLanding = landingPlanetId === 'earth';
+    const landingSurfacePath = `/images/landingsurface/${landingPlanetId || 'earth'}surface.png`;
     const visitorsForSelectedPlanet = selectedPlanet
         ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
         : [];
@@ -1365,7 +1430,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                               >
                                   <div className="relative w-full h-full">
                                       <img 
-                                            src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
+                                            src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                            }}
                                             alt="Traveling Ship"
                                                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] relative z-20" 
                                       />
@@ -1533,7 +1602,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                         >
                                             <div className="relative w-full h-full">
                                                 <img 
-                                                    src={getAssetPath(`/images/ships/${ship.shipId || 'finalship'}.png`)}
+                                                    src={getAssetPath(resolveShipAssetPath(ship.shipId || 'finalship'))}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                                    }}
                                                     alt="Docked Ship"
                                                     className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] relative z-20"
                                                 />
@@ -1552,8 +1625,30 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
        {userData?.role === 'teacher' && (
            <>
-               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none opacity-30">
-                   <h1 className="text-white font-mono text-xs tracking-widest uppercase">Classroom Sensor Feed // Live</h1>
+               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 opacity-70">
+                   <div className="text-white font-mono text-xs tracking-widest uppercase flex items-center gap-2">
+                        <span>Classroom Sensor Feed // </span>
+                        {!loadingTeacherOptions && teacherOptions.length > 1 ? (
+                            <select
+                                value={activeTeacherId || userData.uid}
+                                onChange={(event) => setActiveTeacherId(event.target.value)}
+                                aria-label="Select active class"
+                                title="Select active class"
+                                className="pointer-events-auto bg-transparent border border-cyan-400/40 text-cyan-300 rounded px-2 py-0.5 uppercase tracking-wider text-[11px] focus:outline-none focus:border-cyan-300"
+                            >
+                                {teacherOptions.map((option) => {
+                                    const label = option.schoolName || option.displayName || option.email || "Class";
+                                    return (
+                                        <option key={option.uid} value={option.uid} className="bg-slate-900 text-cyan-200">
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        ) : (
+                            <span>Live</span>
+                        )}
+                   </div>
                </div>
 
                 <Link href="/teacher/space" className="absolute top-6 left-6 z-40 bg-black/20 hover:bg-black/80 border border-white/10 hover:border-cyan-500 text-white/50 hover:text-cyan-400 px-6 py-3 rounded-full backdrop-blur-sm flex items-center gap-3 transition-all group">
@@ -1914,6 +2009,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              selectedIds={selectedIds}
              setSelectedIds={setSelectedIds}
              behaviors={behaviors}
+             creditsPerAward={creditsPerAward}
          />
       )}
 
@@ -1994,7 +2090,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                                     <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
                                         <img 
-                                            src={getAssetPath(`/images/ships/${award.ship.shipId || 'finalship'}.png`)} 
+                                            src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))} 
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                            }}
                                             alt="Award Ship"
                                             className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
                                         />
@@ -2092,7 +2192,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start justify-items-center">
                                         {(activeUnlockReveal.unlocks?.ships || []).map((id) => (
                                             <div key={`reveal-ship-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                <img src={getAssetPath(`/images/ships/${id}.png`)} alt={id} className="w-16 h-16 object-contain drop-shadow-md" />
+                                                <img
+                                                    src={getAssetPath(resolveShipAssetPath(id))}
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                                    }}
+                                                    alt={id}
+                                                    className="w-16 h-16 object-contain drop-shadow-md"
+                                                />
                                                 <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Ship</div>
                                             </div>
                                         ))}
@@ -2147,9 +2255,45 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 className="absolute inset-0 z-[200] bg-black flex flex-col items-center justify-end overflow-hidden"
             >
                 {/* Space Background */}
-                <div className="absolute inset-0 opacity-50">
-                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black to-black" />
+                <div className="absolute inset-0">
+                    <>
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#0b1228] via-[#040812] to-black" />
+                        <div className="absolute inset-0 pointer-events-none">
+                            {stars.map(star => (
+                                <div
+                                    key={`landing-star-${star.id}`}
+                                    className={`absolute bg-white rounded-full ${star.size} animate-pulse`}
+                                    style={{
+                                        top: star.top,
+                                        left: star.left,
+                                        opacity: Math.min(1, star.opacity + 0.2),
+                                        animationDuration: star.animationDuration
+                                    }}
+                                />
+                            ))}
+                        </div>
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black/30 to-black/80" />
+                    </>
                 </div>
+
+                {/* Planet in Sky */}
+                {!isEarthLanding && (
+                    <motion.div
+                        initial={{ y: -40, opacity: 0, scale: 0.92 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.35, duration: 0.9, ease: "easeOut" }}
+                        className="absolute top-[13vh] left-1/2 -translate-x-1/2 z-[5]"
+                    >
+                        <div className="relative w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56">
+                            <div className={`absolute inset-0 rounded-full ${selectedPlanet.color} blur-3xl opacity-40`} />
+                            <img
+                                src={getAssetPath(`/images/planetpng/${selectedPlanet.id}.png`)}
+                                alt={`${selectedPlanet.name} planet`}
+                                className="relative w-full h-full object-contain drop-shadow-[0_0_40px_rgba(255,255,255,0.35)]"
+                            />
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Planet Info Header */}
                 <div className="absolute top-10 left-0 right-0 text-center z-10">
@@ -2173,16 +2317,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 </div>
 
                 {/* Surface Horizon */}
-                <motion.div 
+                <motion.img
                     initial={{ y: "100%" }}
-                    animate={{ y: "60%" }}
+                    animate={{ y: "0%" }}
                     transition={{ duration: 1, ease: "circOut" }}
-                    className={`absolute bottom-0 left-[-50%] right-[-50%] h-[100vh] rounded-[100%] ${selectedPlanet.color} shadow-[0_0_100px_rgba(0,0,0,0.5)] z-0`}
-                    style={{ filter: 'brightness(0.8)' }}
+                    src={getAssetPath(landingSurfacePath)}
+                    alt={`${selectedPlanet.name} surface`}
+                    className="absolute bottom-0 left-0 w-full h-[100vh] object-cover object-bottom z-0"
+                    onError={(event) => {
+                        event.currentTarget.onerror = null;
+                        event.currentTarget.src = getAssetPath('/images/landingsurface/earthsurface.png');
+                    }}
                 />
 
-                {/* Character & Flag Container */}
-                <div className="relative z-10 mb-20 flex items-end gap-8 pb-32">
+                     {/* Character & Flag Container */}
+                    <div className="absolute bottom-[18vh] left-1/2 -translate-x-1/2 z-10 flex items-end gap-8">
                      {/* Flag */}
                      <motion.div
                         initial={{ y: -200, opacity: 0, rotate: -20 }}
@@ -2190,7 +2339,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         transition={{ delay: 1.2, type: "spring" }}
                         className="origin-bottom-left"
                      >
-                         <div className="transform scale-[3] drop-shadow-2xl">
+                                 <div className="transform scale-[5.25] drop-shadow-2xl">
                             <TinyFlag config={(landingSubject as any).flag || buildFallbackFlag(landingSubject)} />
                          </div>
                      </motion.div>
@@ -2200,7 +2349,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                          initial={{ scale: 0 }}
                          animate={{ scale: 1 }}
                          transition={{ delay: 0.8, type: "spring" }}
-                         className="relative w-48 h-48 -mb-4"
+                         className="relative w-[21rem] h-[21rem]"
                      >
                          <div className="absolute inset-0 bg-black/50 rounded-full blur-xl transform scale-x-150 translate-y-8 opacity-50" />
                          <div className="relative w-full h-full">

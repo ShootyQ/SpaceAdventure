@@ -54,7 +54,6 @@ export default function AdminAnalyticsPage() {
     const now = Date.now();
     const day7Start = now - 7 * MILLISECONDS_IN_DAY;
     const day30Start = now - 30 * MILLISECONDS_IN_DAY;
-    const day14Start = now - 14 * MILLISECONDS_IN_DAY;
 
     const teachers = users.filter((u) => u.role === "teacher");
     const students = users.filter((u) => u.role === "student");
@@ -107,10 +106,16 @@ export default function AdminAnalyticsPage() {
       let completedMissions = 0;
       let attempted = 0;
       let passed = 0;
-      let hasRecentActivity = false;
+      let hasRecentXpAward = false;
 
       for (const student of roster) {
         xpTotal += student.xp || 0;
+
+        const lastAwardAt = toTimestamp(student.lastAward?.timestamp);
+        const lastAwardXp = Number(student.lastAward?.xpGained || 0);
+        if (lastAwardXp > 0 && lastAwardAt !== null && lastAwardAt >= day7Start) {
+          hasRecentXpAward = true;
+        }
 
         const entries = Object.values(student.missionProgress || {});
         let studentRecent = false;
@@ -125,9 +130,6 @@ export default function AdminAnalyticsPage() {
           const attemptAt = toTimestamp(entry.lastAttemptAt);
           if (attemptAt !== null && attemptAt >= day7Start) {
             studentRecent = true;
-          }
-          if (attemptAt !== null && attemptAt >= day14Start) {
-            hasRecentActivity = true;
           }
         }
 
@@ -144,7 +146,7 @@ export default function AdminAnalyticsPage() {
         avgXP: studentCount ? Math.round(xpTotal / studentCount) : 0,
         completedMissions,
         passRate: attempted ? Math.round((passed / attempted) * 100) : 0,
-        atRisk: studentCount === 0 || !hasRecentActivity,
+        atRisk: studentCount === 0 || !hasRecentXpAward,
       };
     });
 
@@ -345,7 +347,7 @@ export default function AdminAnalyticsPage() {
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Teacher Health</h2>
-            <p className="mt-1 text-xs text-slate-500">At-risk indicates no student activity in the last 14 days or no roster.</p>
+            <p className="mt-1 text-xs text-slate-500">At-risk indicates no student XP awarded in the last 7 days or no roster.</p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[980px] text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">

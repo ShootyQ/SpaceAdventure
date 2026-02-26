@@ -13,6 +13,7 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { generateClassCode, sanitizeName } from "@/lib/utils";
 import { DEFAULT_PET_ID, STARTER_PET_IDS } from "@/lib/pets";
+import { isTeacherAccessRestricted, TEACHER_TRIAL_DAYS } from "@/lib/subscription";
 
 import { UserData, SpaceshipConfig, FlagConfig, Rank } from "@/types";
 
@@ -26,6 +27,30 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+
+const TRIAL_DURATION_MS = TEACHER_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+
+function toMillis(value: any): number | null {
+  if (!value) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (value instanceof Date) {
+    const parsed = value.getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (typeof value?.toDate === "function") {
+    const parsed = value.toDate()?.getTime?.();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (typeof value?.seconds === "number") {
+    const nanos = typeof value?.nanoseconds === "number" ? value.nanoseconds : 0;
+    return value.seconds * 1000 + Math.floor(nanos / 1_000_000);
+  }
+  return null;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -63,6 +88,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     updates.classCode = newCode;
                 }
 
+                if (data.role === 'teacher') {
+                  const createdAtMs = toMillis(data.createdAt) ?? Date.now();
+
+                  if (!data.trialStartedAt) {
+                    const trialStart = new Date(createdAtMs);
+                    data.trialStartedAt = trialStart as any;
+                    updates.trialStartedAt = trialStart as any;
+                  }
+
+                  if (!data.trialEndsAt) {
+                    const trialEnd = new Date(createdAtMs + TRIAL_DURATION_MS);
+                    data.trialEndsAt = trialEnd as any;
+                    updates.trialEndsAt = trialEnd as any;
+                  }
+                }
+
                 if (!data.createdAt) {
                   updates.createdAt = serverTimestamp() as any;
                 }
@@ -84,6 +125,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         console.warn("Could not update user profile in DB", e);
                     }
                 }
+
+                if (data.role === "teacher" && isTeacherAccessRestricted(data)) {
+                  try {
+                    await setDoc(userRef, { trialAccessLockedAt: serverTimestamp() as any }, { merge: true });
+                  } catch (e) {
+                    console.warn("Could not store trial lock timestamp", e);
+                  }
+
+                  if (typeof window !== "undefined") {
+                    sessionStorage.setItem("spaceadventure_login_error", "trial-expired");
+                  }
+
+                  await signOut(auth);
+                  router.replace("/login?role=teacher&error=trial-expired");
+                  return;
+                }
                 
                 setUserData(data);
             } else {
@@ -104,6 +161,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     status: 'active', // Auto-activate new teachers
                     subscriptionStatus: 'trial', // Start on Trial
                     createdAt: serverTimestamp() as any,
+                    trialStartedAt: serverTimestamp() as any,
+                    trialEndsAt: new Date(Date.now() + TRIAL_DURATION_MS) as any,
                     schoolName: '',
                     location: 'earth',
                     spaceship: {

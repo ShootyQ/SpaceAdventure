@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, getDocs, doc, updateDoc, arrayUnion, increment, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy } from "lucide-react";
+import { Loader2, ArrowLeft, BookOpen, Video, Brain, CheckCircle, XCircle, Trophy, Coins } from "lucide-react";
 import Link from "next/link";
 import confetti from 'canvas-confetti';
 import { createPracticeQuestions, PracticeAssignmentConfig, PracticeQuestion, getPracticeTemplatesForGrade } from "@/lib/practice";
@@ -29,12 +29,14 @@ interface Mission {
     targetGrades?: Array<StudentGrade | 'all'>;
     practiceConfig?: PracticeAssignmentConfig;
     xpReward: number;
+    creditsReward?: number;
 }
 
 interface MissionProgress {
     attempts: number;
     lastScore: number;
     passedEver: boolean;
+    completedCount?: number;
     completedAt?: number;
     lastAttemptAt?: number;
 }
@@ -53,7 +55,7 @@ export default function StudentMissions() {
     const [completedMissions, setCompletedMissions] = useState<string[]>([]);
     const [missionProgress, setMissionProgress] = useState<Record<string, MissionProgress>>({});
     const [submitting, setSubmitting] = useState(false);
-    const [feedback, setFeedback] = useState<{correct: boolean, score: number, newRank?: string} | null>(null);
+    const [feedback, setFeedback] = useState<{correct: boolean, score: number, awardedXp: number, awardedCredits: number, newRank?: string} | null>(null);
     const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[]>([]);
     const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
     const [practiceGraphPoints, setPracticeGraphPoints] = useState<Record<string, GraphPoint[]>>({});
@@ -74,6 +76,7 @@ export default function StudentMissions() {
         denominatorMax: 12,
         decimalPlaces: 2,
         attemptPolicy: 'once',
+        maxCompletions: 3,
     };
 
     const inferPracticeFromLegacy = (mission: Mission) => {
@@ -175,7 +178,24 @@ export default function StudentMissions() {
             ...(config || {}),
             templateId: (templateExists ? requestedTemplate : defaultTemplateId) as PracticeAssignmentConfig['templateId'],
             questionCount: Math.min(Math.max(Number(config?.questionCount ?? DEFAULT_PRACTICE_CONFIG.questionCount), 5), 60),
+            maxCompletions: Math.min(Math.max(Number(config?.maxCompletions ?? DEFAULT_PRACTICE_CONFIG.maxCompletions ?? 3), 1), 50),
         };
+    };
+
+    const getCompletionCap = (mission: Mission) => {
+        if (!inferPracticeFromLegacy(mission)) return 1;
+        const config = normalizePracticeConfig(mission.practiceConfig);
+        if (config.attemptPolicy === 'unlimited') return Number.POSITIVE_INFINITY;
+        if (config.attemptPolicy === 'limited') {
+            return Math.min(Math.max(Number(config.maxCompletions || 3), 1), 50);
+        }
+        return 1;
+    };
+
+    const getCompletedCount = (mission: Mission, progress?: MissionProgress) => {
+        const countFromProgress = Number(progress?.completedCount || 0);
+        if (countFromProgress > 0) return countFromProgress;
+        return completedMissions.includes(mission.id) ? 1 : 0;
     };
 
     const isMissionAssignedToStudentGrade = (mission: Mission, studentGrade?: StudentGrade) => {
@@ -269,8 +289,13 @@ export default function StudentMissions() {
         const isPracticeMission = inferPracticeFromLegacy(mission);
         const practiceConfig = normalizePracticeConfig(mission.practiceConfig || DEFAULT_PRACTICE_CONFIG);
         const missionState = missionProgress[mission.id];
-        if (isPracticeMission && practiceConfig.attemptPolicy === 'once' && (missionState?.attempts || 0) > 0) {
-            alert("This assignment is set to one attempt.");
+        const completionCap = getCompletionCap(mission);
+        const completedCount = getCompletedCount(mission, missionState);
+        if (isPracticeMission && completedCount >= completionCap) {
+            const message = Number.isFinite(completionCap)
+                ? `This assignment has reached its completion limit (${completionCap}).`
+                : "This assignment has reached its completion limit.";
+            alert(message);
             return;
         }
 
@@ -399,9 +424,15 @@ export default function StudentMissions() {
             const passed = score >= 70; // 70% passing grade
 
             let newRankName: string | undefined;
+            let awardedXp = 0;
+            let awardedCredits = 0;
             const userRef = doc(db, "users", user.uid);
             const currentProgress = missionProgress[activeMission.id] || { attempts: 0, lastScore: 0, passedEver: false };
             const nextAttempts = (currentProgress.attempts || 0) + 1;
+            const completionCap = getCompletionCap(activeMission);
+            const currentCompletedCount = getCompletedCount(activeMission, currentProgress);
+            const canEarnCompletion = currentCompletedCount < completionCap;
+            const nextCompletedCount = passed && canEarnCompletion ? currentCompletedCount + 1 : currentCompletedCount;
             const now = Date.now();
             const progressPayload: Record<string, any> = {
                 [`missionProgress.${activeMission.id}.attempts`]: nextAttempts,
@@ -413,12 +444,13 @@ export default function StudentMissions() {
             if (passed) {
                 progressPayload[`missionProgress.${activeMission.id}.completedAt`] = now;
                 
-                // Only award XP if not already completed
-                if (!completedMissions.includes(activeMission.id)) {
+                if (canEarnCompletion) {
                     const locationId = (userData?.location || "").toLowerCase();
                     const planetXpKey = locationId ? `planetXP.${locationId}` : null;
                     const previousXP = Number(userData?.xp || 0);
                     const nextXP = previousXP + Number(activeMission.xpReward || 0);
+                    const xpReward = Number(activeMission.xpReward || 0);
+                    const creditsReward = Math.max(0, Number(activeMission.creditsReward || 0));
                     const sortedRanks = [...DEFAULT_RANKS].sort((a, b) => b.minXP - a.minXP);
                     const oldRank = sortedRanks.find((rank) => previousXP >= rank.minXP);
                     const newRank = sortedRanks.find((rank) => nextXP >= rank.minXP);
@@ -426,21 +458,30 @@ export default function StudentMissions() {
                     if (promoted) {
                         newRankName = newRank?.name;
                     }
+                    awardedXp = xpReward;
+                    awardedCredits = creditsReward;
 
                     await updateDoc(userRef, {
                         completedMissions: arrayUnion(activeMission.id),
-                        xp: increment(activeMission.xpReward),
-                        ...(planetXpKey ? { [planetXpKey]: increment(activeMission.xpReward) } : {}),
+                        xp: increment(xpReward),
+                        ...(creditsReward > 0 ? { galacticCredits: increment(creditsReward) } : {}),
+                        ...(planetXpKey && xpReward > 0 ? { [planetXpKey]: increment(xpReward) } : {}),
+                        lastAward: {
+                            reason: `Mission completed: ${activeMission.title}`,
+                            xpGained: xpReward,
+                            timestamp: now,
+                        },
                         lastXpReason: `Mission completed: ${activeMission.title}`,
+                        [`missionProgress.${activeMission.id}.completedCount`]: nextCompletedCount,
                         ...progressPayload,
                     });
 
-                    if (activeMission.xpReward > 0) {
+                    if (xpReward > 0) {
                         try {
                             await setDoc(
                                 doc(db, "public-stats", "landing"),
                                 {
-                                    focusPointsAwarded: increment(activeMission.xpReward),
+                                    focusPointsAwarded: increment(xpReward),
                                     awardEvents: increment(1),
                                     studentsAwarded: increment(1),
                                     updatedAt: serverTimestamp(),
@@ -459,25 +500,30 @@ export default function StudentMissions() {
                         origin: { y: 0.6 }
                     });
 
-                    setCompletedMissions(prev => [...prev, activeMission.id]);
+                    setCompletedMissions(prev => (prev.includes(activeMission.id) ? prev : [...prev, activeMission.id]));
                     setMissionProgress((prev) => ({
                         ...prev,
                         [activeMission.id]: {
                             attempts: nextAttempts,
                             lastScore: score,
                             passedEver: true,
+                            completedCount: nextCompletedCount,
                             completedAt: now,
                             lastAttemptAt: now,
                         }
                     }));
                 } else {
-                    await updateDoc(userRef, progressPayload);
+                    await updateDoc(userRef, {
+                        ...progressPayload,
+                        [`missionProgress.${activeMission.id}.completedCount`]: nextCompletedCount,
+                    });
                     setMissionProgress((prev) => ({
                         ...prev,
                         [activeMission.id]: {
                             attempts: nextAttempts,
                             lastScore: score,
                             passedEver: currentProgress.passedEver || passed,
+                            completedCount: nextCompletedCount,
                             completedAt: currentProgress.completedAt || now,
                             lastAttemptAt: now,
                         }
@@ -497,7 +543,11 @@ export default function StudentMissions() {
                 }));
             }
 
-            setFeedback({ correct: passed, score, newRank: newRankName });
+            if (passed) {
+                setFeedback({ correct: true, score, awardedXp, awardedCredits, newRank: newRankName });
+            } else {
+                setFeedback({ correct: false, score, awardedXp: 0, awardedCredits: 0 });
+            }
 
         } catch (e) {
             console.error("Error submitting mission:", e);
@@ -510,11 +560,11 @@ export default function StudentMissions() {
         return missions.map((mission) => {
             const isPracticeMission = inferPracticeFromLegacy(mission);
             const progress = missionProgress[mission.id];
-            const isCompleted = completedMissions.includes(mission.id);
-            const missionPracticeConfig = mission.practiceConfig || DEFAULT_PRACTICE_CONFIG;
-            const isOneTime = isPracticeMission && missionPracticeConfig.attemptPolicy === 'once';
-            const attemptsUsed = progress?.attempts || 0;
-            const isLocked = isOneTime && attemptsUsed > 0 && !isCompleted;
+            const completionCap = getCompletionCap(mission);
+            const completedCount = getCompletedCount(mission, progress);
+            const isCompleted = Number.isFinite(completionCap) && completedCount >= completionCap;
+            const isOneTime = isPracticeMission && completionCap === 1;
+            const isLocked = Number.isFinite(completionCap) && completedCount >= completionCap;
 
             return {
                 mission,
@@ -523,6 +573,8 @@ export default function StudentMissions() {
                 progress,
                 isOneTime,
                 isLocked,
+                completedCount,
+                completionCap,
             };
         });
     }, [missions, missionProgress, completedMissions]);
@@ -543,7 +595,7 @@ export default function StudentMissions() {
                 <div className="rounded-xl border border-dashed border-cyan-900/50 p-5 text-sm text-cyan-700">{emptyText}</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {items.map(({ mission, isPracticeMission, isCompleted, progress, isLocked }) => {
+                    {items.map(({ mission, isPracticeMission, isCompleted, progress, isLocked, completedCount, completionCap }) => {
                         const isUnavailable = isLocked;
                         return (
                             <div
@@ -570,12 +622,17 @@ export default function StudentMissions() {
                                         </span>
                                     ) : isUnavailable ? (
                                         <span className="flex items-center gap-1 text-gray-300 font-bold bg-gray-800/60 px-3 py-1 rounded-full border border-gray-600/40 text-xs uppercase">
-                                            Attempt Used
+                                            Completion Limit Reached
                                         </span>
                                     ) : (
-                                        <span className="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-500/30 text-xs uppercase">
-                                            <Trophy size={14} /> {mission.xpReward} XP
-                                        </span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-500/30 text-xs uppercase">
+                                                <Trophy size={14} /> {mission.xpReward} XP
+                                            </span>
+                                            <span className="flex items-center gap-1 text-amber-300 font-bold bg-amber-900/20 px-3 py-1 rounded-full border border-amber-500/30 text-xs uppercase">
+                                                <Coins size={14} /> {Math.max(0, Number(mission.creditsReward || 0))} GC
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
 
@@ -587,6 +644,9 @@ export default function StudentMissions() {
                                 {!!progress && (
                                     <div className="text-xs text-cyan-500 mb-3">
                                         Attempts: {progress.attempts || 0}
+                                        {Number.isFinite(completionCap)
+                                            ? ` • Completions: ${completedCount}/${completionCap}`
+                                            : ` • Completions: ${completedCount}`}
                                         {typeof progress.lastScore === 'number' ? ` • Last score: ${progress.lastScore}%` : ''}
                                     </div>
                                 )}
@@ -615,7 +675,10 @@ export default function StudentMissions() {
 
     if (activeMission) {
         const isPracticeMission = inferPracticeFromLegacy(activeMission);
-        const isCompleted = completedMissions.includes(activeMission.id);
+        const activeProgress = missionProgress[activeMission.id];
+        const completionCap = getCompletionCap(activeMission);
+        const completedCount = getCompletedCount(activeMission, activeProgress);
+        const isCompleted = Number.isFinite(completionCap) && completedCount >= completionCap;
 
         return (
             <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">
@@ -636,9 +699,15 @@ export default function StudentMissions() {
                                     {activeMission.type === 'watch' && !isPracticeMission ? <Video size={14} /> : isPracticeMission ? <Brain size={14} /> : <BookOpen size={14} />}
                                     {activeMission.type === 'watch' && !isPracticeMission ? 'Video Log' : isPracticeMission ? 'Math Practice' : 'Intel Report'}
                                 </span>
-                                <div className="flex items-center gap-2 text-yellow-400 font-bold">
-                                    <Trophy size={18} />
-                                    <span>{activeMission.xpReward} XP</span>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="flex items-center gap-2 text-yellow-400 font-bold">
+                                        <Trophy size={18} />
+                                        <span>{activeMission.xpReward} XP</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-amber-300 font-bold">
+                                        <Coins size={18} />
+                                        <span>{Math.max(0, Number(activeMission.creditsReward || 0))} GC</span>
+                                    </div>
                                 </div>
                             </div>
                             <h1 className="text-3xl font-bold text-white mb-2">{activeMission.title}</h1>
@@ -880,7 +949,8 @@ export default function StudentMissions() {
                                         <div className="flex flex-col items-center gap-2">
                                             <CheckCircle className="text-green-500 w-16 h-16 mb-2" />
                                             <h2 className="text-2xl font-bold text-white">Mission Accomplished!</h2>
-                                            <p className="text-green-300">Score: {feedback.score}% - You have earned {activeMission.xpReward} XP.</p>
+                                            <p className="text-green-300">Score: {feedback.score}% - {feedback.awardedXp > 0 ? `You have earned ${feedback.awardedXp} XP.` : 'Completion recorded. No additional XP awarded.'}</p>
+                                            <p className="text-amber-300">{feedback.awardedCredits > 0 ? `You have earned ${feedback.awardedCredits} Galactic Credits.` : 'No Galactic Credits awarded for this mission.'}</p>
                                             {feedback.newRank && <p className="text-yellow-300 font-bold">Promotion Unlocked: {feedback.newRank}</p>}
                                             <button onClick={() => setActiveMission(null)} className="mt-4 px-6 py-2 bg-green-600 rounded-full font-bold text-white hover:bg-green-500">Return to Base</button>
                                         </div>

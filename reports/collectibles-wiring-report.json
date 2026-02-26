@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-02-23T19:25:16.959Z",
+  "mode": "standard",
+  "summary": {
+    "errors": 0,
+    "warnings": 13
+  },
+  "errors": [],
+  "warnings": [
+    "SHIP_OPTIONS:earth-xp-earn: filename contains whitespace (earth-xp earn.png).",
+    "SHIP_OPTIONS:jupiter-xp-earn: filename contains whitespace (jupiter-xp earn.png).",
+    "SHIP_OPTIONS:mars-xp-earn: filename contains whitespace (mars-xp earn.png).",
+    "SHIP_OPTIONS:mercury-xp-earn: filename contains whitespace (mercury-xp earn.png).",
+    "SHIP_OPTIONS:saturn-xp-earn: filename contains whitespace (saturn-xp earn.png).",
+    "SHIP_OPTIONS:uranus-xp-earn: filename contains whitespace (uranus-xp earn.png).",
+    "SHIP_OPTIONS:venus-xp-earn: filename contains whitespace (venus-xp earn.png).",
+    "SHIP_OPTIONS:earth-extremely-rare: filename contains whitespace (earth-extremely rare.png).",
+    "SHIP_OPTIONS:jupiter-extremely-rare: filename contains whitespace (jupiter-extremely rare.png).",
+    "SHIP_OPTIONS:saturn-extremely-rare: filename contains whitespace (saturn-extremely rare.png).",
+    "SHIP_OPTIONS:uranus-extremely-rare: filename contains whitespace (uranus-extremely rare.png).",
+    "catalog:acidic-axolotl: filename contains whitespace (venus.Acidic Axolotl.png).",
+    "catalog:acidic-axolotl: filename contains uppercase letters (venus.Acidic Axolotl.png)."
+  ]
+}

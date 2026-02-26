@@ -27,6 +27,16 @@ export interface PetUnlockChanceConfig {
     };
 }
 
+export type PetUnlockMethod = "chance" | "shop" | "starter" | "unassigned";
+export type PetUnlockScope = "planet" | "any";
+
+export interface PetUnlockAssignment {
+    method: PetUnlockMethod;
+    scope: PetUnlockScope;
+    planetId?: string;
+    rarity?: RollablePetRarity;
+}
+
 const DEFAULT_PLANET_RARITY_CHANCES: Record<RollablePetRarity, number> = {
     common: 50,
     uncommon: 500,
@@ -75,6 +85,11 @@ const PET_EMOJI_FALLBACKS: Record<string, string> = {
     canyonraptor: "🦖",
     "acidic-axolotl": "🦎",
     rockcat: "🐈",
+};
+
+const PET_NAME_FALLBACKS: Record<string, string> = {
+    slimepet: "Nebula Goo",
+    skateboardsquirrell: "Kickflip Comet Squirrel",
 };
 
 type CatalogItem = {
@@ -159,6 +174,41 @@ export const normalizePetUnlockChanceConfig = (raw?: Partial<PetUnlockChanceConf
     };
 };
 
+export const normalizePetUnlockAssignments = (raw?: Record<string, any> | null): Record<string, PetUnlockAssignment> => {
+    if (!raw || typeof raw !== "object") return {};
+
+    const normalized: Record<string, PetUnlockAssignment> = {};
+
+    Object.entries(raw).forEach(([petId, value]) => {
+        const normalizedPetId = String(petId || "").trim().toLowerCase();
+        if (!normalizedPetId) return;
+
+        const methodRaw = String((value as any)?.method || "chance").trim().toLowerCase();
+        const method: PetUnlockMethod = (methodRaw === "starter" || methodRaw === "unassigned" || methodRaw === "shop") ? methodRaw : "chance";
+
+        const scopeRaw = String((value as any)?.scope || "any").trim().toLowerCase();
+        const scope: PetUnlockScope = scopeRaw === "planet" ? "planet" : "any";
+
+        const planetId = String((value as any)?.planetId || "").trim().toLowerCase();
+        const rarityRaw = String((value as any)?.rarity || "").trim().toLowerCase();
+        const rarity: RollablePetRarity = (
+            rarityRaw === "common" ||
+            rarityRaw === "uncommon" ||
+            rarityRaw === "rare" ||
+            rarityRaw === "extremely-rare"
+        ) ? rarityRaw : "common";
+
+        normalized[normalizedPetId] = {
+            method,
+            scope,
+            planetId: scope === "planet" ? planetId : undefined,
+            rarity: method === "chance" ? rarity : undefined,
+        };
+    });
+
+    return normalized;
+};
+
 const getChanceDenominator = (rarity: PetRarity, unlockPlanetId: string | undefined, config: PetUnlockChanceConfig) => {
     if (rarity === "testing") return config.testing;
     if (rarity === "standard") return undefined;
@@ -228,12 +278,15 @@ export const rollPetUnlocksForXpEvent = ({
     planetId,
     currentlyUnlockedPetIds,
     chanceConfig,
+    assignmentOverrides,
 }: {
     planetId: string;
     currentlyUnlockedPetIds: Set<string>;
     chanceConfig?: Partial<PetUnlockChanceConfig> | null;
+    assignmentOverrides?: Record<string, PetUnlockAssignment> | null;
 }): string[] => {
     const normalizedConfig = normalizePetUnlockChanceConfig(chanceConfig || null);
+    const normalizedAssignments = normalizePetUnlockAssignments(assignmentOverrides || null);
     const normalizedPlanetId = String(planetId || "").toLowerCase();
     if (!normalizedPlanetId || normalizedPlanetId === "sun") return [];
 
@@ -254,15 +307,53 @@ export const rollPetUnlocksForXpEvent = ({
 
     ROLLABLE_RARITIES.forEach((rarity) => {
         const planetPool = PET_OPTIONS.filter((pet) => (
-            pet.rarity === rarity &&
-            pet.unlockPlanetId === normalizedPlanetId &&
+            (() => {
+                const assignment = normalizedAssignments[String(pet.id || "").toLowerCase()];
+                const effectiveMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
+                if (effectiveMethod !== "chance") return false;
+
+                const assignmentRarity = assignment?.rarity;
+                const effectiveRarity = (
+                    assignmentRarity === "common" ||
+                    assignmentRarity === "uncommon" ||
+                    assignmentRarity === "rare" ||
+                    assignmentRarity === "extremely-rare"
+                )
+                    ? assignmentRarity
+                    : pet.rarity;
+
+                const effectiveScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
+                const effectivePlanetId = effectiveScope === "planet"
+                    ? (assignment?.planetId || pet.unlockPlanetId || "").toLowerCase()
+                    : "";
+
+                return effectiveRarity === rarity &&
+                    effectiveScope === "planet" &&
+                    effectivePlanetId === normalizedPlanetId;
+            })() &&
             !pet.starter &&
             !unlocked.has(pet.id)
         ));
 
         const anyPlanetPool = PET_OPTIONS.filter((pet) => (
-            pet.rarity === rarity &&
-            !pet.unlockPlanetId &&
+            (() => {
+                const assignment = normalizedAssignments[String(pet.id || "").toLowerCase()];
+                const effectiveMethod: PetUnlockMethod = assignment?.method || (pet.starter ? "starter" : "chance");
+                if (effectiveMethod !== "chance") return false;
+
+                const assignmentRarity = assignment?.rarity;
+                const effectiveRarity = (
+                    assignmentRarity === "common" ||
+                    assignmentRarity === "uncommon" ||
+                    assignmentRarity === "rare" ||
+                    assignmentRarity === "extremely-rare"
+                )
+                    ? assignmentRarity
+                    : pet.rarity;
+
+                const effectiveScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
+                return effectiveRarity === rarity && effectiveScope === "any";
+            })() &&
             !pet.starter &&
             !unlocked.has(pet.id)
         ));
@@ -304,6 +395,30 @@ export const getPetById = (petId?: string | null): PetOption => {
     if (petId) {
         const found = PET_OPTIONS.find((pet) => pet.id === petId);
         if (found) return found;
+
+        const normalizedPetId = String(petId)
+            .trim()
+            .toLowerCase()
+            .replace(/\.[^.]+$/g, "")
+            .replace(/[^a-z0-9._-]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+
+        if (normalizedPetId) {
+            const dynamicName = PET_NAME_FALLBACKS[normalizedPetId] || normalizedPetId
+                .replace(/[-_]+/g, " ")
+                .replace(/\s+/g, " ")
+                .trim()
+                .replace(/\b\w/g, (char) => char.toUpperCase()) || "Companion";
+
+            return {
+                id: normalizedPetId,
+                name: dynamicName,
+                emoji: "🐾",
+                imageSrc: `/images/collectibles/pets/shop/${normalizedPetId}.png`,
+                rarity: "common",
+                starter: false,
+            };
+        }
     }
     return PET_OPTIONS.find((pet) => pet.id === DEFAULT_PET_ID) || PET_OPTIONS[0];
 };
