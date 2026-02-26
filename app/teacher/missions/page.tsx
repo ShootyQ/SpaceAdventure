@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, getDocs, orderBy, where } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, where, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -41,6 +41,7 @@ export default function MissionsPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [students, setStudents] = useState<StudentProgress[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchMissions = async () => {
@@ -149,6 +150,23 @@ export default function MissionsPage() {
         ? Math.round((totalCompleted / totalPossibleCompletions) * 100)
         : 0;
 
+    const handleDeleteMission = async (mission: Mission) => {
+        if (!user) return;
+        const confirmed = window.confirm(`Delete assignment "${mission.title}"? This cannot be undone.`);
+        if (!confirmed) return;
+
+        setDeletingMissionId(mission.id);
+        try {
+            await deleteDoc(doc(db, `users/${user.uid}/missions`, mission.id));
+            setMissions((prev) => prev.filter((item) => item.id !== mission.id));
+        } catch (error) {
+            console.error("Failed to delete mission:", error);
+            window.alert("Failed to delete assignment. Please try again.");
+        } finally {
+            setDeletingMissionId(null);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-space-950 p-6 font-mono text-cyan-400">
             <div className="max-w-6xl mx-auto">
@@ -249,11 +267,13 @@ export default function MissionsPage() {
                                             </span>
                                         </Link>
                                         <button
+                                            onClick={() => handleDeleteMission(mission)}
+                                            disabled={deletingMissionId === mission.id}
                                             className="p-2 rounded bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors"
                                             aria-label="Delete mission"
                                             title="Delete mission"
                                         >
-                                            <Trash2 size={18} />
+                                            {deletingMissionId === mission.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                                         </button>
                                     </div>
                                 </div>

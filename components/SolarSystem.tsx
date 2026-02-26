@@ -1263,7 +1263,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, []);
 
   const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
-        const isEarthLanding = normalizePlanetId(selectedPlanet?.id) === 'earth';
+    const landingPlanetId = normalizePlanetId(selectedPlanet?.id);
+    const isEarthLanding = landingPlanetId === 'earth';
+    const landingSurfacePath = `/images/landingsurface/${landingPlanetId || 'earth'}surface.png`;
     const visitorsForSelectedPlanet = selectedPlanet
         ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
         : [];
@@ -2254,30 +2256,24 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
             >
                 {/* Space Background */}
                 <div className="absolute inset-0">
-                    {isEarthLanding ? (
-                        <>
-                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#0b1228] via-[#040812] to-black" />
-                            <div className="absolute inset-0 pointer-events-none">
-                                {stars.map(star => (
-                                    <div
-                                        key={`landing-star-${star.id}`}
-                                        className={`absolute bg-white rounded-full ${star.size} animate-pulse`}
-                                        style={{
-                                            top: star.top,
-                                            left: star.left,
-                                            opacity: Math.min(1, star.opacity + 0.2),
-                                            animationDuration: star.animationDuration
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black/30 to-black/80" />
-                        </>
-                    ) : (
-                        <div className="absolute inset-0 opacity-50">
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black to-black" />
+                    <>
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#0b1228] via-[#040812] to-black" />
+                        <div className="absolute inset-0 pointer-events-none">
+                            {stars.map(star => (
+                                <div
+                                    key={`landing-star-${star.id}`}
+                                    className={`absolute bg-white rounded-full ${star.size} animate-pulse`}
+                                    style={{
+                                        top: star.top,
+                                        left: star.left,
+                                        opacity: Math.min(1, star.opacity + 0.2),
+                                        animationDuration: star.animationDuration
+                                    }}
+                                />
+                            ))}
                         </div>
-                    )}
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-transparent via-black/30 to-black/80" />
+                    </>
                 </div>
 
                 {/* Planet in Sky */}
@@ -2321,24 +2317,18 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 </div>
 
                 {/* Surface Horizon */}
-                {isEarthLanding ? (
-                    <motion.img
-                        initial={{ y: "100%" }}
-                        animate={{ y: "0%" }}
-                        transition={{ duration: 1, ease: "circOut" }}
-                        src={getAssetPath('/images/landingsurface/earthsurface.png')}
-                        alt="Earth surface"
-                        className="absolute bottom-0 left-0 w-full h-[100vh] object-cover object-bottom z-0"
-                    />
-                ) : (
-                    <motion.div 
-                        initial={{ y: "100%" }}
-                        animate={{ y: "60%" }}
-                        transition={{ duration: 1, ease: "circOut" }}
-                        className={`absolute bottom-0 left-[-50%] right-[-50%] h-[100vh] rounded-[100%] ${selectedPlanet.color} shadow-[0_0_100px_rgba(0,0,0,0.5)] z-0`}
-                        style={{ filter: 'brightness(0.8)' }}
-                    />
-                )}
+                <motion.img
+                    initial={{ y: "100%" }}
+                    animate={{ y: "0%" }}
+                    transition={{ duration: 1, ease: "circOut" }}
+                    src={getAssetPath(landingSurfacePath)}
+                    alt={`${selectedPlanet.name} surface`}
+                    className="absolute bottom-0 left-0 w-full h-[100vh] object-cover object-bottom z-0"
+                    onError={(event) => {
+                        event.currentTarget.onerror = null;
+                        event.currentTarget.src = getAssetPath('/images/landingsurface/earthsurface.png');
+                    }}
+                />
 
                      {/* Character & Flag Container */}
                     <div className="absolute bottom-[18vh] left-1/2 -translate-x-1/2 z-10 flex items-end gap-8">
