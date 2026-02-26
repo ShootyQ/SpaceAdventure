@@ -125,6 +125,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Rank System
   const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
   const ranksRef = useRef<Rank[]>(DEFAULT_RANKS); // Ref for access in listeners
+    const sortedRanksDescRef = useRef<Rank[]>([...DEFAULT_RANKS].sort((a, b) => b.minXP - a.minXP));
 
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
@@ -320,7 +321,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       }, flushDelayMs);
   }, [flushPendingAwardEvents]);
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
     const [creditsPerAward, setCreditsPerAward] = useState(1);
   const previousXPRef = useRef<Map<string, number>>(new Map());
@@ -332,7 +332,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const panRef = useRef({ x: 0, y: 0 });
   
   // Sync Rank Ref
-  useEffect(() => { ranksRef.current = ranks; }, [ranks]);
+    useEffect(() => {
+            ranksRef.current = ranks;
+            sortedRanksDescRef.current = [...ranks].sort((a, b) => b.minXP - a.minXP);
+    }, [ranks]);
 
   // Load Ranks Configuration
   useEffect(() => {
@@ -567,8 +570,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              if (!isFirstLoad.current && !isStudentPersonalView) {
                 const oldXP = previousXPRef.current.get(shipData.id);
                 if (oldXP !== undefined && shipData.xp > oldXP) {
-                    const oldRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => oldXP >= r.minXP);
-                    const newRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => shipData.xp >= r.minXP);
+                    const oldRank = sortedRanksDescRef.current.find((r) => oldXP >= r.minXP);
+                    const newRank = sortedRanksDescRef.current.find((r) => shipData.xp >= r.minXP);
                     const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
                     const planetId = (shipData.locationId || '').toLowerCase();
@@ -2031,8 +2034,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              onClose={handleCloseManifest}
              ships={ships}
              ranks={ranks}
-             selectedIds={selectedIds}
-             setSelectedIds={setSelectedIds}
              behaviors={behaviors}
              creditsPerAward={creditsPerAward}
          />
@@ -2068,9 +2069,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     onClick={(e) => e.stopPropagation()}
                 >
                     {awardQueue.map((award, index) => {
+                        const isSingleAward = awardQueue.length === 1;
                         const isCompactAward = awardQueue.length > 2;
                         const isDenseAward = awardQueue.length > 6;
                         const isUltraDenseAward = awardQueue.length > 10;
+                        const useLightAnimation = awardQueue.length > 6;
                         const selectedPet = getPetById(award.ship.selectedPetId);
                         return (
                         <motion.div
@@ -2079,13 +2082,14 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             animate={{ scale: 1, rotate: 0, y: 0 }}
                             exit={{ scale: 0, opacity: 0 }}
                             transition={{ 
-                                type: "spring",
-                                stiffness: 200,
-                                damping: 20,
+                                type: useLightAnimation ? "tween" : "spring",
+                                stiffness: useLightAnimation ? undefined : 200,
+                                damping: useLightAnimation ? undefined : 20,
+                                duration: useLightAnimation ? 0.16 : undefined,
                                 delay: 0
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : 'w-[420px] aspect-square p-8'}
+                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[520px] aspect-square p-8' : 'w-[420px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -2101,11 +2105,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                             {/* Avatar + Ship + Pet */}
                             <motion.div
-                                animate={{
+                                animate={isDenseAward ? undefined : {
                                     y: [0, -10, 0],
-                                    rotate: [0, -5, 5, 0] 
+                                    rotate: [0, -5, 5, 0]
                                 }}
-                                transition={{ 
+                                transition={isDenseAward ? undefined : {
                                     repeat: Infinity,
                                     duration: 4,
                                     ease: "easeInOut"
@@ -2149,7 +2153,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 </div>
                             </motion.div>
 
-                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : 'text-4xl'} font-bold text-white font-sans relative z-10 truncate w-full`}>
+                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.1rem] mb-3' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward ? 'w-full max-w-[460px] px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
                                 {award.ship.cadetName}
                             </div>
                             

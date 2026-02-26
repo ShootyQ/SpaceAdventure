@@ -67,8 +67,6 @@ interface ManifestOverlayProps {
     onClose: () => void;
     ships: Ship[];
     ranks: Rank[];
-    selectedIds: Set<string>;
-    setSelectedIds: (ids: Set<string>) => void;
     behaviors: Behavior[];
     creditsPerAward: number;
 }
@@ -168,7 +166,8 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle, density }: { stud
 });
 ShipCard.displayName = "ShipCard";
 
-const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, setSelectedIds, behaviors, creditsPerAward }: ManifestOverlayProps) => {
+const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, creditsPerAward }: ManifestOverlayProps) => {
+    const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
     
     // 1. Optimize Ranks (Sort once)
     const sortedRanks = React.useMemo(() => ranks.slice().sort((a,b) => b.minXP - a.minXP), [ranks]);
@@ -187,6 +186,10 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
         else newSet.add(id);
         setSelectedIds(newSet);
     }, [selectedIds, setSelectedIds]);
+
+    React.useEffect(() => {
+        if (!isVisible) setSelectedIds(new Set());
+    }, [isVisible]);
 
     if (!isVisible) return null;
 
