@@ -67,86 +67,85 @@ export default function StudentConsole() {
         } as React.CSSProperties;
     };
 
-  return (
-    <div className="h-[100dvh] w-full relative overflow-hidden text-cyan-400 font-mono bg-black">
-        <main className="h-full w-full relative z-0">
-            <div className="h-full w-full flex items-center justify-center p-2 md:p-3">
-                <div className="relative w-full max-w-[calc(100dvh*1.7778)] aspect-[1536/864] rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 shadow-[0_30px_90px_rgba(8,145,178,0.2)]">
-                            <img
-                                src={getAssetPath(interiorZones.image)}
-                                alt="Spaceship Interior"
-                                className="absolute inset-0 w-full h-full object-cover"
-                            />
+    return (
+        <div className="h-[100dvh] w-full relative overflow-hidden text-cyan-400 font-mono bg-black">
+            <main className="h-full w-full relative z-0">
+                <div className="h-full w-full flex items-center justify-center p-2 md:p-3">
+                    <div className="relative w-full max-w-[calc(100dvh*1.7778)] aspect-[1536/864] rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 shadow-[0_30px_90px_rgba(8,145,178,0.2)]">
+                        <img
+                            src={getAssetPath(interiorZones.image)}
+                            alt="Spaceship Interior"
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
 
-                            {badgeZone && (
-                                <div className="absolute p-1" style={zoneStyle(badgeZone)}>
-                                    {currentRank.image ? (
-                                        <img
-                                            src={getAssetPath(currentRank.image)}
-                                            alt={currentRank.name}
-                                            className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(250,204,21,0.35)]"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full rounded-md bg-black/30 border border-yellow-500/30 flex items-center justify-center text-yellow-400">
-                                            <Star size={18} />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {avatarZone && (
-                                <div className="absolute p-1" style={zoneStyle(avatarZone)}>
+                        {badgeZone && (
+                            <div className="absolute p-1" style={zoneStyle(badgeZone)}>
+                                {currentRank.image ? (
                                     <img
-                                        src={getAssetPath(selectedAvatar.src)}
-                                        alt={selectedAvatar.name}
-                                        className="w-full h-full object-contain"
+                                        src={getAssetPath(currentRank.image)}
+                                        alt={currentRank.name}
+                                        className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(250,204,21,0.35)]"
                                     />
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="w-full h-full rounded-md bg-black/30 border border-yellow-500/30 flex items-center justify-center text-yellow-400">
+                                        <Star size={18} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                            {shipZone && (
-                                <div className="absolute p-1" style={zoneStyle(shipZone)}>
+                        {avatarZone && (
+                            <div className="absolute p-1" style={zoneStyle(avatarZone)}>
+                                <img
+                                    src={getAssetPath(selectedAvatar.src)}
+                                    alt={selectedAvatar.name}
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
+                        )}
+
+                        {shipZone && (
+                            <div className="absolute p-1" style={zoneStyle(shipZone)}>
+                                <img
+                                    src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                                    onError={(event) => {
+                                        event.currentTarget.onerror = null;
+                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                    }}
+                                    alt="Current Ship"
+                                    className="w-full h-full object-contain drop-shadow-[0_0_16px_rgba(34,211,238,0.35)]"
+                                />
+                            </div>
+                        )}
+
+                        {petZone && (
+                            <div className="absolute p-1" style={zoneStyle(petZone)}>
+                                {selectedPet.imageSrc ? (
                                     <img
-                                        src={getAssetPath(resolveShipAssetPath(selectedShipId))}
-                                        onError={(event) => {
-                                            event.currentTarget.onerror = null;
-                                            event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
-                                        }}
-                                        alt="Current Ship"
-                                        className="w-full h-full object-contain drop-shadow-[0_0_16px_rgba(34,211,238,0.35)]"
+                                        src={getAssetPath(selectedPet.imageSrc)}
+                                        alt={selectedPet.name}
+                                        className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(167,139,250,0.35)]"
                                     />
-                                </div>
-                            )}
-
-                            {petZone && (
-                                <div className="absolute p-1" style={zoneStyle(petZone)}>
-                                    {selectedPet.imageSrc ? (
-                                        <img
-                                            src={getAssetPath(selectedPet.imageSrc)}
-                                            alt={selectedPet.name}
-                                            className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(167,139,250,0.35)]"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full rounded-xl bg-black/35 border border-purple-400/40 flex flex-col items-center justify-center">
-                                            <div className="text-3xl md:text-4xl leading-none">{selectedPet.emoji}</div>
-                                            <div className="mt-1 text-[10px] md:text-xs uppercase tracking-widest text-purple-200 text-center px-1">
-                                                {selectedPet.name}
-                                            </div>
+                                ) : (
+                                    <div className="w-full h-full rounded-xl bg-black/35 border border-purple-400/40 flex flex-col items-center justify-center">
+                                        <div className="text-3xl md:text-4xl leading-none">{selectedPet.emoji}</div>
+                                        <div className="mt-1 text-[10px] md:text-xs uppercase tracking-widest text-purple-200 text-center px-1">
+                                            {selectedPet.name}
                                         </div>
-                                    )}
-                                </div>
-                            )}
-                </div>
-            </div>
-
-            <div className="absolute top-4 left-4 md:top-6 md:left-6 z-30">
-                <Link href="/student/studentnavigation" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
-                    <ArrowLeft size={18} />
-                    <span className="hidden md:inline font-bold">Back to Cockpit</span>
-                </Link>
-            </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-       </main>
-    </div>
-  );
+                </div>
+
+                <div className="absolute top-4 left-4 md:top-6 md:left-6 z-30">
+                    <Link href="/student/studentnavigation" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
+                        <ArrowLeft size={18} />
+                        <span className="hidden md:inline font-bold">Back to Cockpit</span>
+                    </Link>
+                </div>
+            </main>
+        </div>
+    );
 }
