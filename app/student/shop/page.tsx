@@ -52,6 +52,29 @@ const getEquivalentUnlockIds = (category: string, unlockId: string) => {
     const canonical = toCanonicalUnlockId(category, raw);
     const options = new Set<string>([raw, canonical]);
 
+    if (category === "avatars") {
+        const addAvatarVariants = (value: string) => {
+            const normalized = String(value || "").trim().toLowerCase();
+            if (!normalized) return;
+
+            const withoutPrefix = normalized.replace(/^avatar_/, "");
+            const withoutSuffix = normalized.replace(/_avatar$/, "");
+            const withoutBoth = withoutPrefix.replace(/_avatar$/, "");
+
+            options.add(normalized);
+            options.add(withoutPrefix);
+            options.add(withoutSuffix);
+            options.add(withoutBoth);
+
+            if (withoutPrefix) options.add(`avatar_${withoutPrefix}`);
+            if (withoutSuffix) options.add(`avatar_${withoutSuffix}`);
+            if (withoutBoth) options.add(`avatar_${withoutBoth}`);
+        };
+
+        addAvatarVariants(raw);
+        addAvatarVariants(canonical);
+    }
+
     if (category === "ships" && canonical.startsWith("ship_")) {
         options.add(canonical.replace(/^ship_/, ""));
     }
