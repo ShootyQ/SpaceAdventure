@@ -295,6 +295,16 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       }
   }, []);
 
+  const schedulePendingAwardFlush = useCallback(() => {
+      if (pendingAwardFlushTimerRef.current) {
+          clearTimeout(pendingAwardFlushTimerRef.current);
+      }
+
+      pendingAwardFlushTimerRef.current = setTimeout(() => {
+          flushPendingAwardEvents();
+      }, 320);
+  }, [flushPendingAwardEvents]);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
     const [creditsPerAward, setCreditsPerAward] = useState(1);
@@ -656,10 +666,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
         isFirstLoad.current = false;
 
-        if (pendingAwardEventsRef.current.size > 0 && !pendingAwardFlushTimerRef.current) {
-            pendingAwardFlushTimerRef.current = setTimeout(() => {
-                flushPendingAwardEvents();
-            }, 150);
+        if (pendingAwardEventsRef.current.size > 0) {
+            schedulePendingAwardFlush();
         }
     };
 
@@ -723,7 +731,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, resolvedTeacherId, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments, queueUnlockReveal, flushPendingAwardEvents]);
+    }, [userData, resolvedTeacherId, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments, queueUnlockReveal, schedulePendingAwardFlush]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -2031,8 +2039,16 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 />
 
                 {/* Multiple Awards Container */}
+                {(() => {
+                    const awardCount = awardQueue.length;
+                    const overlayScale = awardCount > 20 ? 0.58 : awardCount > 16 ? 0.66 : awardCount > 12 ? 0.76 : awardCount > 8 ? 0.86 : 1;
+                    const isUltraDense = awardCount > 20;
+                    const isSuperDense = awardCount > 16;
+
+                    return (
                 <div
-                    className={`flex flex-wrap items-center justify-center ${awardQueue.length > 12 ? 'gap-2 p-3' : awardQueue.length > 6 ? 'gap-4 p-6' : 'gap-8 p-12'} h-[calc(100vh-2rem)] overflow-y-auto cursor-default`}
+                    className={`flex flex-wrap items-center justify-center ${awardQueue.length > 16 ? 'gap-1 p-1' : awardQueue.length > 12 ? 'gap-1.5 p-2' : awardQueue.length > 6 ? 'gap-4 p-6' : 'gap-8 p-12'} h-[calc(100vh-2rem)] overflow-hidden cursor-default origin-center`}
+                    style={{ transform: `scale(${overlayScale})` }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {awardQueue.map((award, index) => {
@@ -2053,7 +2069,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 delay: 0
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isUltraDenseAward ? 'w-[190px] p-3 rounded-2xl' : isDenseAward ? 'w-[240px] p-4 rounded-2xl' : isCompactAward ? 'w-[300px] aspect-auto p-5' : 'w-[500px] aspect-square p-8'}
+                                ${isSuperDense ? 'w-[150px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[170px] p-2.5 rounded-xl' : isDenseAward ? 'w-[220px] p-4 rounded-2xl' : isCompactAward ? 'w-[300px] aspect-auto p-5' : 'w-[500px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -2065,7 +2081,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             {/* Background Shine */}
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
 
-                            <h2 className={`${isUltraDenseAward ? 'text-[10px]' : isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest mb-4 uppercase relative z-10`}>Training Milestone</h2>
+                            <h2 className={`${isSuperDense ? 'text-[9px]' : isUltraDenseAward ? 'text-[10px]' : isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest ${isSuperDense ? 'mb-1.5' : 'mb-4'} uppercase relative z-10`}>Training Milestone</h2>
 
                             {/* Avatar + Ship + Pet */}
                             <motion.div
@@ -2078,9 +2094,9 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     duration: 4,
                                     ease: "easeInOut"
                                 }}
-                                className={`relative z-10 ${isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : 'mb-6'}`}
+                                className={`relative z-10 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : 'mb-6'}`}
                             >
-                                <div className={`relative flex items-center justify-center ${isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
+                                <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-32 h-12' : isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
                                     {award.ship.flag && (
                                         <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : '-top-3 right-[38%] scale-95'}`}>
                                             <TinyFlag config={award.ship.flag} />
@@ -2117,21 +2133,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 </div>
                             </motion.div>
 
-                            <div className={`${isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : 'text-4xl'} font-bold text-white mb-2 font-sans relative z-10 truncate w-full`}>
+                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : 'text-4xl'} font-bold text-white font-sans relative z-10 truncate w-full`}>
                                 {award.ship.cadetName}
                             </div>
                             
                             {award.reason && (
-                                <div className={`text-cyan-400/80 ${isUltraDenseAward ? 'text-[9px]' : isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest ${isUltraDenseAward ? 'mb-2' : 'mb-6'} relative z-10`}>
+                                <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[8px]' : isUltraDenseAward ? 'text-[9px]' : isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : 'mb-6'} relative z-10`}>
                                     {award.reason}
                                 </div>
                             )}
 
-                            {!award.reason && <div className={isUltraDenseAward ? 'mb-2' : 'mb-6'} />}
+                            {!award.reason && <div className={isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : 'mb-6'} />}
 
-                            <div className="flex items-center justify-center gap-4 w-full relative z-10">
-                                <div className="flex-1 bg-green-500/10 p-3 rounded-xl border border-green-500/30">
-                                    <span className="block text-green-400 text-[10px] font-bold uppercase tracking-wider mb-1">XP Gained</span>
+                            <div className={`flex items-center justify-center ${isSuperDense ? 'gap-2' : 'gap-4'} w-full relative z-10`}>
+                                <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-green-500/30`}>
+                                    <span className={`block text-green-400 ${isSuperDense ? 'text-[8px]' : 'text-[10px]'} font-bold uppercase tracking-wider mb-1`}>XP Gained</span>
                                     <span className={`${isUltraDenseAward ? 'text-lg' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
                                 </div>
 
@@ -2164,6 +2180,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         );
                     })}
                 </div>
+                    );
+                })()}
 
                 <AnimatePresence>
                     {activeUnlockReveal && (

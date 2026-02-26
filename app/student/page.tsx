@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Settings, Power, Star, Coins } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
 import { getAssetPath } from '@/lib/utils';
 import { resolveShipAssetPath } from '@/lib/ships';
 import { Rank } from '@/types';
@@ -26,18 +26,8 @@ const DEFAULT_RANKS: Rank[] = [
     { id: '10', name: "Grand Star Admiral", minXP: 5000, image: "/images/badges/GrandStarAdmiral.png" }
 ];
 
-// Custom Icon
-const Rocket = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
-    <img 
-        src={getAssetPath("/images/collectibles/ships/starter/finalship.png")}
-        alt="Rocket"
-        className={`object-contain ${className}`}
-        style={{ width: size, height: size }}
-    />
-);
-
 export default function StudentConsole() {
-  const { user, userData, logout } = useAuth();
+    const { userData } = useAuth();
   const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
 
     const findZone = (zoneId: string) => interiorZones.zones.find((zone) => zone.id === zoneId);
@@ -55,27 +45,16 @@ export default function StudentConsole() {
     return () => unsub();
   }, []);
 
-  const currentXP = userData?.xp || 0;
+    const currentXP = userData?.xp || 0;
     const sortedRanksAsc = [...ranks].sort((a, b) => a.minXP - b.minXP);
     const sortedRanksDesc = [...ranks].sort((a, b) => b.minXP - a.minXP);
     const currentRank = sortedRanksDesc.find(r => currentXP >= r.minXP) || sortedRanksAsc[0];
-    const currentRankIndex = sortedRanksAsc.findIndex((rank) => rank.id === currentRank?.id);
-    const nextRank = currentRankIndex >= 0 ? (sortedRanksAsc[currentRankIndex + 1] || null) : null;
-
-    const currentRankFloor = currentRank?.minXP || 0;
-    const xpEarnedInRank = Math.max(currentXP - currentRankFloor, 0);
-    const xpNeededForNext = nextRank ? Math.max(nextRank.minXP - currentXP, 0) : 0;
-    const rankSpan = nextRank ? Math.max(nextRank.minXP - currentRankFloor, 1) : 1;
-    const xpProgressPercent = nextRank
-            ? Math.min(100, Math.max(0, (xpEarnedInRank / rankSpan) * 100))
-            : 100;
 
     const selectedShipId = userData?.spaceship?.modelId || userData?.spaceship?.id || 'finalship';
     const selectedAvatarId = userData?.avatar?.avatarId || 'bunny';
     const selectedAvatar = AVATAR_OPTIONS.find((avatar) => avatar.id === selectedAvatarId) || AVATAR_OPTIONS[0];
     const selectedPetId = getResolvedSelectedPetId(userData);
     const selectedPet = getPetById(selectedPetId);
-    const galacticCredits = Number(userData?.galacticCredits || 0);
 
     const zoneStyle = (zone?: { x: number; y: number; w: number; h: number; z?: number }) => {
         if (!zone) return undefined;
@@ -89,49 +68,10 @@ export default function StudentConsole() {
     };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col text-cyan-400 font-mono bg-black">
-       {/* Background is handled by SolarSystem component usually, but here we can reuse it or just show dashboard */}
-       
-       {/* Top HUD Bar */}
-       <header className="z-10 flex justify-between items-center p-4 border-b border-cyan-500/30 bg-black/80 backdrop-blur-md">
-          <div className="flex items-center gap-4">
-             <div className="bg-cyan-500/20 p-2 rounded-full border border-cyan-400">
-                <Rocket size={20} />
-             </div>
-             <div>
-                 <h1 className="text-xl font-bold tracking-widest uppercase">Cadet Terminal</h1>
-                 <div className="text-xs text-cyan-600">ID: {user?.uid.slice(0,8)}</div>
-             </div>
-          </div>
-          <div className="flex gap-4">
-             <div className="flex items-center gap-2 px-4 py-2 border border-yellow-500/30 bg-yellow-900/10 rounded-full">
-                 {currentRank.image ? (
-                     <img src={getAssetPath(currentRank.image)} alt="Badge" className="w-6 h-6 object-contain" />
-                 ) : (
-                     <Star size={16} className="text-yellow-400" />
-                 )}
-                 <span className="font-bold text-yellow-100">{currentRank.name}</span>
-             </div>
-
-             <div className="flex items-center gap-2 px-4 py-2 border border-amber-500/30 bg-amber-900/10 rounded-full">
-                 <Coins size={16} className="text-amber-300" />
-                 <span className="font-bold text-amber-100">{galacticCredits} GC</span>
-             </div>
-             
-             <button 
-                onClick={logout}
-                className="p-2 hover:bg-red-900/20 text-red-400 rounded transition-colors"
-                title="Logout"
-             >
-                <Power size={20} />
-             </button>
-          </div>
-       </header>
-
-             {/* Main Viewport */}
-                 <main className="flex-1 relative z-0 min-h-0 p-4">
-                    <div className="h-full w-full flex items-center justify-center">
-                        <div className="relative w-full max-w-6xl aspect-[1536/864] rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 shadow-[0_30px_90px_rgba(8,145,178,0.2)]">
+    <div className="h-[100dvh] w-full relative overflow-hidden text-cyan-400 font-mono bg-black">
+        <main className="h-full w-full relative z-0">
+            <div className="h-full w-full flex items-center justify-center p-2 md:p-3">
+                <div className="relative w-full max-w-[calc(100dvh*1.7778)] aspect-[1536/864] rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 shadow-[0_30px_90px_rgba(8,145,178,0.2)]">
                             <img
                                 src={getAssetPath(interiorZones.image)}
                                 alt="Spaceship Interior"
@@ -196,36 +136,17 @@ export default function StudentConsole() {
                                     )}
                                 </div>
                             )}
-                        </div>
-                    </div>
+                </div>
+            </div>
 
-                    {/* Overlay Controls for Student */}
-                    <div className="absolute top-6 left-6 z-30">
-                        <Link href="/student/studentnavigation" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
-                            <Settings size={20} />
-                            <span className="hidden md:inline font-bold">Back to Cockpit</span>
-                        </Link>
+            <div className="absolute top-4 left-4 md:top-6 md:left-6 z-30">
+                <Link href="/student/studentnavigation" className="p-3 bg-black/60 border border-cyan-500/30 rounded-xl hover:bg-cyan-900/40 transition-colors flex items-center gap-2">
+                    <ArrowLeft size={18} />
+                    <span className="hidden md:inline font-bold">Back to Cockpit</span>
+                </Link>
+            </div>
                     </div>
        </main>
-
-       {/* Bottom HUD - Stats */}
-       <div className="z-10 border-t border-cyan-500/30 bg-black/80 backdrop-blur-md p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-           <div className="flex flex-col">
-               <span className="text-xs text-gray-500 uppercase">Current Mission</span>
-               <span className="text-white font-bold">Explore the System</span>
-           </div>
-           <div className="flex flex-col">
-               <span className="text-xs text-gray-500 uppercase">XP Progress</span>
-               <div className="w-full bg-gray-800 h-2 rounded-full mt-1">
-                   <div className="bg-yellow-500 h-2 rounded-full transition-all" style={{ width: `${xpProgressPercent}%` }}></div>
-               </div>
-               <span className="text-xs text-cyan-500 mt-1">
-                   {nextRank
-                       ? `Earned: ${xpEarnedInRank} XP • Left: ${xpNeededForNext} XP to ${nextRank.name}`
-                       : `Earned: ${currentXP} XP • Max Rank Reached`}
-               </span>
-           </div>
-       </div>
     </div>
   );
 }
