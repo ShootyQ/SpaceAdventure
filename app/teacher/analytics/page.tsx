@@ -72,6 +72,7 @@ export default function TeacherAnalyticsPage() {
     const [gradeFilter, setGradeFilter] = useState<string>("all");
     const [sortMode, setSortMode] = useState<SortMode>("net30");
     const [selectedStudentId, setSelectedStudentId] = useState<string>("all");
+    const [eventsListenerError, setEventsListenerError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!teacherScopeId) return;
@@ -88,25 +89,34 @@ export default function TeacherAnalyticsPage() {
         });
 
         const eventsQuery = query(collection(db, "xpEvents"), where("teacherId", "==", teacherScopeId));
-        const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
-            const events = snapshot.docs
-                .map((docSnap) => {
-                    const data = docSnap.data() as any;
-                    return {
-                        id: docSnap.id,
-                        teacherId: String(data.teacherId || ""),
-                        studentId: String(data.studentId || ""),
-                        gradeLevel: data.gradeLevel ? String(data.gradeLevel) : undefined,
-                        xpDelta: toNumber(data.xpDelta),
-                        reason: data.reason ? String(data.reason) : undefined,
-                        source: data.source ? String(data.source) : undefined,
-                        timestamp: toNumber(data.timestamp),
-                    } satisfies XPEvent;
-                })
-                .filter((event) => event.studentId && event.timestamp > 0);
+        const unsubEvents = onSnapshot(
+            eventsQuery,
+            (snapshot) => {
+                setEventsListenerError(null);
+                const events = snapshot.docs
+                    .map((docSnap) => {
+                        const data = docSnap.data() as any;
+                        return {
+                            id: docSnap.id,
+                            teacherId: String(data.teacherId || ""),
+                            studentId: String(data.studentId || ""),
+                            gradeLevel: data.gradeLevel ? String(data.gradeLevel) : undefined,
+                            xpDelta: toNumber(data.xpDelta),
+                            reason: data.reason ? String(data.reason) : undefined,
+                            source: data.source ? String(data.source) : undefined,
+                            timestamp: toNumber(data.timestamp),
+                        } satisfies XPEvent;
+                    })
+                    .filter((event) => event.studentId && event.timestamp > 0);
 
-            setXpEvents(events);
-        });
+                setXpEvents(events);
+            },
+            (error) => {
+                console.error("xpEvents listener error:", error);
+                setEventsListenerError(error?.message || "Unknown listener error");
+                setXpEvents([]);
+            }
+        );
 
         return () => {
             unsubStudents();
@@ -135,6 +145,31 @@ export default function TeacherAnalyticsPage() {
         return xpEvents.filter((event) => event.timestamp >= since30 && visibleStudentIds.has(event.studentId));
     }, [xpEvents, since30, visibleStudentIds]);
 
+    const fallbackEvents30 = useMemo<XPEvent[]>(() => {
+        return visibleStudents
+            .map((student): XPEvent | null => {
+                const award = student.lastAward as any;
+                const timestamp = toNumber(award?.timestamp);
+                const xpDelta = toNumber(award?.xpGained);
+                if (!timestamp || timestamp < since30 || xpDelta === 0) return null;
+
+                return {
+                    id: `fallback-${student.uid}-${timestamp}`,
+                    teacherId: teacherScopeId || "",
+                    studentId: student.uid,
+                    gradeLevel: student.gradeLevel ? String(student.gradeLevel) : undefined,
+                    xpDelta,
+                    reason: typeof award?.reason === "string" ? award.reason : "Recent award",
+                    source: "lastAward_fallback",
+                    timestamp,
+                } satisfies XPEvent;
+            })
+            .filter((event): event is XPEvent => event !== null);
+    }, [visibleStudents, since30, teacherScopeId]);
+
+    const usingFallbackEvents = events30.length === 0 && fallbackEvents30.length > 0;
+    const effectiveEvents30 = usingFallbackEvents ? fallbackEvents30 : events30;
+
     const studentMap = useMemo(() => {
         const m = new Map<string, UserData>();
         students.forEach((student) => m.set(student.uid, student));
@@ -157,7 +192,7 @@ export default function TeacherAnalyticsPage() {
             });
         });
 
-        events30.forEach((event) => {
+        effectiveEvents30.forEach((event) => {
             const summary = byStudent.get(event.studentId);
             if (!summary) return;
 
@@ -185,7 +220,7 @@ export default function TeacherAnalyticsPage() {
         });
 
         return rows;
-    }, [events30, visibleStudents, sortMode]);
+    }, [effectiveEvents30, visibleStudents, sortMode]);
 
     const classMetrics = useMemo(() => {
         const totalPositive = studentSummaries.reduce((sum, row) => sum + row.positive30, 0);
@@ -234,7 +269,7 @@ export default function TeacherAnalyticsPage() {
             dayMap.set(getDayKey(dayStart), { positive: 0, negative: 0, net: 0 });
         }
 
-        events30.forEach((event) => {
+        effectiveEvents30.forEach((event) => {
             const key = getDayKey(event.timestamp);
             const existing = dayMap.get(key);
             if (!existing) return;
@@ -245,7 +280,7 @@ export default function TeacherAnalyticsPage() {
         });
 
         return Array.from(dayMap.entries()).map(([day, stats]) => ({ day, ...stats }));
-    }, [events30]);
+    }, [effectiveEvents30]);
 
     const selectedStudentTrend = useMemo(() => {
         if (selectedStudentId === "all") return classDailyTrend;
@@ -256,7 +291,7 @@ export default function TeacherAnalyticsPage() {
             dayMap.set(getDayKey(dayStart), { positive: 0, negative: 0, net: 0 });
         }
 
-        events30
+        effectiveEvents30
             .filter((event) => event.studentId === selectedStudentId)
             .forEach((event) => {
                 const key = getDayKey(event.timestamp);
@@ -268,7 +303,7 @@ export default function TeacherAnalyticsPage() {
             });
 
         return Array.from(dayMap.entries()).map(([day, stats]) => ({ day, ...stats }));
-    }, [classDailyTrend, events30, selectedStudentId]);
+    }, [classDailyTrend, effectiveEvents30, selectedStudentId]);
 
     const maxTrendMagnitude = useMemo(() => {
         const maxAbs = selectedStudentTrend.reduce((max, item) => Math.max(max, Math.abs(item.net)), 0);
@@ -602,6 +637,11 @@ export default function TeacherAnalyticsPage() {
 
                 <div className="border border-cyan-500/20 rounded-xl bg-black/40 p-4 text-xs text-cyan-500">
                     Data notes: Trend window defaults to last 30 days. Positive and negative XP are shown separately. This dashboard uses `xpEvents` telemetry; legacy awards before event logging may not appear in trend history.
+                </div>
+
+                <div className="mt-4 text-[11px] text-cyan-600 uppercase tracking-wider">
+                    Event source: {usingFallbackEvents ? "lastAward fallback" : "xpEvents"} • Loaded events: {effectiveEvents30.length}
+                    {eventsListenerError ? ` • Listener error: ${eventsListenerError}` : ""}
                 </div>
             </div>
         </div>
