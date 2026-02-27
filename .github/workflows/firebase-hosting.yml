@@ -60,6 +60,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+          firebaseToolsVersion: 13.31.2
           projectId: spaceadventure-7d540
           channelId: live
           entryPoint: .
@@ -114,6 +115,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+          firebaseToolsVersion: 13.31.2
           projectId: spaceadventure-7d540
           channelId: dev
           entryPoint: .
