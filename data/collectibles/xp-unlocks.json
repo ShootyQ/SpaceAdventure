@@ -57,10 +57,24 @@
       "channel": "xp"
     },
     {
+      "id": "neptune-xpearn",
+      "name": "Abysswake Frigate",
+      "planetId": "neptune",
+      "unlockKey": "neptune-xpearn",
+      "channel": "xp"
+    },
+    {
       "id": "saturn-xp-earn",
       "name": "Ringline Hauler",
       "planetId": "saturn",
       "unlockKey": "saturn-xp-earn",
+      "channel": "xp"
+    },
+    {
+      "id": "sun-xpearn",
+      "name": "Helion Forgecraft",
+      "planetId": "sun",
+      "unlockKey": "sun-xpearn",
       "channel": "xp"
     },
     {

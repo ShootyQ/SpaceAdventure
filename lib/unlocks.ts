@@ -246,6 +246,21 @@ const normalizeRuleArray = (rawArray: any): UnlockRule[] => {
     .filter((rule): rule is UnlockRule => Boolean(rule));
 };
 
+const mergeRulesWithDefaults = (rawRules: any, defaultRules: UnlockRule[]): UnlockRule[] => {
+  if (!Array.isArray(rawRules)) return normalizeRuleArray(defaultRules);
+
+  const normalizedRawRules = normalizeRuleArray(rawRules);
+  const normalizedDefaultRules = normalizeRuleArray(defaultRules);
+  const byId = new Map<string, UnlockRule>();
+
+  normalizedRawRules.forEach((rule) => byId.set(rule.id, rule));
+  normalizedDefaultRules.forEach((rule) => {
+    if (!byId.has(rule.id)) byId.set(rule.id, rule);
+  });
+
+  return Array.from(byId.values());
+};
+
 export const DEFAULT_UNLOCK_CONFIG: UnlockConfig = {
   version: Number((xpUnlockConfig as any)?.version || 1),
   channels: DEFAULT_UNLOCK_CHANNELS,
@@ -287,9 +302,9 @@ export const normalizeUnlockConfig = (raw?: Partial<UnlockConfig> | null): Unloc
   const normalizedStarterAvatars = dedupeIds(starterAvatars);
   const normalizedStarterPets = dedupeIds(starterPets);
 
-  const normalizedShips = normalizeRuleArray(raw?.ships ?? DEFAULT_UNLOCK_CONFIG.ships)
+  const normalizedShips = mergeRulesWithDefaults(raw?.ships, DEFAULT_UNLOCK_CONFIG.ships)
     .filter((rule) => !normalizedStarterShips.includes(rule.id));
-  const normalizedAvatars = normalizeRuleArray(raw?.avatars ?? DEFAULT_UNLOCK_CONFIG.avatars)
+  const normalizedAvatars = mergeRulesWithDefaults(raw?.avatars, DEFAULT_UNLOCK_CONFIG.avatars)
     .filter((rule) => !normalizedStarterAvatars.includes(rule.id));
 
   return {
