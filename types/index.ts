@@ -146,6 +146,7 @@ export interface UserData {
     shopUnlockedShipIds?: string[];
     shopUnlockedAvatarIds?: string[];
     achievementsEarned?: Record<string, { earnedAt: number }>;
+    interiorAchievementSlots?: Record<string, string>;
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)
