@@ -505,10 +505,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, []);
 
   useEffect(() => {
-      if (activeUnlockReveal || unlockRevealQueue.length === 0) return;
+      if (activeUnlockReveal || unlockRevealQueue.length === 0 || awardQueue.length > 0) return;
       setActiveUnlockReveal(unlockRevealQueue[0]);
       setUnlockRevealQueue((prev) => prev.slice(1));
-  }, [activeUnlockReveal, unlockRevealQueue]);
+  }, [activeUnlockReveal, unlockRevealQueue, awardQueue.length]);
 
   useEffect(() => {
       if (!activeUnlockReveal) return;
@@ -2159,6 +2159,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 >
                     {awardQueue.map((award, index) => {
                         const isSingleAward = awardQueue.length === 1;
+                        const isDualAward = awardQueue.length === 2;
                         const isCompactAward = awardQueue.length > 2;
                         const isDenseAward = awardQueue.length > 6;
                         const isUltraDenseAward = awardQueue.length > 10;
@@ -2178,7 +2179,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 delay: 0
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[520px] aspect-square p-8' : 'w-[420px] aspect-square p-8'}
+                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[520px] aspect-square p-8' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -2242,7 +2243,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 </div>
                             </motion.div>
 
-                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.1rem] mb-3' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward ? 'w-full max-w-[460px] px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
+                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.1rem] mb-3' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
                                 {award.ship.cadetName}
                             </div>
                             
@@ -2726,7 +2727,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
        {/* CLASS BONUS VICTORY OVERLAY */}
        <AnimatePresence>
-          {!isStudentPersonalView && showBonusVictory && bonusConfig && (
+          {!isStudentPersonalView && showBonusVictory && bonusConfig && awardQueue.length === 0 && !activeUnlockReveal && unlockRevealQueue.length === 0 && !activePlanetCompletions && planetCompletionQueue.length === 0 && (
               <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
