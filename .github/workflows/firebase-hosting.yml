@@ -35,6 +35,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Firebase service account secret JSON (live)
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" | python -c "import json,sys; s=sys.stdin.read(); d=json.loads(s); assert isinstance(d,dict); assert d.get('type')=='service_account'; assert d.get('client_email'); assert d.get('private_key'); print('Firebase service account JSON is valid')"
+
       - name: Validate required deploy secrets (live)
         run: |
           [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ] || (echo "Missing STRIPE_SECRET_KEY" && exit 1)
@@ -60,6 +66,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+          firebaseToolsVersion: 13.31.2
           projectId: spaceadventure-7d540
           channelId: live
           entryPoint: .
@@ -89,6 +96,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Firebase service account secret JSON (dev)
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" | python -c "import json,sys; s=sys.stdin.read(); d=json.loads(s); assert isinstance(d,dict); assert d.get('type')=='service_account'; assert d.get('client_email'); assert d.get('private_key'); print('Firebase service account JSON is valid')"
+
       - name: Validate required deploy secrets (dev)
         run: |
           [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ] || (echo "Missing STRIPE_SECRET_KEY" && exit 1)
@@ -114,6 +127,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+          firebaseToolsVersion: 13.31.2
           projectId: spaceadventure-7d540
           channelId: dev
           entryPoint: .

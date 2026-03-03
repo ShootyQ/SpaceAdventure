@@ -108,6 +108,15 @@ type PlanetDiscoveredUnlocks = {
     objects?: string[];
 };
 
+type PlanetCompletionEvent = {
+    id: string;
+    planetId: string;
+    planetName: string;
+    rewardName?: string;
+    rewardDescription?: string;
+    completedAt: number;
+};
+
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
         const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
@@ -125,12 +134,19 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Rank System
   const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
   const ranksRef = useRef<Rank[]>(DEFAULT_RANKS); // Ref for access in listeners
+    const sortedRanksDescRef = useRef<Rank[]>([...DEFAULT_RANKS].sort((a, b) => b.minXP - a.minXP));
 
   // Award System State
   const [awardQueue, setAwardQueue] = useState<AwardEvent[]>([]);
   const [currentAward, setCurrentAward] = useState<AwardEvent | null>(null);
     const [unlockRevealQueue, setUnlockRevealQueue] = useState<AwardEvent[]>([]);
     const [activeUnlockReveal, setActiveUnlockReveal] = useState<AwardEvent | null>(null);
+        const [planetCompletionQueue, setPlanetCompletionQueue] = useState<PlanetCompletionEvent[][]>([]);
+        const [activePlanetCompletions, setActivePlanetCompletions] = useState<PlanetCompletionEvent[] | null>(null);
+        const pendingAwardEventsRef = useRef<Map<string, AwardEvent>>(new Map());
+        const pendingAwardFlushTimerRef = useRef<NodeJS.Timeout | null>(null);
+        const awardBurstStartedAtRef = useRef<number | null>(null);
+        const lastAwardSoundAtRef = useRef(0);
     const scheduledUnlockRevealAwardIdsRef = useRef<Set<string>>(new Set());
     const unlockRevealTimerMapRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
@@ -149,6 +165,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const shipXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.ships));
     const avatarXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.avatars));
+    const previousDynamicPlanetsRef = useRef<Map<string, { currentXP: number; xpGoal: number }>>(new Map());
+    const isFirstDynamicPlanetsLoadRef = useRef(true);
 
     const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
     const resolvedTeacherId = userData?.role === 'teacher' ? (activeTeacherId || userData.uid) : userData?.teacherId;
@@ -250,7 +268,72 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const isSoundOnRef = useRef(isSoundOn);
   useEffect(() => { isSoundOnRef.current = isSoundOn; }, [isSoundOn]);
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const queueUnlockReveal = useCallback((award: AwardEvent) => {
+      const hasUnlocks = Boolean(
+          award.unlocks?.ships?.length ||
+          award.unlocks?.avatars?.length ||
+          award.unlocks?.pets?.length ||
+          award.unlocks?.objects?.length
+      );
+
+      if (!hasUnlocks || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
+
+      scheduledUnlockRevealAwardIdsRef.current.add(award.id);
+      const timerId = setTimeout(() => {
+          unlockRevealTimerMapRef.current.delete(award.id);
+          setUnlockRevealQueue((prev) => (prev.some((queuedAward) => queuedAward.id === award.id) ? prev : [...prev, award]));
+      }, 5000);
+
+      unlockRevealTimerMapRef.current.set(award.id, timerId);
+  }, []);
+
+  const flushPendingAwardEvents = useCallback(() => {
+      pendingAwardFlushTimerRef.current = null;
+      const pendingEvents = Array.from(pendingAwardEventsRef.current.values());
+      if (pendingEvents.length === 0) return;
+      awardBurstStartedAtRef.current = null;
+
+      pendingAwardEventsRef.current.clear();
+
+      setAwardQueue((prev) => {
+          const byShipId = new Map<string, AwardEvent>();
+          prev.forEach((award) => byShipId.set(award.ship.id, award));
+          pendingEvents.forEach((award) => byShipId.set(award.ship.id, award));
+          return Array.from(byShipId.values());
+      });
+
+      if (isSoundOnRef.current) {
+          const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
+          const nowMs = Date.now();
+          if (audioElement && nowMs - lastAwardSoundAtRef.current >= 2200) {
+              audioElement.pause();
+              audioElement.currentTime = 0;
+              audioElement.volume = 0.5;
+              audioElement.play().catch(() => {});
+              lastAwardSoundAtRef.current = nowMs;
+          }
+      }
+  }, []);
+
+  const schedulePendingAwardFlush = useCallback(() => {
+      const nowMs = Date.now();
+      if (awardBurstStartedAtRef.current === null) {
+          awardBurstStartedAtRef.current = nowMs;
+      }
+
+      if (pendingAwardFlushTimerRef.current) {
+          clearTimeout(pendingAwardFlushTimerRef.current);
+      }
+
+      const elapsedMs = nowMs - awardBurstStartedAtRef.current;
+      const maxWaitRemainingMs = Math.max(0, 2400 - elapsedMs);
+      const flushDelayMs = maxWaitRemainingMs === 0 ? 0 : Math.min(900, maxWaitRemainingMs);
+
+      pendingAwardFlushTimerRef.current = setTimeout(() => {
+          flushPendingAwardEvents();
+      }, flushDelayMs);
+  }, [flushPendingAwardEvents]);
+
   const [behaviors, setBehaviors] = useState<Behavior[]>([]);
     const [creditsPerAward, setCreditsPerAward] = useState(1);
   const previousXPRef = useRef<Map<string, number>>(new Map());
@@ -262,7 +345,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const panRef = useRef({ x: 0, y: 0 });
   
   // Sync Rank Ref
-  useEffect(() => { ranksRef.current = ranks; }, [ranks]);
+    useEffect(() => {
+            ranksRef.current = ranks;
+            sortedRanksDescRef.current = [...ranks].sort((a, b) => b.minXP - a.minXP);
+    }, [ranks]);
 
   // Load Ranks Configuration
   useEffect(() => {
@@ -409,58 +495,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, [awardQueue]);
 
   useEffect(() => {
-      if (awardQueue.length === 0) {
-          scheduledUnlockRevealAwardIdsRef.current.clear();
-          unlockRevealTimerMapRef.current.forEach((timerId) => clearTimeout(timerId));
-          unlockRevealTimerMapRef.current.clear();
-          setUnlockRevealQueue([]);
-          setActiveUnlockReveal(null);
-      }
-  }, [awardQueue.length]);
-
-  useEffect(() => {
-      if (awardQueue.length === 0) return;
-
-      const activeAwardIds = new Set(awardQueue.map((award) => award.id));
-      const scheduledAwardIds = Array.from(scheduledUnlockRevealAwardIdsRef.current);
-
-      scheduledAwardIds.forEach((awardId) => {
-          if (!activeAwardIds.has(awardId)) {
-              scheduledUnlockRevealAwardIdsRef.current.delete(awardId);
-              const timerId = unlockRevealTimerMapRef.current.get(awardId);
-              if (timerId) {
-                  clearTimeout(timerId);
-                  unlockRevealTimerMapRef.current.delete(awardId);
-              }
+      return () => {
+          if (pendingAwardFlushTimerRef.current) {
+              clearTimeout(pendingAwardFlushTimerRef.current);
+              pendingAwardFlushTimerRef.current = null;
           }
-      });
-
-      awardQueue.forEach((award) => {
-          const hasUnlocks = Boolean(
-              award.unlocks?.ships?.length ||
-              award.unlocks?.avatars?.length ||
-              award.unlocks?.pets?.length ||
-              award.unlocks?.objects?.length
-          );
-
-          if (!hasUnlocks || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
-
-          scheduledUnlockRevealAwardIdsRef.current.add(award.id);
-
-          const timerId = setTimeout(() => {
-              unlockRevealTimerMapRef.current.delete(award.id);
-              setUnlockRevealQueue((prev) => (prev.some((queuedAward) => queuedAward.id === award.id) ? prev : [...prev, award]));
-          }, 5000);
-
-          unlockRevealTimerMapRef.current.set(award.id, timerId);
-      });
-  }, [awardQueue]);
+          awardBurstStartedAtRef.current = null;
+      };
+  }, []);
 
   useEffect(() => {
-      if (activeUnlockReveal || unlockRevealQueue.length === 0) return;
+      if (activeUnlockReveal || unlockRevealQueue.length === 0 || awardQueue.length > 0) return;
       setActiveUnlockReveal(unlockRevealQueue[0]);
       setUnlockRevealQueue((prev) => prev.slice(1));
-  }, [activeUnlockReveal, unlockRevealQueue]);
+  }, [activeUnlockReveal, unlockRevealQueue, awardQueue.length]);
 
   useEffect(() => {
       if (!activeUnlockReveal) return;
@@ -485,11 +533,53 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       }
 
       const dismissTimer = setTimeout(() => {
+          scheduledUnlockRevealAwardIdsRef.current.delete(activeUnlockReveal.id);
           setActiveUnlockReveal(null);
       }, 7000);
 
       return () => clearTimeout(dismissTimer);
   }, [activeUnlockReveal]);
+
+  useEffect(() => {
+      if (
+          activePlanetCompletions ||
+          planetCompletionQueue.length === 0 ||
+          awardQueue.length > 0 ||
+          Boolean(activeUnlockReveal) ||
+          unlockRevealQueue.length > 0
+      ) {
+          return;
+      }
+
+      setActivePlanetCompletions(planetCompletionQueue[0]);
+      setPlanetCompletionQueue((prev) => prev.slice(1));
+  }, [activePlanetCompletions, planetCompletionQueue, awardQueue.length, activeUnlockReveal, unlockRevealQueue.length]);
+
+  useEffect(() => {
+      if (!activePlanetCompletions || activePlanetCompletions.length === 0) return;
+
+      try {
+          const particleCount = Math.max(150, Math.min(420, activePlanetCompletions.length * 160));
+          confetti({ particleCount, spread: 110, startVelocity: 58, origin: { y: 0.58 } });
+      } catch {
+          // no-op
+      }
+
+      if (isSoundOnRef.current) {
+          const revealAudio = document.getElementById('map-reveal-audio') as HTMLAudioElement;
+          if (revealAudio) {
+              revealAudio.currentTime = 0;
+              revealAudio.volume = 0.8;
+              revealAudio.play().catch(() => {});
+          }
+      }
+
+      const dismissTimer = setTimeout(() => {
+          setActivePlanetCompletions(null);
+      }, 8500);
+
+      return () => clearTimeout(dismissTimer);
+  }, [activePlanetCompletions]);
 
   useEffect(() => {
       return () => {
@@ -534,8 +624,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              if (!isFirstLoad.current && !isStudentPersonalView) {
                 const oldXP = previousXPRef.current.get(shipData.id);
                 if (oldXP !== undefined && shipData.xp > oldXP) {
-                    const oldRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => oldXP >= r.minXP);
-                    const newRank = ranksRef.current.slice().sort((a,b) => b.minXP - a.minXP).find(r => shipData.xp >= r.minXP);
+                    const oldRank = sortedRanksDescRef.current.find((r) => oldXP >= r.minXP);
+                    const newRank = sortedRanksDescRef.current.find((r) => shipData.xp >= r.minXP);
                     const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
                     const planetId = (shipData.locationId || '').toLowerCase();
@@ -616,6 +706,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         unlocks
                     };
 
+                    queueUnlockReveal(event);
+
                     if (canRollPetUnlocks && unlocks && userData.uid) {
                         const discoveredUpdates: Record<string, any> = {};
                         if (unlocks.pets?.length) discoveredUpdates["discoveredUnlocks.pets"] = arrayUnion(...unlocks.pets);
@@ -633,21 +725,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         }
                     }
 
-                    const audioElement = document.getElementById('map-notification-audio') as HTMLAudioElement;
-                    if (audioElement && isSoundOnRef.current) {
-                        audioElement.currentTime = 0;
-                        audioElement.volume = 0.5;
-                        audioElement.play().catch(() => {});
-                    }
-
-                    setAwardQueue((prev) => {
-                        const existingIndex = prev.findIndex((queuedAward) => queuedAward.ship.id === event.ship.id);
-                        if (existingIndex === -1) return [...prev, event];
-
-                        const next = [...prev];
-                        next[existingIndex] = event;
-                        return next;
-                    });
+                    pendingAwardEventsRef.current.set(event.ship.id, event);
                 }
              }
 
@@ -660,6 +738,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         });
 
         isFirstLoad.current = false;
+
+        if (pendingAwardEventsRef.current.size > 0) {
+            schedulePendingAwardFlush();
+        }
     };
 
     if (isStudentPersonalView) {
@@ -722,7 +804,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     });
     
         return () => unsubscribe();
-    }, [userData, resolvedTeacherId, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments]);
+    }, [userData, resolvedTeacherId, isStudentPersonalView, petUnlockChanceConfig, petUnlockAssignments, queueUnlockReveal, schedulePendingAwardFlush]);
 
   // On-demand visitors feed for selected planet in student personal view (lightweight class read)
   useEffect(() => {
@@ -795,12 +877,47 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
      
      const unsub = onSnapshot(q, (snapshot) => {
          const d = new Map();
+         const nextStats = new Map<string, { currentXP: number; xpGoal: number }>();
+         const newlyCompletedPlanets: PlanetCompletionEvent[] = [];
+
          snapshot.forEach(doc => {
              const data = doc.data();
-             const planetKey = data.id || doc.id;
+             const planetKey = String(data.id || doc.id || '').toLowerCase();
+             if (!planetKey) return;
+
              d.set(planetKey, data);
+
+             const currentXP = Number(data.currentXP || 0);
+             const xpGoal = Number(data.xpGoal || 0);
+             nextStats.set(planetKey, { currentXP, xpGoal });
+
+             if (!isFirstDynamicPlanetsLoadRef.current && xpGoal > 0) {
+                 const previous = previousDynamicPlanetsRef.current.get(planetKey);
+                 const oldXP = Number(previous?.currentXP || 0);
+                 const crossedGoal = oldXP < xpGoal && currentXP >= xpGoal;
+
+                 if (crossedGoal) {
+                     const planetMeta = PLANETS.find((planet) => planet.id === planetKey);
+                     newlyCompletedPlanets.push({
+                         id: `${planetKey}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                         planetId: planetKey,
+                         planetName: planetMeta?.name || String(data.name || planetKey).toUpperCase(),
+                         rewardName: data.rewardName ? String(data.rewardName) : undefined,
+                         rewardDescription: data.rewardDescription ? String(data.rewardDescription) : undefined,
+                         completedAt: Date.now(),
+                     });
+                 }
+             }
          });
+
          setDynamicPlanets(d);
+
+         if (newlyCompletedPlanets.length > 0) {
+             setPlanetCompletionQueue((prev) => [...prev, newlyCompletedPlanets]);
+         }
+
+         previousDynamicPlanetsRef.current = nextStats;
+         isFirstDynamicPlanetsLoadRef.current = false;
      });
      return () => unsub();
     }, [userData, resolvedTeacherId]);
@@ -2006,8 +2123,6 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
              onClose={handleCloseManifest}
              ships={ships}
              ranks={ranks}
-             selectedIds={selectedIds}
-             setSelectedIds={setSelectedIds}
              behaviors={behaviors}
              creditsPerAward={creditsPerAward}
          />
@@ -2030,12 +2145,25 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                 />
 
                 {/* Multiple Awards Container */}
+                {(() => {
+                    const awardCount = awardQueue.length;
+                    const overlayScale = awardCount > 20 ? 0.42 : awardCount > 16 ? 0.5 : awardCount > 12 ? 0.6 : awardCount > 8 ? 0.72 : awardCount > 6 ? 0.82 : 1;
+                    const isUltraDense = awardCount > 20;
+                    const isSuperDense = awardCount > 16;
+
+                    return (
                 <div
-                    className="flex flex-wrap gap-8 items-center justify-center p-12 max-h-[calc(100vh-2rem)] overflow-y-auto cursor-default"
+                    className={`flex flex-wrap items-center justify-center ${awardQueue.length > 16 ? 'gap-1 p-1' : awardQueue.length > 10 ? 'gap-1.5 p-1.5' : awardQueue.length > 6 ? 'gap-2 p-2' : 'gap-6 p-8'} h-[100dvh] overflow-hidden cursor-default origin-center`}
+                    style={{ transform: `scale(${overlayScale})` }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {awardQueue.map((award, index) => {
-                        const isCompactAward = awardQueue.length > 1;
+                        const isSingleAward = awardQueue.length === 1;
+                        const isDualAward = awardQueue.length === 2;
+                        const isCompactAward = awardQueue.length > 2;
+                        const isDenseAward = awardQueue.length > 6;
+                        const isUltraDenseAward = awardQueue.length > 10;
+                        const useLightAnimation = awardQueue.length > 6;
                         const selectedPet = getPetById(award.ship.selectedPetId);
                         return (
                         <motion.div
@@ -2044,13 +2172,14 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             animate={{ scale: 1, rotate: 0, y: 0 }}
                             exit={{ scale: 0, opacity: 0 }}
                             transition={{ 
-                                type: "spring",
-                                stiffness: 200,
-                                damping: 20,
-                                delay: index * 0.1 // Stagger effect
+                                type: useLightAnimation ? "tween" : "spring",
+                                stiffness: useLightAnimation ? undefined : 200,
+                                damping: useLightAnimation ? undefined : 20,
+                                duration: useLightAnimation ? 0.16 : undefined,
+                                delay: 0
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isCompactAward ? 'w-[300px] aspect-auto' : 'w-[500px] aspect-square p-8'}
+                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[520px] aspect-square p-8' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -2062,22 +2191,22 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             {/* Background Shine */}
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
 
-                            <h2 className={`${isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest mb-4 uppercase relative z-10`}>Training Milestone</h2>
+                            <h2 className={`${isSuperDense ? 'text-[9px]' : isUltraDenseAward ? 'text-[10px]' : isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest ${isSuperDense ? 'mb-1.5' : 'mb-4'} uppercase relative z-10`}>Training Milestone</h2>
 
                             {/* Avatar + Ship + Pet */}
                             <motion.div
-                                animate={{
+                                animate={isDenseAward ? undefined : {
                                     y: [0, -10, 0],
-                                    rotate: [0, -5, 5, 0] 
+                                    rotate: [0, -5, 5, 0]
                                 }}
-                                transition={{ 
+                                transition={isDenseAward ? undefined : {
                                     repeat: Infinity,
                                     duration: 4,
                                     ease: "easeInOut"
                                 }}
-                                className={`relative z-10 ${isCompactAward ? 'mb-2' : 'mb-6'}`}
+                                className={`relative z-10 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : 'mb-6'}`}
                             >
-                                <div className={`relative flex items-center justify-center ${isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
+                                <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-32 h-12' : isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
                                     {award.ship.flag && (
                                         <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : '-top-3 right-[38%] scale-95'}`}>
                                             <TinyFlag config={award.ship.flag} />
@@ -2114,22 +2243,22 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 </div>
                             </motion.div>
 
-                            <div className={`${isCompactAward ? 'text-2xl' : 'text-4xl'} font-bold text-white mb-2 font-sans relative z-10 truncate w-full`}>
+                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.1rem] mb-3' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
                                 {award.ship.cadetName}
                             </div>
                             
                             {award.reason && (
-                                <div className={`text-cyan-400/80 ${isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest mb-6 relative z-10`}>
+                                <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[8px]' : isUltraDenseAward ? 'text-[9px]' : isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : 'mb-6'} relative z-10`}>
                                     {award.reason}
                                 </div>
                             )}
 
-                            {!award.reason && <div className="mb-6" />}
+                            {!award.reason && <div className={isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : 'mb-6'} />}
 
-                            <div className="flex items-center justify-center gap-4 w-full relative z-10">
-                                <div className="flex-1 bg-green-500/10 p-3 rounded-xl border border-green-500/30">
-                                    <span className="block text-green-400 text-[10px] font-bold uppercase tracking-wider mb-1">XP Gained</span>
-                                    <span className="block text-2xl font-black text-green-300">+{award.xpGained}</span>
+                            <div className={`flex items-center justify-center ${isSuperDense ? 'gap-2' : 'gap-4'} w-full relative z-10`}>
+                                <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-green-500/30`}>
+                                    <span className={`block text-green-400 ${isSuperDense ? 'text-[8px]' : 'text-[10px]'} font-bold uppercase tracking-wider mb-1`}>XP Gained</span>
+                                    <span className={`${isUltraDenseAward ? 'text-lg' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
                                 </div>
 
                                 {award.newRank && (
@@ -2161,6 +2290,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         );
                     })}
                 </div>
+                    );
+                })()}
 
                 <AnimatePresence>
                     {activeUnlockReveal && (
@@ -2242,6 +2373,80 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     )}
                 </AnimatePresence>
             </div>
+         )}
+       </AnimatePresence>
+
+       {/* PLANET COMPLETION CELEBRATION */}
+       <AnimatePresence>
+         {activePlanetCompletions && activePlanetCompletions.length > 0 && (
+             <motion.div
+                key={`planet-completion-${activePlanetCompletions.map((event) => event.id).join('-')}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[390] flex items-center justify-center bg-black/70 backdrop-blur-[3px] px-4"
+                onClick={() => setActivePlanetCompletions(null)}
+             >
+                <div
+                    className="w-full max-w-6xl"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <div className="text-center mb-6 md:mb-8">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 border border-yellow-300/40 text-yellow-100 text-xs font-black uppercase tracking-[0.25em]">
+                            <Award size={14} />
+                            Planet Completed
+                        </div>
+                        <div className="mt-3 text-2xl md:text-4xl font-black text-white uppercase tracking-wider">
+                            Huzzah! Colony Reward Granted
+                        </div>
+                    </div>
+
+                    <div className={`grid gap-4 md:gap-6 ${activePlanetCompletions.length === 1 ? 'grid-cols-1' : activePlanetCompletions.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                        {activePlanetCompletions.map((completion) => (
+                            <motion.div
+                                key={completion.id}
+                                initial={{ opacity: 0, scale: 0.82, y: 36 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                                transition={{ type: 'spring', stiffness: 210, damping: 18 }}
+                                className="relative rounded-3xl border border-cyan-400/50 bg-black/90 p-5 md:p-7 shadow-[0_0_70px_rgba(34,211,238,0.35)] overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-600/25 via-transparent to-transparent" />
+
+                                <div className="relative z-10 text-center">
+                                    <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-200/80 font-bold mb-2">{completion.planetName}</div>
+
+                                    <motion.div
+                                        animate={{ scale: [1, 1.08, 1] }}
+                                        transition={{ duration: 2.3, repeat: Infinity, ease: 'easeInOut' }}
+                                        className="mx-auto w-48 h-48 md:w-56 md:h-56"
+                                    >
+                                        <img
+                                            src={getAssetPath(`/images/planetpng/${completion.planetId}.png`)}
+                                            alt={completion.planetName}
+                                            className="w-full h-full object-contain drop-shadow-[0_0_38px_rgba(255,255,255,0.42)]"
+                                        />
+                                    </motion.div>
+
+                                    {completion.rewardName ? (
+                                        <div className="mt-4 rounded-2xl border border-yellow-300/40 bg-yellow-500/10 px-4 py-3">
+                                            <div className="text-[10px] uppercase tracking-[0.2em] text-yellow-300 font-black mb-1">Award Given</div>
+                                            <div className="text-xl md:text-2xl font-black text-white">{completion.rewardName}</div>
+                                            {completion.rewardDescription && (
+                                                <div className="mt-1 text-xs md:text-sm text-yellow-50/85">{completion.rewardDescription}</div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-4 rounded-2xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white/80">
+                                            Goal reached and reward delivered.
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                </div>
+             </motion.div>
          )}
        </AnimatePresence>
 
@@ -2522,7 +2727,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
        {/* CLASS BONUS VICTORY OVERLAY */}
        <AnimatePresence>
-          {!isStudentPersonalView && showBonusVictory && bonusConfig && (
+          {!isStudentPersonalView && showBonusVictory && bonusConfig && awardQueue.length === 0 && !activeUnlockReveal && unlockRevealQueue.length === 0 && !activePlanetCompletions && planetCompletionQueue.length === 0 && (
               <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}

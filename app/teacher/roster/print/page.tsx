@@ -52,7 +52,7 @@ export default function PrintRosterPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white text-black p-8 font-mono">
+        <div className="min-h-screen bg-white text-black p-8 print:p-0 font-mono">
             {/* No-Print Header */}
             <div className="print:hidden mb-8 flex justify-between items-center bg-gray-100 p-4 rounded-lg border border-gray-300">
                 <div className="flex items-center gap-4">
@@ -71,43 +71,43 @@ export default function PrintRosterPage() {
 
             {/* Print Layout */}
             {chunks.map((chunk, pageIndex) => (
-                <div key={pageIndex} className="break-after-page page-break-always mb-8 last:mb-0">
-                    <div className="grid grid-cols-2 gap-8 h-[9.5in] content-start">
+                <div key={pageIndex} className="credential-page break-after-page page-break-always mb-8 print:mb-0">
+                    <div className="grid grid-cols-2 grid-rows-2 gap-4 print:gap-3 h-[10.2in] print:h-[10.2in] content-start">
                         {chunk.map((student) => (
-                            <div key={student.uid} className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col relative h-[4.5in] break-inside-avoid">
+                            <div key={student.uid} className="credential-card border-2 border-dashed border-gray-300 rounded-xl p-4 md:p-6 flex flex-col relative h-full break-inside-avoid">
                                 {/* Header / Class Code */}
-                                <div className="flex justify-between items-start mb-6 border-b border-gray-200 pb-4">
+                                <div className="flex justify-between items-start mb-4 border-b border-gray-200 pb-3">
                                      <div>
                                          <h2 className="text-sm text-gray-500 uppercase tracking-widest font-bold">Class ID</h2>
                                          <div className="text-2xl font-black text-gray-800">{student.classCode || activeTeacherProfile?.classCode || userData?.classCode || "N/A"}</div>
                                      </div>
-                                     <img src={getAssetPath("/images/logo.png")} alt="Logo" className="h-8 opacity-50" />
+                                     <img src={getAssetPath("/images/logos/croppedclasscravelogo.png")} alt="Logo" className="h-8 opacity-70" />
                                 </div>
 
                                 {/* Main Content */}
-                                <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                                <div className="flex-1 flex flex-col items-center justify-center gap-3">
                                      {/* Avatar Container */}
-                                     <div className="w-32 h-32 rounded-full border-4 border-gray-100 overflow-hidden relative bg-gray-50">
+                                     <div className="w-28 h-28 rounded-full border-4 border-gray-100 overflow-hidden relative bg-gray-50">
                                          <UserAvatar 
                                             userData={student} 
                                             className="w-full h-full scale-110 translate-y-2"
                                          />
                                      </div>
 
-                                     <div className="text-center w-full space-y-4">
+                                     <div className="text-center w-full space-y-3">
                                          <div>
                                              <div className="text-xs text-gray-400 uppercase tracking-wide font-bold mb-1">Cadet Name</div>
-                                             <div className="text-xl font-bold">{student.displayName}</div>
+                                             <div className="text-3xl font-bold leading-tight">{student.displayName}</div>
                                          </div>
                                          
-                                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-left space-y-3 w-full max-w-xs mx-auto">
+                                         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-left space-y-2 w-full max-w-xs mx-auto">
                                              <div>
                                                  <span className="text-xs text-gray-400 uppercase font-bold block">Username</span>
-                                                 <span className="font-mono font-bold text-lg">{student.username || student.email?.split('@')[0] || "_______"}</span>
+                                                 <span className="font-mono font-bold text-3xl leading-none tracking-tight">{student.username || student.email?.split('@')[0] || "_______"}</span>
                                              </div>
                                              <div>
                                                  <span className="text-xs text-gray-400 uppercase font-bold block">Password</span>
-                                                 <span className="font-mono font-bold text-lg">{student.password || "______________"}</span>
+                                                 <span className="font-mono font-bold text-3xl leading-none tracking-tight">{student.password || "______________"}</span>
                                              </div>
                                          </div>
                                      </div>
@@ -125,11 +125,14 @@ export default function PrintRosterPage() {
 
             <style jsx global>{`
                 @media print {
-                    @page { margin: 0.5in; size: portrait; }
+                    @page { margin: 0.35in; size: portrait; }
                     body { background: white; }
                     .print\\:hidden { display: none !important; }
                     .page-break-always { page-break-after: always; }
                     .break-after-page { break-after: page; }
+                    .credential-page:last-child { page-break-after: auto; break-after: auto; }
+                    .credential-card { break-inside: avoid; page-break-inside: avoid; }
+                    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
             `}</style>
         </div>

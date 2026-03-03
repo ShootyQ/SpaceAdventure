@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, increment, addDoc, deleteDoc, orderBy, runTransaction, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, increment, runTransaction, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useTeacherScope } from "@/context/TeacherScopeContext";
 import { getAssetPath } from "@/lib/utils";
 import { UserData, Rank } from "@/types";
 import { UserAvatar } from '@/components/UserAvatar';
-import { Star, Trash2, X, Zap, Award, Check } from "lucide-react";
+import { Star, X, Zap, Award, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
@@ -27,13 +27,9 @@ export default function RewardsPage() {
     // UI State
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isAwarding, setIsAwarding] = useState(false);
-    const [isManagingProtocols, setIsManagingProtocols] = useState(false);
     const [isOneTapMode, setIsOneTapMode] = useState(false);
     const [oneTapBehaviorId, setOneTapBehaviorId] = useState<string | null>(null);
     
-    // Forms
-    const [newLabel, setNewLabel] = useState("");
-    const [newXpInput, setNewXpInput] = useState("50");
     const [creditsPerAward, setCreditsPerAward] = useState(1);
     const { user } = useAuth();
     const { activeTeacherId } = useTeacherScope();
@@ -63,15 +59,6 @@ export default function RewardsPage() {
         }
     };
     
-    // Mobile check roughly (can be done with CSS mostly, but logic helps for panel)
-    const [isMobile, setIsMobile] = useState(false);
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
-
     useEffect(() => {
         if (!teacherScopeId || !user) return;
 
@@ -168,6 +155,10 @@ export default function RewardsPage() {
                      const sfDoc = await transaction.get(studentRef);
                      if (!sfDoc.exists()) throw "Student document not found";
                      const data = sfDoc.data();
+                     const awardTimestamp = Date.now();
+                     const dayKey = new Date(awardTimestamp).toISOString().slice(0, 10);
+                     const positiveDelta = Math.max(0, xpAmount);
+                     const negativeDelta = Math.max(0, Math.abs(Math.min(0, xpAmount)));
                      
                      // 2. Calculate User Updates (Fuel Logic)
                      const fuelLevel = data.upgrades?.fuel || 0;
@@ -192,9 +183,12 @@ export default function RewardsPage() {
                                 lastAward: {
                                     reason: behavior.label,
                                     xpGained: xpAmount,
-                                    timestamp: Date.now(),
+                                    timestamp: awardTimestamp,
                                 },
-                                lastXpReason: behavior.label
+                                lastXpReason: behavior.label,
+                                [`xpDaily.${dayKey}.net`]: increment(xpAmount),
+                                ...(positiveDelta > 0 ? { [`xpDaily.${dayKey}.positive`]: increment(positiveDelta) } : {}),
+                                ...(negativeDelta > 0 ? { [`xpDaily.${dayKey}.negative`]: increment(negativeDelta) } : {}),
                             };
 
                      if (xpAmount > 0 && creditsAwardValue > 0) {
@@ -221,6 +215,17 @@ export default function RewardsPage() {
                              teacherId: teacherScopeId
                          }, { merge: true });
                      }
+
+                     const xpEventRef = doc(collection(db, "xpEvents"));
+                     transaction.set(xpEventRef, {
+                         teacherId: teacherScopeId,
+                         studentId: uid,
+                         gradeLevel: data.gradeLevel || null,
+                         xpDelta: xpAmount,
+                         reason: behavior.label,
+                         source: "teacher_rewards",
+                         timestamp: awardTimestamp,
+                     });
 
                      transaction.update(studentRef, userUpdates);
                 });
@@ -272,38 +277,6 @@ export default function RewardsPage() {
         toggleSelection(uid);
     };
 
-    const handleAddBehavior = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!user || !teacherScopeId) return;
-        const parsedXp = Number(newXpInput);
-        if (!Number.isInteger(parsedXp) || parsedXp < -1000 || parsedXp > 1000) {
-            alert("XP must be an integer between -1000 and 1000.");
-            return;
-        }
-        try {
-            // Add to subcollection
-            await addDoc(collection(db, `users/${teacherScopeId}/behaviors`), {
-                label: newLabel,
-                xp: parsedXp,
-                color: parsedXp > 0 ? "bg-green-600" : "bg-red-600",
-                teacherId: teacherScopeId
-            });
-            setNewLabel("");
-            setNewXpInput("50");
-        } catch (error) {
-            console.error("Error adding behavior:", error);
-            alert("Failed to add protocol. ensure you have permission.");
-        }
-    };
-
-    const handleDeleteBehavior = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!teacherScopeId || !confirm("Remove this behavior?")) return;
-        try {
-            await deleteDoc(doc(db, `users/${teacherScopeId}/behaviors`, id));
-        } catch (e) { console.error(e); }
-    };
-
     const handleSaveCreditsPerAward = async () => {
         if (!teacherScopeId) return;
         const normalized = Math.max(0, Math.round(Number(creditsPerAward) || 0));
@@ -329,7 +302,7 @@ export default function RewardsPage() {
             {/* Hidden Audio Element */}
             <audio id="notification-audio" src={getAssetPath("/sounds/notification.m4a?v=1")} preload="auto" />
 
-            <div className="max-w-7xl mx-auto h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] flex flex-col">
+            <div className="max-w-7xl mx-auto min-h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] flex flex-col">
                 
                 {/* Header */}
                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 shrink-0 gap-4">
@@ -339,8 +312,8 @@ export default function RewardsPage() {
                         </Link>
                         <h1 className="text-xl md:text-2xl font-bold uppercase tracking-widest text-white">Rewards Command</h1>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <div className="flex items-center gap-2 border border-cyan-800 rounded px-2 py-1 bg-black/30">
+                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        <div className="flex items-center gap-2 border border-cyan-800 rounded px-2 py-1 bg-black/30 w-full sm:w-auto">
                             <label htmlFor="credits-per-award" className="text-[10px] uppercase tracking-wider text-cyan-500">Credits / Award</label>
                             <input
                                 id="credits-per-award"
@@ -365,90 +338,23 @@ export default function RewardsPage() {
                                 setIsAwarding(false);
                                 setSelectedIds(new Set());
                             }}
-                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border transition-colors ${isOneTapMode ? 'bg-emerald-900/40 border-emerald-400 text-white' : 'border-emerald-800 text-emerald-500 hover:border-emerald-500'}`}
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border transition-colors ${isOneTapMode ? 'bg-emerald-900/40 border-emerald-400 text-white' : 'border-emerald-800 text-emerald-500 hover:border-emerald-500'}`}
                         >
                             <Star size={16} className={isOneTapMode ? 'fill-emerald-300 text-emerald-300' : ''} />
                             {isOneTapMode ? 'ONE TAP ON' : 'ONE TAP OFF'}
                         </button>
-                        <button 
-                            onClick={() => setIsManagingProtocols(!isManagingProtocols)}
-                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border transition-colors ${isManagingProtocols ? 'bg-cyan-900/40 border-cyan-400 text-white' : 'border-cyan-800 text-cyan-500 hover:border-cyan-500'}`}
+                        <Link
+                            href="/teacher/protocols"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded border border-cyan-800 text-cyan-500 hover:border-cyan-500 transition-colors"
                         >
                             <Zap size={16} />
-                            {isManagingProtocols ? 'DONE' : 'PROTOCOLS'}
-                        </button>
+                            PROTOCOLS
+                        </Link>
                     </div>
                  </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 overflow-hidden relative">
-                    
-                    {/* LEFT: Manage Protocols */}
-                    <AnimatePresence>
-                        {isManagingProtocols && (
-                             <motion.div 
-                                initial={{ height: 0, opacity: 0, width: "100%" }}
-                                animate={{ 
-                                    height: isMobile ? "auto" : "100%", 
-                                    width: isMobile ? "100%" : 320,
-                                    opacity: 1 
-                                }}
-                                exit={{ height: 0, opacity: 0, width: isMobile ? "100%" : 0 }}
-                                className="bg-black/40 border md:border-r border-cyan-900/50 p-4 rounded-xl md:rounded-l-2xl overflow-hidden flex flex-col shrink-0 order-first"
-                             >
-                                <div className="w-full md:min-w-[280px]">
-                                    <h3 className="text-white font-bold mb-4">Edit Protocols</h3>
-                                    <form onSubmit={handleAddBehavior} className="bg-cyan-950/30 p-4 rounded-xl border border-cyan-800/30 mb-4 space-y-3">
-                                        <div>
-                                            <label className="text-xs text-cyan-500 uppercase">Label</label>
-                                            <input 
-                                                value={newLabel}
-                                                onChange={e => setNewLabel(e.target.value)}
-                                                className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none"
-                                                placeholder="e.g. Leadership"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-cyan-500 uppercase">XP Amount</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    value={newXpInput}
-                                                    onChange={(e) => {
-                                                        const next = e.target.value.trim();
-                                                        if (/^-?\d*$/.test(next)) {
-                                                            setNewXpInput(next);
-                                                        }
-                                                    }}
-                                                    placeholder="-1000 to 1000"
-                                                    className="w-full bg-black/50 border border-cyan-800 rounded p-2 text-white text-sm focus:border-cyan-400 outline-none"
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-                                        <button className="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 md:py-2 rounded text-xs uppercase tracking-wider shadow-lg">
-                                            Add Protocol
-                                        </button>
-                                    </form>
-
-                                    <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[300px] md:max-h-[calc(100vh-350px)] custom-scrollbar">
-                                        {behaviors.map(b => (
-                                            <div key={b.id} className="flex items-center justify-between p-3 bg-cyan-900/20 rounded border border-cyan-800/50">
-                                                <div>
-                                                    <div className="text-white text-sm font-bold">{b.label}</div>
-                                                    <div className={`text-xs ${b.xp > 0 ? 'text-green-400' : 'text-red-400'}`}>{b.xp > 0 ? '+' : ''}{b.xp} XP</div>
-                                                </div>
-                                                <button title="Delete protocol" aria-label="Delete protocol" onClick={(e) => handleDeleteBehavior(b.id, e)} className="p-2 text-red-500 hover:text-white hover:bg-red-500/20 rounded"><Trash2 size={16} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                             </motion.div>
-                        )}
-                    </AnimatePresence>
-
+                <div className="flex-1 flex flex-col gap-4 md:gap-6 min-h-0 overflow-hidden relative">
                     {/* RIGHT: Cadet Grid */}
                     <div className="flex-1 bg-black/20 rounded-2xl p-2 md:p-4 overflow-hidden flex flex-col border border-white/5 relative">
                         {isOneTapMode && (
@@ -495,9 +401,9 @@ export default function RewardsPage() {
                                 </div>
                             </div>
                          ) : (
-                             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-24">
+                             <div className="flex-1 overflow-y-auto pr-1 md:pr-2 custom-scrollbar pb-24">
                                 {/* Density adjustments for mobile: grid-cols-4, smaller gap */}
-                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-4 auto-rows-fr">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4 auto-rows-fr">
                                     {students.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
                                         const isSelected = selectedIds.has(student.uid);
@@ -507,7 +413,7 @@ export default function RewardsPage() {
                                             key={student.uid}
                                             onClick={() => handleCadetTap(student.uid)}
                                             className={`
-                                                relative w-full min-h-[66px] md:min-h-[136px] flex flex-col p-1.5 md:p-3 rounded-md md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
+                                                relative w-full min-h-[92px] md:min-h-[136px] flex flex-col p-2 md:p-3 rounded-md md:rounded-2xl border transition-all cursor-pointer group overflow-hidden
                                                 ${isSelected 
                                                     ? 'bg-cyan-900/60 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
                                                     : 'bg-black/40 border-cyan-900/50 hover:bg-cyan-900/40 hover:border-cyan-400'}
@@ -540,7 +446,7 @@ export default function RewardsPage() {
                                                     <h3 className="text-white font-bold text-[11px] sm:text-xs md:text-base leading-tight w-full px-0.5 break-words md:truncate">
                                                         {student.displayName || 'Cadet'}
                                                     </h3>
-                                                    <p className="hidden md:block text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
+                                                    <p className="text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
                                                         {rank?.name || 'Space Cadet'} • {student.xp || 0} XP
                                                     </p>
                                                     {isOneTapMode && oneTapBehavior && (
@@ -642,7 +548,9 @@ export default function RewardsPage() {
                                     {behaviors.length === 0 && (
                                         <div className="text-center p-8 text-gray-500">
                                             <p>No protocols defined.</p>
-                                            <p className="text-xs">Tap "PROTOCOLS" to add some.</p>
+                                            <Link href="/teacher/protocols" className="text-xs text-cyan-400 hover:text-cyan-300 underline">
+                                                Open Protocol Editor
+                                            </Link>
                                         </div>
                                     )}
                                     {behaviors.map(b => (

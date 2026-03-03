@@ -18,7 +18,9 @@ export const SHIP_OPTIONS: ShipOption[] = [
     { id: "jupiter-xp-earn", name: "Stormbelly Freighter", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/jupiter-xp-earn.png" },
     { id: "mars-xp-earn", name: "Crimson Striker", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/mars-xp-earn.png" },
     { id: "mercury-xp-earn", name: "Solar Needle", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/mercury-xp-earn.png" },
+    { id: "neptune-xpearn", name: "Abysswake Frigate", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/neptune-xpearn.png" },
     { id: "saturn-xp-earn", name: "Ringline Hauler", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/saturn-xp-earn.png" },
+    { id: "sun-xpearn", name: "Helion Forgecraft", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/sun-xpearn.png" },
     { id: "uranus-xp-earn", name: "Cryo Bulkrunner", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/uranus-xp-earn.png" },
     { id: "venus-xp-earn", name: "Aurora Lance", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/venus-xp-earn.png" },
 
@@ -26,7 +28,9 @@ export const SHIP_OPTIONS: ShipOption[] = [
     { id: "jupiter-uncommon", name: "Tempest Skimmer", type: "scout", assetPath: "/images/collectibles/ships/uncommon/jupiter-uncommon.png" },
     { id: "mars-uncommon", name: "Dustrunner Mk II", type: "scout", assetPath: "/images/collectibles/ships/uncommon/mars-uncommon.png" },
     { id: "mercury-uncommon", name: "Helios Dart", type: "scout", assetPath: "/images/collectibles/ships/uncommon/mercury-uncommon.png" },
+    { id: "neptune-uncommon", name: "Tideglass Skiff", type: "scout", assetPath: "/images/collectibles/ships/uncommon/neptune-uncommon.png" },
     { id: "saturn-uncommon", name: "Halo Glider", type: "scout", assetPath: "/images/collectibles/ships/uncommon/saturn-uncommon.png" },
+    { id: "sun-uncommon", name: "Corona Swiftsail", type: "scout", assetPath: "/images/collectibles/ships/uncommon/sun-uncommon.png" },
     { id: "uranus-uncommon", name: "Tiltwind Sprite", type: "scout", assetPath: "/images/collectibles/ships/uncommon/uranus-uncommon.png" },
     { id: "venus-uncommon", name: "Cloudpiercer", type: "scout", assetPath: "/images/collectibles/ships/uncommon/venus-uncommon.png" },
 
@@ -34,9 +38,16 @@ export const SHIP_OPTIONS: ShipOption[] = [
     { id: "jupiter-extremely-rare", name: "Zephyr Colossus", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/jupiter-extremely-rare.png" },
     { id: "mars-extremely-rare", name: "Red Dreadnought", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/mars-extremelyrare.png" },
     { id: "mercury-extremely-rare", name: "Perihelion Wraith", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/mercury-extremelyrare.png" },
+    { id: "neptune-extremely-rare", name: "Abyssal Leviathan", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/neptune-extremely-rare.png" },
     { id: "saturn-extremely-rare", name: "Ring Sovereign", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/saturn-extremely-rare.png" },
+    { id: "sun-extremely-rare", name: "Solar Imperator", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/sun-extremely-rare.png" },
     { id: "uranus-extremely-rare", name: "Obliquity Monarch", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/uranus-extremely-rare.png" },
     { id: "venus-extremely-rare", name: "Celestial Siren", type: "cruiser", assetPath: "/images/collectibles/ships/extremely-rare/venus-extremelyrare.png" },
+
+    { id: "lionspaceship", name: "Lionheart Prowler", type: "fighter", assetPath: "/images/collectibles/ships/rare/lionspaceship.png" },
+    { id: "roosterspaceship", name: "Dawncrow Interceptor", type: "fighter", assetPath: "/images/collectibles/ships/rare/roosterspaceship.png" },
+    { id: "otherword-rareship", name: "Otherworld Phantom", type: "cruiser", assetPath: "/images/collectibles/ships/rare/otherword-rareship.png" },
+    { id: "void-triangle-extremelyrare-anywhere", name: "Void Triangle Apex", type: "cruiser", assetPath: "/images/collectibles/ships/rare/void-triangle-extremelyrare-anywhere.png" },
 ];
 
 const SHIP_ASSET_PATHS = new Map<string, string>(

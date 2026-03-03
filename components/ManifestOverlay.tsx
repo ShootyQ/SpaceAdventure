@@ -4,7 +4,7 @@ import React, { memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutGrid, Check, Crown } from "lucide-react";
 import { Ship, Rank, Behavior } from "@/types";
-import { updateDoc, doc, runTransaction, increment } from "firebase/firestore";
+import { updateDoc, doc, runTransaction, increment, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
 import { resolveShipAssetPath } from "@/lib/ships";
@@ -67,22 +67,24 @@ interface ManifestOverlayProps {
     onClose: () => void;
     ships: Ship[];
     ranks: Rank[];
-    selectedIds: Set<string>;
-    setSelectedIds: (ids: Set<string>) => void;
     behaviors: Behavior[];
     creditsPerAward: number;
 }
 
-const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void }) => {
+type ManifestDensity = 'large' | 'medium' | 'small';
+
+const ShipCard = memo(({ student, ranks, isSelected, onToggle, density }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void, density: ManifestDensity }) => {
     // Memoize rank reset per card to avoid array operations
     const rank = React.useMemo(() => ranks.find(r => student.xp >= r.minXP), [ranks, student.xp]);
     const shipModelId = (student as any)?.spaceship?.id || (student as any)?.spaceship?.modelId || (student as any)?.shipId || 'finalship';
     const selectedPet = React.useMemo(() => getPetById(student.selectedPetId), [student.selectedPetId]);
+    const isSmall = density === 'small';
+    const isMedium = density === 'medium';
 
     return (
         <div 
             onClick={onToggle}
-            className={`relative group cursor-pointer transition-all hover:scale-105 p-4 rounded-2xl border flex flex-col items-center
+            className={`relative group cursor-pointer transition-all hover:scale-[1.03] ${isSmall ? 'p-2 rounded-xl' : isMedium ? 'p-3 rounded-xl' : 'p-4 rounded-2xl'} border flex flex-col items-center
                 ${isSelected 
                     ? 'bg-cyan-900/40 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]' 
                     : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-cyan-500/50'
@@ -101,18 +103,18 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             </div>
 
             {/* Avatar + Ship + Pet */}
-            <div className="relative w-full h-36 mb-4 flex items-center justify-center">
+            <div className={`relative w-full ${isSmall ? 'h-24 mb-2' : isMedium ? 'h-28 mb-3' : 'h-36 mb-4'} flex items-center justify-center`}>
                 {student.flag && (
-                    <div className="absolute top-6 right-2 z-40 scale-90 drop-shadow-md">
+                    <div className={`absolute ${isSmall ? 'top-2 right-1 scale-60' : isMedium ? 'top-4 right-1 scale-75' : 'top-6 right-2 scale-90'} z-40 drop-shadow-md`}>
                         <TinyFlag config={student.flag} />
                     </div>
                 )}
 
-                <div className="absolute left-0 top-[76%] -translate-y-1/2 z-30 w-[58px] h-[58px] md:w-[68px] md:h-[68px] flex items-end justify-center">
+                <div className={`absolute left-0 top-[76%] -translate-y-1/2 z-30 ${isSmall ? 'w-[36px] h-[36px]' : isMedium ? 'w-[48px] h-[48px]' : 'w-[58px] h-[58px] md:w-[68px] md:h-[68px]'} flex items-end justify-center`}>
                     <UserAvatar userData={student as any} transparentBg className="w-full h-full" />
                 </div>
 
-                <div className="relative z-20 w-24 h-24 md:w-28 md:h-28">
+                <div className={`relative z-20 ${isSmall ? 'w-16 h-16' : isMedium ? 'w-20 h-20' : 'w-24 h-24 md:w-28 md:h-28'}`}>
                     <img
                         src={getAssetPath(resolveShipAssetPath(shipModelId))}
                         onError={(event) => {
@@ -124,7 +126,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
                     />
                 </div>
 
-                <div className="absolute right-0 top-[76%] -translate-y-1/2 z-30 w-[52px] h-[52px] md:w-[62px] md:h-[62px] flex items-end justify-center">
+                <div className={`absolute right-0 top-[76%] -translate-y-1/2 z-30 ${isSmall ? 'w-[34px] h-[34px]' : isMedium ? 'w-[44px] h-[44px]' : 'w-[52px] h-[52px] md:w-[62px] md:h-[62px]'} flex items-end justify-center`}>
                     {selectedPet.imageSrc ? (
                         <img
                             src={getAssetPath(selectedPet.imageSrc)}
@@ -138,10 +140,10 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             </div>
 
             {/* Name */}
-            <div className="text-center w-full mb-4">
-                <h3 className="text-white font-bold truncate w-full mb-1">{truncateName(student.cadetName)}</h3>
+            <div className={`text-center w-full ${isSmall ? 'mb-2' : 'mb-4'}`}>
+                <h3 className={`text-white font-bold truncate w-full mb-1 ${isSmall ? 'text-xs' : ''}`}>{truncateName(student.cadetName)}</h3>
                 <div className="flex flex-col items-center justify-center gap-1">
-                    {rank?.image && <img src={getAssetPath(rank.image)} alt={rank.name} className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-md my-2" />}
+                    {rank?.image && <img src={getAssetPath(rank.image)} alt={rank.name} className={`${isSmall ? 'w-10 h-10 my-1' : isMedium ? 'w-14 h-14 my-1.5' : 'w-16 h-16 md:w-20 md:h-20 my-2'} object-contain drop-shadow-md`} />}
                     
                     {/* Dynamic Rank Styling */}
                     <div className={`text-xs uppercase tracking-wider font-bold ${
@@ -155,7 +157,7 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
             </div>
             
             {/* Status Indicator */}
-            <div className="mt-4 flex items-center gap-2 text-[10px] text-gray-400 uppercase tracking-widest bg-black/30 px-2 py-1 rounded">
+            <div className={`${isSmall ? 'mt-2 text-[9px]' : 'mt-4 text-[10px]'} flex items-center gap-2 text-gray-400 uppercase tracking-widest bg-black/30 px-2 py-1 rounded`}>
                 <div className={`w-2 h-2 rounded-full ${student.status === 'traveling' ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
                 {student.status === 'traveling' ? 'In Transit' : 'Docked'}
             </div>
@@ -164,7 +166,8 @@ const ShipCard = memo(({ student, ranks, isSelected, onToggle }: { student: Ship
 });
 ShipCard.displayName = "ShipCard";
 
-const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, setSelectedIds, behaviors, creditsPerAward }: ManifestOverlayProps) => {
+const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, behaviors, creditsPerAward }: ManifestOverlayProps) => {
+    const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
     
     // 1. Optimize Ranks (Sort once)
     const sortedRanks = React.useMemo(() => ranks.slice().sort((a,b) => b.minXP - a.minXP), [ranks]);
@@ -174,6 +177,8 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
         return ships.filter(s => s.role !== 'teacher').sort((a,b) => b.xp - a.xp);
     }, [ships]);
 
+    const manifestDensity: ManifestDensity = visibleShips.length > 14 ? 'small' : visibleShips.length > 8 ? 'medium' : 'large';
+
     // Handler for toggling selection (memoized to prevent prop churn)
     const handleToggle = React.useCallback((id: string) => {
         const newSet = new Set(selectedIds);
@@ -181,6 +186,10 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
         else newSet.add(id);
         setSelectedIds(newSet);
     }, [selectedIds, setSelectedIds]);
+
+    React.useEffect(() => {
+        if (!isVisible) setSelectedIds(new Set());
+    }, [isVisible]);
 
     if (!isVisible) return null;
 
@@ -205,13 +214,14 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                          </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-7">
+                    <div className={`grid grid-cols-2 md:grid-cols-4 ${visibleShips.length > 14 ? 'lg:grid-cols-6 xl:grid-cols-7 gap-3' : visibleShips.length > 8 ? 'lg:grid-cols-5 xl:grid-cols-6 gap-4' : 'lg:grid-cols-5 xl:grid-cols-6 gap-7'}`}>
                         {visibleShips.map(student => (
                             <ShipCard 
                                 key={student.id}
                                 student={student}
                                 ranks={sortedRanks}
                                 isSelected={selectedIds.has(student.id)}
+                                density={manifestDensity}
                                 onToggle={() => handleToggle(student.id)}
                             />
                         ))}
@@ -302,6 +312,10 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                     if (!sfDoc.exists()) return; // Skip if user deleted
                                                     
                                                     const data = sfDoc.data();
+                                                    const awardTimestamp = Date.now();
+                                                    const dayKey = new Date(awardTimestamp).toISOString().slice(0, 10);
+                                                    const positiveDelta = Math.max(0, xpInput);
+                                                    const negativeDelta = Math.max(0, Math.abs(Math.min(0, xpInput)));
                                                     
                                                     // 1. Calculate Fuel Logic
                                                     const fuelLevel = data.upgrades?.fuel || 0;
@@ -319,10 +333,13 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                         lastAward: {
                                                             reason: reasonInput,
                                                             xpGained: xpInput,
-                                                            timestamp: Date.now()
+                                                            timestamp: awardTimestamp
                                                         },
                                                         // Ensure legacy field is updated too for compatibility
-                                                        lastXpReason: reasonInput
+                                                        lastXpReason: reasonInput,
+                                                        [`xpDaily.${dayKey}.net`]: increment(xpInput),
+                                                        ...(positiveDelta > 0 ? { [`xpDaily.${dayKey}.positive`]: increment(positiveDelta) } : {}),
+                                                        ...(negativeDelta > 0 ? { [`xpDaily.${dayKey}.negative`]: increment(negativeDelta) } : {}),
                                                     };
 
                                                     if (xpInput > 0 && creditsPerAward > 0) {
@@ -357,6 +374,17 @@ const ManifestOverlay = memo(({ isVisible, onClose, ships, ranks, selectedIds, s
                                                             id: planetId 
                                                         }, { merge: true });
                                                     }
+
+                                                    const xpEventRef = doc(collection(db, "xpEvents"));
+                                                    transaction.set(xpEventRef, {
+                                                        teacherId: data.teacherId || null,
+                                                        studentId: id,
+                                                        gradeLevel: data.gradeLevel || null,
+                                                        xpDelta: xpInput,
+                                                        reason: reasonInput,
+                                                        source: "manifest_overlay",
+                                                        timestamp: awardTimestamp,
+                                                    });
 
                                                     transaction.update(studentRef, userUpdates);
                                                 });
