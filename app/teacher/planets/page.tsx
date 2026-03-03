@@ -17,8 +17,8 @@ interface PlanetData {
     id: string;
     xpGoal: number;
     currentXP: number;
-    rewardName: string;
-    rewardDescription: string;
+    rewardName?: string;
+    rewardDescription?: string;
     unlocks?: {
         ships?: Record<string, number>;
         avatars?: Record<string, number>;
@@ -69,10 +69,20 @@ export default function PlanetManagementPage() {
         const unsub = onSnapshot(q, (snapshot) => {
              const dynamicMap = new Map<string, PlanetData>();
              snapshot.forEach(d => {
-                 const data = d.data() as PlanetData;
+                 const data = d.data() as Partial<PlanetData>;
                  // Ensure ID is set (if not in data, use doc ID)
                  const normalizedPlanetId = normalizePlanetId(d.id);
-                 dynamicMap.set(normalizedPlanetId, { ...data, id: normalizedPlanetId });
+                 dynamicMap.set(normalizedPlanetId, {
+                     id: normalizedPlanetId,
+                     xpGoal: toIntMin(data.xpGoal, 1),
+                     currentXP: toIntMin(data.currentXP, 0),
+                     rewardName: String(data.rewardName || ""),
+                     rewardDescription: String(data.rewardDescription || ""),
+                     unlocks: {
+                         ships: { ...(data.unlocks?.ships || {}) },
+                         avatars: { ...(data.unlocks?.avatars || {}) },
+                     },
+                 });
              });
 
              const merged = PLANETS.map(staticPlanet => {
@@ -167,8 +177,8 @@ export default function PlanetManagementPage() {
                 id: planet.id,
                 xpGoal: toIntMin(planet.xpGoal, 1),
                 currentXP: toIntMin(planet.currentXP, 0),
-                rewardName: planet.rewardName,
-                rewardDescription: planet.rewardDescription,
+                rewardName: String(planet.rewardName || ""),
+                rewardDescription: String(planet.rewardDescription || ""),
                 unlocks: unlocksToSave,
                 teacherId: user.uid
             }, { merge: true });

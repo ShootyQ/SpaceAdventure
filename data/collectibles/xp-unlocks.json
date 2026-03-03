@@ -25,6 +25,13 @@
       "planetId": "mars",
       "unlockKey": "vylaet",
       "channel": "xp"
+    },
+    {
+      "id": "candor",
+      "name": "Candor (Extremely Rare)",
+      "planetId": "mercury",
+      "unlockKey": "candor",
+      "channel": "xp"
     }
   ],
   "ships": [
