@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { Trophy, Lock, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -43,10 +43,36 @@ export default function StudentAchievementsPage() {
             return;
         }
 
-        const unsub = onSnapshot(doc(db, `users/${teacherId}/planets`, "unlocks"), (snapshot) => {
-            const data = (snapshot.data() as any) || {};
-            setPlanetShipUnlocks((data?.ships || {}) as PlanetUnlockMap);
-            setPlanetAvatarUnlocks((data?.avatars || {}) as PlanetUnlockMap);
+        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snapshot) => {
+            const nextShipUnlocks: PlanetUnlockMap = {};
+            const nextAvatarUnlocks: PlanetUnlockMap = {};
+
+            snapshot.forEach((planetDoc) => {
+                const planetId = String(planetDoc.id || "").trim().toLowerCase();
+                if (!planetId) return;
+
+                const data = (planetDoc.data() as any) || {};
+                const rawShipUnlocks = (data?.unlocks?.ships || {}) as Record<string, unknown>;
+                const rawAvatarUnlocks = (data?.unlocks?.avatars || {}) as Record<string, unknown>;
+
+                const normalizedShipUnlocks: Record<string, number> = {};
+                Object.entries(rawShipUnlocks).forEach(([key, value]) => {
+                    const threshold = Number(value || 0);
+                    if (threshold > 0) normalizedShipUnlocks[key] = threshold;
+                });
+
+                const normalizedAvatarUnlocks: Record<string, number> = {};
+                Object.entries(rawAvatarUnlocks).forEach(([key, value]) => {
+                    const threshold = Number(value || 0);
+                    if (threshold > 0) normalizedAvatarUnlocks[key] = threshold;
+                });
+
+                nextShipUnlocks[planetId] = normalizedShipUnlocks;
+                nextAvatarUnlocks[planetId] = normalizedAvatarUnlocks;
+            });
+
+            setPlanetShipUnlocks(nextShipUnlocks);
+            setPlanetAvatarUnlocks(nextAvatarUnlocks);
         });
 
         return () => unsub();

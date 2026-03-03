@@ -7,7 +7,7 @@ import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId } from "@/lib/unlocks";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { Check, Loader2 } from "lucide-react";
 
 const getPurchasedShopAvatarIds = (purchasedShopItemIds?: string[]) => {
@@ -55,9 +55,24 @@ export default function StudentAvatarPage() {
             return;
         }
 
-        const unsub = onSnapshot(doc(db, `users/${teacherId}/planets`, "unlocks"), (snapshot) => {
-            const data = (snapshot.data() as any) || {};
-            setPlanetAvatarUnlocks((data?.avatars || {}) as Record<string, Record<string, number>>);
+        const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snapshot) => {
+            const nextMap: Record<string, Record<string, number>> = {};
+
+            snapshot.forEach((planetDoc) => {
+                const planetId = normalizePlanetId(planetDoc.id);
+                if (!planetId) return;
+                const rawUnlocks = ((planetDoc.data() as any)?.unlocks?.avatars || {}) as Record<string, unknown>;
+                const normalizedUnlocks: Record<string, number> = {};
+
+                Object.entries(rawUnlocks).forEach(([key, value]) => {
+                    const threshold = Number(value || 0);
+                    if (threshold > 0) normalizedUnlocks[key] = threshold;
+                });
+
+                nextMap[planetId] = normalizedUnlocks;
+            });
+
+            setPlanetAvatarUnlocks(nextMap);
         });
 
         return () => unsub();
