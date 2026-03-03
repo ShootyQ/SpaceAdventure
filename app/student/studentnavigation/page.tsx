@@ -194,6 +194,7 @@ export default function StudentNavigationPage() {
                         <NavCard href="/student/collectibles" title="Collectibles Book" subtitle="Unlock guide by planet" />
                         <NavCard href="/student/flag" title="Flag Designer" subtitle="Customize your class flag" />
                         <NavCard href="/student/missions" title="Mission Log" subtitle="View and complete assignments" />
+                        <NavCard href="/student/achievements" title="Achievements" subtitle="View earned badges and progress" />
                         <NavCard href="/student" title="Spaceship Interior" subtitle="Enter interior view" />
                         <NavCard href="/student/shop" title="Intergalactic Shop" subtitle="Spend galactic credits" />
                         <NavCard href="/student/map" title="Solar System Map" subtitle="Open star map" />
