@@ -2,7 +2,8 @@
   "version": 1,
   "channels": ["starter", "chance", "xp", "shop"],
   "starters": {
-    "ships": ["finalship", "alienship", "jellyalienship", "coconutship", "dragoneggship"]
+    "ships": ["finalship", "alienship", "jellyalienship", "coconutship", "dragoneggship"],
+    "avatars": ["bunny", "cat", "raccoon", "otter", "pup", "hamster", "owl", "penguin", "turtle"]
   },
   "avatars": [
     {
@@ -32,6 +33,151 @@
       "planetId": "mercury",
       "unlockKey": "candor",
       "channel": "xp"
+    },
+    {
+      "id": "earth-xp-avatar",
+      "name": "Terra Trailblazer",
+      "planetId": "earth",
+      "unlockKey": "earth-xp-avatar",
+      "channel": "xp"
+    },
+    {
+      "id": "mercury-xp-avatar",
+      "name": "Solar Sprint",
+      "planetId": "mercury",
+      "unlockKey": "mercury-xp-avatar",
+      "channel": "xp"
+    },
+    {
+      "id": "saturn-xp-avatar",
+      "name": "Ringline Renegade",
+      "planetId": "saturn",
+      "unlockKey": "saturn-xp-avatar",
+      "channel": "xp"
+    },
+    {
+      "id": "uranus-xp-avatar",
+      "name": "Aurora Tiltwalker",
+      "planetId": "uranus",
+      "unlockKey": "uranus-xp-avatar",
+      "channel": "xp"
+    },
+    {
+      "id": "venus-common-avatar",
+      "name": "Venus Cloudhopper",
+      "planetId": "venus",
+      "unlockKey": "venus-common-avatar",
+      "channel": "chance",
+      "rarity": "common"
+    },
+    {
+      "id": "stellix",
+      "name": "Stellix Star Scribe",
+      "planetId": "any",
+      "unlockKey": "stellix",
+      "channel": "chance",
+      "rarity": "common"
+    },
+    {
+      "id": "jupiter-uncommon-avatar",
+      "name": "Jupiter Stormling",
+      "planetId": "jupiter",
+      "unlockKey": "jupiter-uncommon-avatar",
+      "channel": "chance",
+      "rarity": "uncommon"
+    },
+    {
+      "id": "mercury-uncommon-avatar",
+      "name": "Mercury Ember Sprite",
+      "planetId": "mercury",
+      "unlockKey": "mercury-uncommon-avatar",
+      "channel": "chance",
+      "rarity": "uncommon"
+    },
+    {
+      "id": "uranus-uncommon-avatar",
+      "name": "Uranus Ice Drifter",
+      "planetId": "uranus",
+      "unlockKey": "uranus-uncommon-avatar",
+      "channel": "chance",
+      "rarity": "uncommon"
+    },
+    {
+      "id": "earth-rare-avatar",
+      "name": "Gaia Night Ranger",
+      "planetId": "earth",
+      "unlockKey": "earth-rare-avatar",
+      "channel": "chance",
+      "rarity": "rare"
+    },
+    {
+      "id": "jupiter-rare-avatar",
+      "name": "Tempest Crown",
+      "planetId": "jupiter",
+      "unlockKey": "jupiter-rare-avatar",
+      "channel": "chance",
+      "rarity": "rare"
+    },
+    {
+      "id": "saturn-rare-avatar",
+      "name": "Ring Phantom",
+      "planetId": "saturn",
+      "unlockKey": "saturn-rare-avatar",
+      "channel": "chance",
+      "rarity": "rare"
+    },
+    {
+      "id": "jellylanternavatar",
+      "name": "Jelly Lantern Wisp",
+      "planetId": "any",
+      "unlockKey": "jellylanternavatar",
+      "channel": "chance",
+      "rarity": "rare"
+    },
+    {
+      "id": "jupiter-extremely-rare-avatar",
+      "name": "Storm Sovereign",
+      "planetId": "jupiter",
+      "unlockKey": "jupiter-extremely-rare-avatar",
+      "channel": "chance",
+      "rarity": "extremely-rare"
+    },
+    {
+      "id": "uranus-extremely-rare-avatar",
+      "name": "Obliquity Oracle",
+      "planetId": "uranus",
+      "unlockKey": "uranus-extremely-rare-avatar",
+      "channel": "chance",
+      "rarity": "extremely-rare"
+    },
+    {
+      "id": "venus-extremely-rare-avatar",
+      "name": "Venus Sky Empress",
+      "planetId": "venus",
+      "unlockKey": "venus-extremely-rare-avatar",
+      "channel": "chance",
+      "rarity": "extremely-rare"
+    },
+    {
+      "id": "avatar-shop",
+      "name": "Galactic Quartermaster",
+      "planetId": "any",
+      "unlockKey": "avatar-shop",
+      "channel": "shop"
+    },
+    {
+      "id": "clockworkbeetle",
+      "name": "Clockwork Beetle",
+      "planetId": "any",
+      "unlockKey": "clockworkbeetle",
+      "channel": "shop"
+    },
+    {
+      "id": "kitedagon",
+      "name": "Kitedagon",
+      "planetId": "any",
+      "unlockKey": "kitedagon",
+      "channel": "shop"
     }
   ],
   "ships": [

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-02-25",
+  "updatedAt": "2026-03-04",
   "items": [
     {
       "id": "batpet",
@@ -100,6 +100,159 @@
       "asset": "/images/collectibles/avatars/rare/neptune-scout.png",
       "active": false,
       "tags": ["placeholder", "avatar"]
+    },
+    {
+      "id": "earth-xp-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Terra Trailblazer",
+      "asset": "/images/collectibles/avatars/xp-unlocks/avatar.earth.xpunlock.png",
+      "active": true,
+      "tags": ["avatar", "earth", "xp"]
+    },
+    {
+      "id": "mercury-xp-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Solar Sprint",
+      "asset": "/images/collectibles/avatars/xp-unlocks/avatar.mercury.xp-earn.png",
+      "active": true,
+      "tags": ["avatar", "mercury", "xp"]
+    },
+    {
+      "id": "saturn-xp-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Ringline Renegade",
+      "asset": "/images/collectibles/avatars/xp-unlocks/avatar.saturn.xpunlock.png",
+      "active": true,
+      "tags": ["avatar", "saturn", "xp"]
+    },
+    {
+      "id": "uranus-xp-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Aurora Tiltwalker",
+      "asset": "/images/collectibles/avatars/xp-unlocks/avatar.uranus.xpunlock.png",
+      "active": true,
+      "tags": ["avatar", "uranus", "xp"]
+    },
+    {
+      "id": "venus-common-avatar",
+      "type": "avatar",
+      "rarity": "common",
+      "name": "Venus Cloudhopper",
+      "asset": "/images/collectibles/avatars/common/avatar.venus.common.png",
+      "active": true,
+      "tags": ["avatar", "venus"]
+    },
+    {
+      "id": "stellix",
+      "type": "avatar",
+      "rarity": "common",
+      "name": "Stellix Star Scribe",
+      "asset": "/images/collectibles/avatars/common/stellixavatar.png",
+      "active": true,
+      "tags": ["avatar", "any-planet"]
+    },
+    {
+      "id": "jupiter-uncommon-avatar",
+      "type": "avatar",
+      "rarity": "uncommon",
+      "name": "Jupiter Stormling",
+      "asset": "/images/collectibles/avatars/uncommon/avatar.jupiter.uncommon.png",
+      "active": true,
+      "tags": ["avatar", "jupiter"]
+    },
+    {
+      "id": "mercury-uncommon-avatar",
+      "type": "avatar",
+      "rarity": "uncommon",
+      "name": "Mercury Ember Sprite",
+      "asset": "/images/collectibles/avatars/uncommon/avatar.mercury.uncommon.png",
+      "active": true,
+      "tags": ["avatar", "mercury"]
+    },
+    {
+      "id": "uranus-uncommon-avatar",
+      "type": "avatar",
+      "rarity": "uncommon",
+      "name": "Uranus Ice Drifter",
+      "asset": "/images/collectibles/avatars/uncommon/avatar.uranus.uncommon.png",
+      "active": true,
+      "tags": ["avatar", "uranus"]
+    },
+    {
+      "id": "earth-rare-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Gaia Night Ranger",
+      "asset": "/images/collectibles/avatars/rare/avatar.earth.rare.png",
+      "active": true,
+      "tags": ["avatar", "earth"]
+    },
+    {
+      "id": "jupiter-rare-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Tempest Crown",
+      "asset": "/images/collectibles/avatars/rare/avatar.jupiter.rare.png",
+      "active": true,
+      "tags": ["avatar", "jupiter"]
+    },
+    {
+      "id": "saturn-rare-avatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Ring Phantom",
+      "asset": "/images/collectibles/avatars/rare/avatar.saturn.rare.png",
+      "active": true,
+      "tags": ["avatar", "saturn"]
+    },
+    {
+      "id": "jellylanternavatar",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Jelly Lantern Wisp",
+      "asset": "/images/collectibles/avatars/rare/jellylanternavatar.png",
+      "active": true,
+      "tags": ["avatar", "any-planet"]
+    },
+    {
+      "id": "jupiter-extremely-rare-avatar",
+      "type": "avatar",
+      "rarity": "extremely-rare",
+      "name": "Storm Sovereign",
+      "asset": "/images/collectibles/avatars/extremely-rare/avatar.jupiter.extremelyrare.png",
+      "active": true,
+      "tags": ["avatar", "jupiter"]
+    },
+    {
+      "id": "uranus-extremely-rare-avatar",
+      "type": "avatar",
+      "rarity": "extremely-rare",
+      "name": "Obliquity Oracle",
+      "asset": "/images/collectibles/avatars/extremely-rare/avatar.uranus.extremely-rare.png",
+      "active": true,
+      "tags": ["avatar", "uranus"]
+    },
+    {
+      "id": "venus-extremely-rare-avatar",
+      "type": "avatar",
+      "rarity": "extremely-rare",
+      "name": "Venus Sky Empress",
+      "asset": "/images/collectibles/avatars/extremely-rare/avatar.venus.extremely-rare.png",
+      "active": true,
+      "tags": ["avatar", "venus"]
+    },
+    {
+      "id": "avatar-shop",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Galactic Quartermaster",
+      "asset": "/images/collectibles/avatars/shop/avatar.shop.png",
+      "active": true,
+      "tags": ["avatar", "shop"]
     },
     {
       "id": "clockworkbeetle",
