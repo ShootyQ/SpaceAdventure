@@ -117,6 +117,18 @@ type PlanetCompletionEvent = {
     completedAt: number;
 };
 
+type SeenXpUnlockState = {
+    ships: Set<string>;
+    avatars: Set<string>;
+};
+
+const XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX = "spaceAdventure:seen-xp-unlocks:v1";
+
+const buildXpUnlockSeenStorageKey = (ownerId?: string) => {
+    const normalizedOwnerId = String(ownerId || "").trim();
+    return `${XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX}:${normalizedOwnerId || "unknown"}`;
+};
+
 export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const { userData } = useAuth();
         const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
@@ -152,6 +164,8 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
     const previousPlanetXPRef = useRef<Map<string, Record<string, number>>>(new Map());
         const previousUnlockedPetsRef = useRef<Map<string, Set<string>>>(new Map());
+    const seenXpUnlocksRef = useRef<Map<string, SeenXpUnlockState>>(new Map());
+    const hasHydratedSeenXpUnlocksRef = useRef(false);
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
@@ -169,7 +183,50 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
     const isFirstDynamicPlanetsLoadRef = useRef(true);
 
     const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+    const readPlanetXpValue = (planetXP: Record<string, number> | undefined, planetId: string) => {
+        const normalizedPlanetId = normalizePlanetId(planetId);
+        if (!normalizedPlanetId) return 0;
+
+        const exactValue = Number(planetXP?.[normalizedPlanetId] || 0);
+        if (Number.isFinite(exactValue) && exactValue > 0) return exactValue;
+
+        const fallbackEntry = Object.entries(planetXP || {}).find(([key]) => normalizePlanetId(key) === normalizedPlanetId);
+        return Number(fallbackEntry?.[1] || 0);
+    };
     const resolvedTeacherId = userData?.role === 'teacher' ? (activeTeacherId || userData.uid) : userData?.teacherId;
+    const xpUnlockSeenOwnerId = resolvedTeacherId || userData?.uid;
+    const xpUnlockSeenStorageKey = buildXpUnlockSeenStorageKey(xpUnlockSeenOwnerId);
+
+    useEffect(() => {
+        hasHydratedSeenXpUnlocksRef.current = false;
+
+        if (typeof window === "undefined") {
+            seenXpUnlocksRef.current = new Map();
+            hasHydratedSeenXpUnlocksRef.current = true;
+            return;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(xpUnlockSeenStorageKey);
+            const parsed = raw ? JSON.parse(raw) as Record<string, { ships?: string[]; avatars?: string[] }> : {};
+            const next = new Map<string, SeenXpUnlockState>();
+
+            Object.entries(parsed || {}).forEach(([shipId, value]) => {
+                const normalizedShipId = String(shipId || "").trim();
+                if (!normalizedShipId) return;
+
+                const ships = new Set((value?.ships || []).map((id) => String(id || "").trim()).filter(Boolean));
+                const avatars = new Set((value?.avatars || []).map((id) => String(id || "").trim()).filter(Boolean));
+                next.set(normalizedShipId, { ships, avatars });
+            });
+
+            seenXpUnlocksRef.current = next;
+        } catch {
+            seenXpUnlocksRef.current = new Map();
+        } finally {
+            hasHydratedSeenXpUnlocksRef.current = true;
+        }
+    }, [xpUnlockSeenStorageKey]);
 
   useEffect(() => {
     if (!userData) return;
@@ -618,9 +675,65 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
     const processFleet = (fleet: Ship[]) => {
         setShips(fleet);
+        const nextSeenXpUnlocks = new Map<string, SeenXpUnlockState>();
 
         fleet.forEach(shipData => {
                let unlockedPetIdsThisPass: string[] = [];
+            const planetXPMap = ((shipData as any)?.planetXP || {}) as Record<string, number>;
+
+            const eligibleShipUnlockKeys = Array.from(new Set(
+                shipXpUnlockRulesRef.current
+                    .filter((rule) => {
+                        const rulePlanetId = normalizePlanetId(rule.planetId);
+                        if (!rulePlanetId) return false;
+                        const threshold = Number(dynamicPlanetsRef.current.get(rulePlanetId)?.unlocks?.ships?.[rule.unlockKey] || 0);
+                        if (threshold <= 0) return false;
+                        return readPlanetXpValue(planetXPMap, rulePlanetId) >= threshold;
+                    })
+                    .map((rule) => String(rule.unlockKey || "").trim())
+                    .filter(Boolean)
+            ));
+
+            const eligibleAvatarUnlockKeys = Array.from(new Set(
+                avatarXpUnlockRulesRef.current
+                    .filter((rule) => {
+                        const rulePlanetId = normalizePlanetId(rule.planetId);
+                        if (!rulePlanetId) return false;
+                        const threshold = Number(dynamicPlanetsRef.current.get(rulePlanetId)?.unlocks?.avatars?.[rule.unlockKey] || 0);
+                        if (threshold <= 0) return false;
+                        return readPlanetXpValue(planetXPMap, rulePlanetId) >= threshold;
+                    })
+                    .map((rule) => String(rule.unlockKey || "").trim())
+                    .filter(Boolean)
+            ));
+
+            if (!isStudentPersonalView && isFirstLoad.current && hasHydratedSeenXpUnlocksRef.current) {
+                const seenUnlocks = seenXpUnlocksRef.current.get(shipData.id);
+                if (seenUnlocks) {
+                    const missedShips = eligibleShipUnlockKeys.filter((unlockId) => !seenUnlocks.ships.has(unlockId));
+                    const missedAvatars = eligibleAvatarUnlockKeys.filter((unlockId) => !seenUnlocks.avatars.has(unlockId));
+
+                    if (missedShips.length > 0 || missedAvatars.length > 0) {
+                        queueUnlockReveal({
+                            id: `unlock-catchup-${shipData.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                            ship: shipData,
+                            xpGained: 0,
+                            startPos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                            reason: "Recovered XP unlocks",
+                            unlocks: {
+                                ...(missedShips.length > 0 ? { ships: missedShips } : {}),
+                                ...(missedAvatars.length > 0 ? { avatars: missedAvatars } : {}),
+                            }
+                        });
+                    }
+                }
+            }
+
+            nextSeenXpUnlocks.set(shipData.id, {
+                ships: new Set(eligibleShipUnlockKeys),
+                avatars: new Set(eligibleAvatarUnlockKeys)
+            });
+
              if (!isFirstLoad.current && !isStudentPersonalView) {
                 const oldXP = previousXPRef.current.get(shipData.id);
                 if (oldXP !== undefined && shipData.xp > oldXP) {
@@ -628,9 +741,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     const newRank = sortedRanksDescRef.current.find((r) => shipData.xp >= r.minXP);
                     const isPromotion = newRank && oldRank && newRank.minXP > oldRank.minXP;
 
-                    const planetId = (shipData.locationId || '').toLowerCase();
-                    const newPlanetXP = Number((shipData as any)?.planetXP?.[planetId] || 0);
-                    const oldPlanetXP = Number((previousPlanetXPRef.current.get(shipData.id) || {})[planetId] || 0);
+                    const planetId = normalizePlanetId(shipData.locationId);
                     const currentUnlockedPets = new Set<string>((shipData.unlockedPetIds || []).map((id) => String(id)));
                     const previousUnlockedPets = previousUnlockedPetsRef.current.get(shipData.id) || new Set<string>();
                     const effectiveUnlockedPets = new Set<string>([
@@ -641,36 +752,51 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                     let unlocks: { ships?: string[]; avatars?: string[]; pets?: string[]; objects?: string[] } | undefined;
 
-                    if (Boolean(planetId) && newPlanetXP > oldPlanetXP) {
-                        const dynamicPlanetData = dynamicPlanetsRef.current.get(planetId) || {};
-                        const planetShipThresholds = (dynamicPlanetData?.unlocks?.ships || {}) as Record<string, number>;
-                        const planetAvatarThresholds = (dynamicPlanetData?.unlocks?.avatars || {}) as Record<string, number>;
+                    const currentPlanetXPMap = planetXPMap;
+                    const previousPlanetXPMap = (previousPlanetXPRef.current.get(shipData.id) || {}) as Record<string, number>;
 
-                        const newlyUnlockedShips = shipXpUnlockRulesRef.current
-                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                    const newlyUnlockedShips = Array.from(new Set(
+                        shipXpUnlockRulesRef.current
                             .filter((rule) => {
-                                const threshold = Number(planetShipThresholds?.[rule.unlockKey] || 0);
-                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                                const rulePlanetId = normalizePlanetId(rule.planetId);
+                                if (!rulePlanetId) return false;
+
+                                const dynamicPlanetData = dynamicPlanetsRef.current.get(rulePlanetId) || {};
+                                const threshold = Number(dynamicPlanetData?.unlocks?.ships?.[rule.unlockKey] || 0);
+                                if (threshold <= 0) return false;
+
+                                const oldPlanetXP = readPlanetXpValue(previousPlanetXPMap, rulePlanetId);
+                                const newPlanetXP = readPlanetXpValue(currentPlanetXPMap, rulePlanetId);
+                                return oldPlanetXP < threshold && newPlanetXP >= threshold;
                             })
                             .map((rule) => String(rule.unlockKey || "").trim())
-                            .filter(Boolean);
+                            .filter(Boolean)
+                    ));
 
-                        const newlyUnlockedAvatars = avatarXpUnlockRulesRef.current
-                            .filter((rule) => normalizePlanetId(rule.planetId) === planetId)
+                    const newlyUnlockedAvatars = Array.from(new Set(
+                        avatarXpUnlockRulesRef.current
                             .filter((rule) => {
-                                const threshold = Number(planetAvatarThresholds?.[rule.unlockKey] || 0);
-                                return threshold > 0 && oldPlanetXP < threshold && newPlanetXP >= threshold;
+                                const rulePlanetId = normalizePlanetId(rule.planetId);
+                                if (!rulePlanetId) return false;
+
+                                const dynamicPlanetData = dynamicPlanetsRef.current.get(rulePlanetId) || {};
+                                const threshold = Number(dynamicPlanetData?.unlocks?.avatars?.[rule.unlockKey] || 0);
+                                if (threshold <= 0) return false;
+
+                                const oldPlanetXP = readPlanetXpValue(previousPlanetXPMap, rulePlanetId);
+                                const newPlanetXP = readPlanetXpValue(currentPlanetXPMap, rulePlanetId);
+                                return oldPlanetXP < threshold && newPlanetXP >= threshold;
                             })
                             .map((rule) => String(rule.unlockKey || "").trim())
-                            .filter(Boolean);
+                            .filter(Boolean)
+                    ));
 
-                        if (newlyUnlockedShips.length > 0 || newlyUnlockedAvatars.length > 0) {
-                            unlocks = {
-                                ...unlocks,
-                                ...(newlyUnlockedShips.length > 0 ? { ships: [...(unlocks?.ships || []), ...newlyUnlockedShips] } : {}),
-                                ...(newlyUnlockedAvatars.length > 0 ? { avatars: [...(unlocks?.avatars || []), ...newlyUnlockedAvatars] } : {}),
-                            };
-                        }
+                    if (newlyUnlockedShips.length > 0 || newlyUnlockedAvatars.length > 0) {
+                        unlocks = {
+                            ...unlocks,
+                            ...(newlyUnlockedShips.length > 0 ? { ships: [...(unlocks?.ships || []), ...newlyUnlockedShips] } : {}),
+                            ...(newlyUnlockedAvatars.length > 0 ? { avatars: [...(unlocks?.avatars || []), ...newlyUnlockedAvatars] } : {}),
+                        };
                     }
 
                     if (canRollPetUnlocks && Boolean(planetId)) {
@@ -736,6 +862,23 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                          unlockedPetIdsThisPass.forEach((petId) => cachedUnlocked.add(String(petId)));
                          previousUnlockedPetsRef.current.set(shipData.id, cachedUnlocked);
         });
+
+        seenXpUnlocksRef.current = nextSeenXpUnlocks;
+        if (typeof window !== "undefined") {
+            try {
+                const serialized = Object.fromEntries(
+                    Array.from(nextSeenXpUnlocks.entries()).map(([shipId, value]) => [
+                        shipId,
+                        {
+                            ships: Array.from(value.ships),
+                            avatars: Array.from(value.avatars),
+                        },
+                    ])
+                );
+                window.localStorage.setItem(xpUnlockSeenStorageKey, JSON.stringify(serialized));
+            } catch {
+            }
+        }
 
         isFirstLoad.current = false;
 
