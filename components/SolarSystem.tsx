@@ -2130,7 +2130,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
        {/* AWARD CEREMONY OVERLAY */}
        <AnimatePresence>
-         {!isStudentPersonalView && awardQueue.length > 0 && (
+         {!isStudentPersonalView && (awardQueue.length > 0 || Boolean(activeUnlockReveal)) && (
             <div 
                 key="award-overlay"
                 className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-auto cursor-pointer"
