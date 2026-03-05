@@ -541,7 +541,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   useEffect(() => {
       if (awardTimer.current) clearTimeout(awardTimer.current);
 
-      if (awardQueue.length > 0) {
+      if (awardQueue.length > 0 && !activeUnlockReveal) {
           awardTimer.current = setTimeout(() => {
               setAwardQueue([]);
           }, 7000);
@@ -550,7 +550,19 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       return () => {
           if (awardTimer.current) clearTimeout(awardTimer.current);
       }
-  }, [awardQueue]);
+  }, [awardQueue, activeUnlockReveal]);
+
+  const dismissCurrentOverlay = useCallback(() => {
+      if (activeUnlockReveal) {
+          scheduledUnlockRevealAwardIdsRef.current.delete(activeUnlockReveal.id);
+          setActiveUnlockReveal(null);
+          return;
+      }
+
+      if (awardQueue.length > 0) {
+          setAwardQueue([]);
+      }
+  }, [activeUnlockReveal, awardQueue.length]);
 
   useEffect(() => {
       return () => {
@@ -563,10 +575,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   }, []);
 
   useEffect(() => {
-      if (activeUnlockReveal || unlockRevealQueue.length === 0 || awardQueue.length > 0) return;
+      if (activeUnlockReveal || unlockRevealQueue.length === 0 || awardQueue.length > 0 || Boolean(activePlanetCompletions)) return;
       setActiveUnlockReveal(unlockRevealQueue[0]);
       setUnlockRevealQueue((prev) => prev.slice(1));
-  }, [activeUnlockReveal, unlockRevealQueue, awardQueue.length]);
+  }, [activeUnlockReveal, unlockRevealQueue, awardQueue.length, activePlanetCompletions]);
 
   useEffect(() => {
       if (!activeUnlockReveal) return;
@@ -2320,11 +2332,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
        {/* AWARD CEREMONY OVERLAY */}
        <AnimatePresence>
-         {!isStudentPersonalView && (awardQueue.length > 0 || Boolean(activeUnlockReveal)) && (
+         {!isStudentPersonalView && ((awardQueue.length > 0 && !activeUnlockReveal) || Boolean(activeUnlockReveal)) && (
             <div 
                 key="award-overlay"
                 className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-auto cursor-pointer"
-                onClick={() => setAwardQueue([])}
+                onClick={dismissCurrentOverlay}
             >
                 {/* Visual Backdrop (Dim the map slightly) */}
                 <motion.div 
@@ -2334,11 +2346,22 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" 
                 />
 
+                <button
+                    type="button"
+                    aria-label="Close reward overlay"
+                    className="absolute right-4 top-4 z-[390] rounded-full border border-white/40 bg-black/60 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-white hover:bg-black/80"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        dismissCurrentOverlay();
+                    }}
+                >
+                    Close
+                </button>
+
                 {/* Multiple Awards Container */}
-                {(() => {
+                {!activeUnlockReveal && (() => {
                     const awardCount = awardQueue.length;
                     const overlayScale = awardCount > 20 ? 0.42 : awardCount > 16 ? 0.5 : awardCount > 12 ? 0.6 : awardCount > 8 ? 0.72 : awardCount > 6 ? 0.82 : 1;
-                    const isUltraDense = awardCount > 20;
                     const isSuperDense = awardCount > 16;
 
                     return (
@@ -2347,7 +2370,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                     style={{ transform: `scale(${overlayScale})` }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {awardQueue.map((award, index) => {
+                    {awardQueue.map((award) => {
                         const isSingleAward = awardQueue.length === 1;
                         const isDualAward = awardQueue.length === 2;
                         const isCompactAward = awardQueue.length > 2;
@@ -2369,7 +2392,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                 delay: 0
                             }}
                             className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[520px] aspect-square p-8' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
+                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[95vw] max-w-[980px] min-h-[78vh] max-h-[94vh] overflow-y-auto p-6 sm:w-[90vw] sm:p-8 lg:p-12' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
                             `}
                             onClick={(e) => {
                                 // Optional: Allow clicking individual card to dismiss just that one? 
@@ -2381,7 +2404,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             {/* Background Shine */}
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
 
-                            <h2 className={`${isSuperDense ? 'text-[9px]' : isUltraDenseAward ? 'text-[10px]' : isCompactAward ? 'text-sm' : 'text-xl'} text-cyan-300 font-mono tracking-widest ${isSuperDense ? 'mb-1.5' : 'mb-4'} uppercase relative z-10`}>Training Milestone</h2>
+                            <h2 className={`${isSuperDense ? 'text-[9px]' : isUltraDenseAward ? 'text-[10px]' : isCompactAward ? 'text-sm' : isSingleAward ? 'text-xl sm:text-2xl lg:text-[2rem]' : 'text-xl'} text-cyan-300 font-mono tracking-widest ${isSuperDense ? 'mb-1.5' : isSingleAward ? 'mb-6' : 'mb-4'} uppercase relative z-10`}>Training Milestone</h2>
 
                             {/* Avatar + Ship + Pet */}
                             <motion.div
@@ -2394,20 +2417,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                     duration: 4,
                                     ease: "easeInOut"
                                 }}
-                                className={`relative z-10 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : 'mb-6'}`}
+                                className={`relative z-10 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : isSingleAward ? 'mb-8' : 'mb-6'}`}
                             >
-                                <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-32 h-12' : isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isCompactAward ? 'w-56 h-24' : 'w-80 h-36'}`}>
+                                <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-32 h-12' : isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isCompactAward ? 'w-56 h-24' : isSingleAward ? 'w-[18rem] h-[10rem] sm:w-[24rem] sm:h-[14rem] lg:w-[30rem] lg:h-[17rem]' : 'w-80 h-36'}`}>
                                     {award.ship.flag && (
-                                        <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : '-top-3 right-[38%] scale-95'}`}>
+                                        <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : isSingleAward ? '-top-3 right-[41%] scale-95 sm:scale-110' : '-top-3 right-[38%] scale-95'}`}>
                                             <TinyFlag config={award.ship.flag} />
                                         </div>
                                     )}
 
-                                    <div className={`absolute left-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
+                                    <div className={`absolute left-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[90px] h-[90px] top-[62%] -translate-y-1/2 sm:w-[112px] sm:h-[112px] lg:w-[126px] lg:h-[126px]' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
                                         <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full" />
                                     </div>
 
-                                    <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : 'w-40 h-40'}`}>
+                                    <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : isSingleAward ? 'w-44 h-44 sm:w-56 sm:h-56 lg:w-60 lg:h-60' : 'w-40 h-40'}`}>
                                         <img 
                                             src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))} 
                                             onError={(event) => {
@@ -2419,7 +2442,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                         />
                                     </div>
 
-                                    <div className={`absolute right-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
+                                    <div className={`absolute right-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[82px] h-[82px] top-[62%] -translate-y-1/2 sm:w-[98px] sm:h-[98px] lg:w-[114px] lg:h-[114px]' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
                                         {selectedPet.imageSrc ? (
                                             <img
                                                 src={getAssetPath(selectedPet.imageSrc)}
@@ -2427,38 +2450,38 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                 className="w-full h-full object-contain"
                                             />
                                         ) : (
-                                            <span className={`${isCompactAward ? 'text-xl' : 'text-2xl'} leading-none`}>{selectedPet.emoji}</span>
+                                            <span className={`${isCompactAward ? 'text-xl' : isSingleAward ? 'text-3xl sm:text-4xl' : 'text-2xl'} leading-none`}>{selectedPet.emoji}</span>
                                         )}
                                     </div>
                                 </div>
                             </motion.div>
 
-                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.1rem] mb-3' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
+                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.55rem] sm:text-5xl lg:text-6xl mb-4' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
                                 {award.ship.cadetName}
                             </div>
                             
                             {award.reason && (
-                                <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[8px]' : isUltraDenseAward ? 'text-[9px]' : isCompactAward ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : 'mb-6'} relative z-10`}>
+                                <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[8px]' : isUltraDenseAward ? 'text-[9px]' : isCompactAward ? 'text-xs' : isSingleAward ? 'text-base sm:text-lg' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : isSingleAward ? 'mb-8' : 'mb-6'} relative z-10`}>
                                     {award.reason}
                                 </div>
                             )}
 
-                            {!award.reason && <div className={isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : 'mb-6'} />}
+                            {!award.reason && <div className={isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : isSingleAward ? 'mb-8' : 'mb-6'} />}
 
                             <div className={`flex items-center justify-center ${isSuperDense ? 'gap-2' : 'gap-4'} w-full relative z-10`}>
-                                <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-green-500/30`}>
+                                <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg' : isSingleAward ? 'p-4 sm:p-5 rounded-2xl' : 'p-3 rounded-xl'} border border-green-500/30`}>
                                     <span className={`block text-green-400 ${isSuperDense ? 'text-[8px]' : 'text-[10px]'} font-bold uppercase tracking-wider mb-1`}>XP Gained</span>
-                                    <span className={`${isUltraDenseAward ? 'text-lg' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
+                                    <span className={`${isUltraDenseAward ? 'text-lg' : isSingleAward ? 'text-4xl sm:text-5xl' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
                                 </div>
 
                                 {award.newRank && (
                                 <motion.div 
                                         animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
                                         transition={{ repeat: Infinity, duration: 1.5 }}
-                                        className="flex-1 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 p-3 rounded-xl border border-yellow-500/50 flex flex-col items-center gap-1 shadow-[0_0_30px_rgba(234,179,8,0.4)] relative overflow-hidden"
+                                        className={`flex-1 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 ${isSingleAward ? 'p-4 sm:p-5 rounded-2xl' : 'p-3 rounded-xl'} border border-yellow-500/50 flex flex-col items-center gap-1 shadow-[0_0_30px_rgba(234,179,8,0.4)] relative overflow-hidden`}
                                 >
                                     <div className="absolute inset-0 bg-yellow-400/10 animate-pulse" />
-                                    <span className="block text-yellow-300 text-[10px] font-black uppercase tracking-widest relative z-10">PROMOTION!</span>
+                                    <span className={`block text-yellow-300 ${isSingleAward ? 'text-xs sm:text-sm' : 'text-[10px]'} font-black uppercase tracking-widest relative z-10`}>PROMOTION!</span>
                                     {(() => {
                                         const r = ranks.find(rk => rk.name === award.newRank);
                                         return r?.image && (
@@ -2468,11 +2491,11 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                                                     transition={{ type: "spring", bounce: 0.6 }}
                                                     src={getAssetPath(r.image)} 
                                                     alt="Rank Badge" 
-                                                    className="w-16 h-16 object-contain my-1 drop-shadow-[0_0_20px_rgba(234,179,8,0.8)] relative z-10" 
+                                                    className={`${isSingleAward ? 'w-20 h-20 sm:w-24 sm:h-24' : 'w-16 h-16'} object-contain my-1 drop-shadow-[0_0_20px_rgba(234,179,8,0.8)] relative z-10`} 
                                             />
                                         );
                                     })()}
-                                    <span className="block text-sm font-black text-yellow-100 truncate w-full text-center relative z-10">{award.newRank}</span>
+                                    <span className={`${isSingleAward ? 'text-base sm:text-lg' : 'text-sm'} block font-black text-yellow-100 truncate w-full text-center relative z-10`}>{award.newRank}</span>
                                 </motion.div>
                                 )}
                             </div>
@@ -2491,9 +2514,20 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: -20 }}
                             transition={{ type: "spring", stiffness: 220, damping: 18 }}
-                            className="absolute inset-0 z-[380] flex items-center justify-center pointer-events-none"
+                            className="absolute inset-0 z-[380] flex items-center justify-center pointer-events-auto"
                         >
-                            <div className="relative w-[760px] max-w-[92vw] bg-black/95 border-2 border-fuchsia-400 rounded-3xl shadow-[0_0_80px_rgba(217,70,239,0.7)] p-8 overflow-hidden">
+                            <div className="relative w-[760px] max-w-[92vw] bg-black/95 border-2 border-fuchsia-400 rounded-3xl shadow-[0_0_80px_rgba(217,70,239,0.7)] p-8 overflow-hidden" onClick={(event) => event.stopPropagation()}>
+                                <button
+                                    type="button"
+                                    aria-label="Close unlock reveal"
+                                    className="absolute right-3 top-3 z-20 rounded-full border border-fuchsia-200/70 bg-black/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-fuchsia-100 hover:bg-black/80"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        dismissCurrentOverlay();
+                                    }}
+                                >
+                                    Close
+                                </button>
                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-fuchsia-700/40 via-purple-800/10 to-transparent" />
                                 <motion.div
                                     initial={{ scale: 0.95, opacity: 0 }}
