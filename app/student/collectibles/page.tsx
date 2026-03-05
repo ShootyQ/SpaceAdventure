@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, doc, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getAssetPath } from "@/lib/utils";
 import { PLANETS } from "@/types";
 import { AVATAR_OPTIONS } from "@/components/UserAvatar";
@@ -26,6 +26,7 @@ import {
     type PetUnlockAssignment,
     type PetUnlockChanceConfig,
 } from "@/lib/pets";
+import { isXpUnlockEarned, normalizeXpUnlockProgressMap, syncXpUnlockProgressForRules } from "@/lib/xp-unlock-progress";
 
 type EntryType = "ship" | "avatar" | "pet";
 
@@ -110,7 +111,7 @@ const getRuleEarnedBy = ({
     if (channel === "chance") return formatDropLabel(rule.rarity);
 
     if (requiredXP > 0) {
-        return `XP Unlock at ${requiredXP.toLocaleString()} XP`;
+        return `XP Unlock after +${requiredXP.toLocaleString()} XP`;
     }
     return "XP Unlock";
 };
@@ -121,8 +122,15 @@ export default function StudentCollectiblesBookPage() {
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const [planetShipUnlocks, setPlanetShipUnlocks] = useState<PlanetUnlockMap>({});
     const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<PlanetUnlockMap>({});
+    const [planetShipUnlockConfiguredAt, setPlanetShipUnlockConfiguredAt] = useState<PlanetUnlockMap>({});
+    const [planetAvatarUnlockConfiguredAt, setPlanetAvatarUnlockConfiguredAt] = useState<PlanetUnlockMap>({});
+    const [xpUnlockProgress, setXpUnlockProgress] = useState(() => normalizeXpUnlockProgressMap(userData?.xpUnlockProgress || {}));
     const [petUnlockAssignments, setPetUnlockAssignments] = useState<Record<string, PetUnlockAssignment>>({});
     const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
+
+    useEffect(() => {
+        setXpUnlockProgress(normalizeXpUnlockProgressMap(userData?.xpUnlockProgress || {}));
+    }, [userData?.xpUnlockProgress]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "unlocks"), (snapshot) => {
@@ -147,12 +155,16 @@ export default function StudentCollectiblesBookPage() {
         if (!teacherId) {
             setPlanetShipUnlocks({});
             setPlanetAvatarUnlocks({});
+            setPlanetShipUnlockConfiguredAt({});
+            setPlanetAvatarUnlockConfiguredAt({});
             return;
         }
 
         const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snapshot) => {
             const nextShipUnlocks: PlanetUnlockMap = {};
             const nextAvatarUnlocks: PlanetUnlockMap = {};
+            const nextShipConfiguredAt: PlanetUnlockMap = {};
+            const nextAvatarConfiguredAt: PlanetUnlockMap = {};
 
             snapshot.forEach((planetDoc) => {
                 const planetId = normalizePlanetId(planetDoc.id);
@@ -161,6 +173,8 @@ export default function StudentCollectiblesBookPage() {
                 const data = (planetDoc.data() as any) || {};
                 const rawShipUnlocks = (data?.unlocks?.ships || {}) as Record<string, unknown>;
                 const rawAvatarUnlocks = (data?.unlocks?.avatars || {}) as Record<string, unknown>;
+                const rawShipConfiguredAt = (data?.unlockConfiguredAt?.ships || {}) as Record<string, unknown>;
+                const rawAvatarConfiguredAt = (data?.unlockConfiguredAt?.avatars || {}) as Record<string, unknown>;
 
                 const normalizedShipUnlocks: Record<string, number> = {};
                 Object.entries(rawShipUnlocks).forEach(([key, value]) => {
@@ -174,16 +188,63 @@ export default function StudentCollectiblesBookPage() {
                     if (threshold > 0) normalizedAvatarUnlocks[key] = threshold;
                 });
 
+                const normalizedShipConfiguredAt: Record<string, number> = {};
+                Object.entries(rawShipConfiguredAt).forEach(([key, value]) => {
+                    const timestamp = Math.floor(Number(value || 0));
+                    if (timestamp > 0) normalizedShipConfiguredAt[key] = timestamp;
+                });
+
+                const normalizedAvatarConfiguredAt: Record<string, number> = {};
+                Object.entries(rawAvatarConfiguredAt).forEach(([key, value]) => {
+                    const timestamp = Math.floor(Number(value || 0));
+                    if (timestamp > 0) normalizedAvatarConfiguredAt[key] = timestamp;
+                });
+
                 nextShipUnlocks[planetId] = normalizedShipUnlocks;
                 nextAvatarUnlocks[planetId] = normalizedAvatarUnlocks;
+                nextShipConfiguredAt[planetId] = normalizedShipConfiguredAt;
+                nextAvatarConfiguredAt[planetId] = normalizedAvatarConfiguredAt;
             });
 
             setPlanetShipUnlocks(nextShipUnlocks);
             setPlanetAvatarUnlocks(nextAvatarUnlocks);
+            setPlanetShipUnlockConfiguredAt(nextShipConfiguredAt);
+            setPlanetAvatarUnlockConfiguredAt(nextAvatarConfiguredAt);
         });
 
         return () => unsub();
     }, [userData?.role, userData?.teacherId, userData?.uid]);
+
+    useEffect(() => {
+        if (!userData?.uid) return;
+
+        const shipSync = syncXpUnlockProgressForRules({
+            progress: xpUnlockProgress,
+            rules: getXpUnlockRules(unlockConfig.ships || []),
+            unlockThresholds: planetShipUnlocks,
+            domain: "ship",
+            planetXP: userData?.planetXP as Record<string, number> | undefined,
+            unlockConfiguredAt: planetShipUnlockConfiguredAt,
+            readPlanetXpValue,
+        });
+
+        const avatarSync = syncXpUnlockProgressForRules({
+            progress: shipSync.nextProgress,
+            rules: getXpUnlockRules(unlockConfig.avatars || []),
+            unlockThresholds: planetAvatarUnlocks,
+            domain: "avatar",
+            planetXP: userData?.planetXP as Record<string, number> | undefined,
+            unlockConfiguredAt: planetAvatarUnlockConfiguredAt,
+            readPlanetXpValue,
+        });
+
+        if (!shipSync.changed && !avatarSync.changed) return;
+
+        setXpUnlockProgress(avatarSync.nextProgress);
+        updateDoc(doc(db, "users", userData.uid), { xpUnlockProgress: avatarSync.nextProgress }).catch((error) => {
+            console.error("Failed to sync collectibles XP unlock progress:", error);
+        });
+    }, [planetAvatarUnlockConfiguredAt, planetAvatarUnlocks, planetShipUnlockConfiguredAt, planetShipUnlocks, unlockConfig.avatars, unlockConfig.ships, userData?.planetXP, userData?.uid, xpUnlockProgress]);
 
     const shipCatalogIds = useMemo(() => new Set(SHIP_OPTIONS.map((ship) => ship.id)), []);
     const avatarCatalogIds = useMemo(() => new Set(AVATAR_OPTIONS.map((avatar) => avatar.id)), []);
@@ -210,13 +271,21 @@ export default function StudentCollectiblesBookPage() {
             const planetId = normalizePlanetId(rule.planetId);
             const requiredXP = Number(planetShipUnlocks?.[planetId]?.[rule.unlockKey] || 0);
             const currentPlanetXP = readPlanetXpValue(userData?.planetXP as Record<string, number> | undefined, planetId);
-            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+            if (isXpUnlockEarned({
+                progress: xpUnlockProgress,
+                planetId,
+                unlockKey: rule.unlockKey,
+                domain: "ship",
+                requiredXP,
+                currentPlanetXP,
+                configuredAt: Number(planetShipUnlockConfiguredAt?.[planetId]?.[rule.unlockKey] || 0),
+            })) {
                 unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, shipCatalogIds));
             }
         });
 
         return unlocked;
-    }, [planetShipUnlocks, shipCatalogIds, unlockConfig.idAliases, unlockConfig.ships, unlockConfig.starters?.ships, userData?.planetXP, userData?.purchasedShopItemIds, userData?.shopUnlockedShipIds, userData?.spaceship?.id, userData?.spaceship?.modelId]);
+    }, [planetShipUnlockConfiguredAt, planetShipUnlocks, shipCatalogIds, unlockConfig.idAliases, unlockConfig.ships, unlockConfig.starters?.ships, userData?.planetXP, userData?.purchasedShopItemIds, userData?.shopUnlockedShipIds, userData?.spaceship?.id, userData?.spaceship?.modelId, xpUnlockProgress]);
 
     const unlockedAvatarIds = useMemo(() => {
         const idAliases = unlockConfig.idAliases;
@@ -240,13 +309,21 @@ export default function StudentCollectiblesBookPage() {
             const planetId = normalizePlanetId(rule.planetId);
             const requiredXP = Number(planetAvatarUnlocks?.[planetId]?.[rule.unlockKey] || 0);
             const currentPlanetXP = readPlanetXpValue(userData?.planetXP as Record<string, number> | undefined, planetId);
-            if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+            if (isXpUnlockEarned({
+                progress: xpUnlockProgress,
+                planetId,
+                unlockKey: rule.unlockKey,
+                domain: "avatar",
+                requiredXP,
+                currentPlanetXP,
+                configuredAt: Number(planetAvatarUnlockConfiguredAt?.[planetId]?.[rule.unlockKey] || 0),
+            })) {
                 unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, avatarCatalogIds));
             }
         });
 
         return unlocked;
-    }, [avatarCatalogIds, planetAvatarUnlocks, unlockConfig.avatars, unlockConfig.idAliases, unlockConfig.starters?.avatars, userData?.avatar?.avatarId, userData?.planetXP, userData?.purchasedShopItemIds, userData?.shopUnlockedAvatarIds]);
+    }, [avatarCatalogIds, planetAvatarUnlockConfiguredAt, planetAvatarUnlocks, unlockConfig.avatars, unlockConfig.idAliases, unlockConfig.starters?.avatars, userData?.avatar?.avatarId, userData?.planetXP, userData?.purchasedShopItemIds, userData?.shopUnlockedAvatarIds, xpUnlockProgress]);
 
     const unlockedPetIds = useMemo(() => {
         const unlocked = getEffectiveUnlockedPetIds(userData || null);

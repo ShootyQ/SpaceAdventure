@@ -2,6 +2,7 @@ import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getEffectiveUnlockedPetIds, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
 import { SHIP_OPTIONS } from "@/lib/ships";
 import { getXpUnlockRules, resolveRuntimeUnlockId, type UnlockConfig } from "@/lib/unlocks";
+import { isXpUnlockEarned, normalizeXpUnlockProgressMap } from "@/lib/xp-unlock-progress";
 import { PLANETS, type UserData } from "@/types";
 
 export type AchievementCategory = "collection" | "exploration" | "rarity";
@@ -236,6 +237,7 @@ const resolveUnlockedShipIds = ({
 }) => {
     const idAliases = unlockConfig.idAliases;
     const shipCatalogIds = new Set(SHIP_OPTIONS.map((ship) => ship.id));
+    const xpUnlockProgress = normalizeXpUnlockProgressMap((userData as any)?.xpUnlockProgress || {});
     const unlocked = new Set<string>();
 
     (unlockConfig.starters?.ships || []).forEach((id) => {
@@ -256,7 +258,14 @@ const resolveUnlockedShipIds = ({
         const planetId = normalizePlanetId(rule.planetId);
         const requiredXP = Number(planetShipUnlocks?.[planetId]?.[rule.unlockKey] || 0);
         const currentPlanetXP = readPlanetXpValue(userData.planetXP as Record<string, number> | undefined, planetId);
-        if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+        if (isXpUnlockEarned({
+            progress: xpUnlockProgress,
+            planetId,
+            unlockKey: rule.unlockKey,
+            domain: "ship",
+            requiredXP,
+            currentPlanetXP,
+        })) {
             unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, shipCatalogIds));
         }
     });
@@ -275,6 +284,7 @@ const resolveUnlockedAvatarIds = ({
 }) => {
     const idAliases = unlockConfig.idAliases;
     const avatarCatalogIds = new Set(AVATAR_OPTIONS.map((avatar) => avatar.id));
+    const xpUnlockProgress = normalizeXpUnlockProgressMap((userData as any)?.xpUnlockProgress || {});
     const unlocked = new Set<string>();
 
     (unlockConfig.starters?.avatars || []).forEach((id) => {
@@ -295,7 +305,14 @@ const resolveUnlockedAvatarIds = ({
         const planetId = normalizePlanetId(rule.planetId);
         const requiredXP = Number(planetAvatarUnlocks?.[planetId]?.[rule.unlockKey] || 0);
         const currentPlanetXP = readPlanetXpValue(userData.planetXP as Record<string, number> | undefined, planetId);
-        if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+        if (isXpUnlockEarned({
+            progress: xpUnlockProgress,
+            planetId,
+            unlockKey: rule.unlockKey,
+            domain: "avatar",
+            requiredXP,
+            currentPlanetXP,
+        })) {
             unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, avatarCatalogIds));
         }
     });

@@ -25,6 +25,7 @@ import {
     rollPetUnlocksForXpEvent,
 } from "@/lib/pets";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, type UnlockRule } from "@/lib/unlocks";
+import { isXpUnlockEarned, normalizeXpUnlockProgressMap } from "@/lib/xp-unlock-progress";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -668,6 +669,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
             flag: data.flag,
             visitedPlanets: data.visitedPlanets || [],
             planetXP: data.planetXP || {},
+            xpUnlockProgress: data.xpUnlockProgress || {},
             unlockedPetIds: data.unlockedPetIds || [],
             selectedPetId: data.selectedPetId
         };
@@ -680,6 +682,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
         fleet.forEach(shipData => {
                let unlockedPetIdsThisPass: string[] = [];
             const planetXPMap = ((shipData as any)?.planetXP || {}) as Record<string, number>;
+            const xpUnlockProgress = normalizeXpUnlockProgressMap((shipData as any)?.xpUnlockProgress || {});
 
             const eligibleShipUnlockKeys = Array.from(new Set(
                 shipXpUnlockRulesRef.current
@@ -688,7 +691,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         if (!rulePlanetId) return false;
                         const threshold = Number(dynamicPlanetsRef.current.get(rulePlanetId)?.unlocks?.ships?.[rule.unlockKey] || 0);
                         if (threshold <= 0) return false;
-                        return readPlanetXpValue(planetXPMap, rulePlanetId) >= threshold;
+                        const currentPlanetXP = readPlanetXpValue(planetXPMap, rulePlanetId);
+                        return isXpUnlockEarned({
+                            progress: xpUnlockProgress,
+                            planetId: rulePlanetId,
+                            unlockKey: rule.unlockKey,
+                            domain: "ship",
+                            requiredXP: threshold,
+                            currentPlanetXP,
+                        });
                     })
                     .map((rule) => String(rule.unlockKey || "").trim())
                     .filter(Boolean)
@@ -701,7 +712,15 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
                         if (!rulePlanetId) return false;
                         const threshold = Number(dynamicPlanetsRef.current.get(rulePlanetId)?.unlocks?.avatars?.[rule.unlockKey] || 0);
                         if (threshold <= 0) return false;
-                        return readPlanetXpValue(planetXPMap, rulePlanetId) >= threshold;
+                        const currentPlanetXP = readPlanetXpValue(planetXPMap, rulePlanetId);
+                        return isXpUnlockEarned({
+                            progress: xpUnlockProgress,
+                            planetId: rulePlanetId,
+                            unlockKey: rule.unlockKey,
+                            domain: "avatar",
+                            requiredXP: threshold,
+                            currentPlanetXP,
+                        });
                     })
                     .map((rule) => String(rule.unlockKey || "").trim())
                     .filter(Boolean)
@@ -767,7 +786,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                                 const oldPlanetXP = readPlanetXpValue(previousPlanetXPMap, rulePlanetId);
                                 const newPlanetXP = readPlanetXpValue(currentPlanetXPMap, rulePlanetId);
-                                return oldPlanetXP < threshold && newPlanetXP >= threshold;
+                                return !isXpUnlockEarned({
+                                    progress: xpUnlockProgress,
+                                    planetId: rulePlanetId,
+                                    unlockKey: rule.unlockKey,
+                                    domain: "ship",
+                                    requiredXP: threshold,
+                                    currentPlanetXP: oldPlanetXP,
+                                }) && isXpUnlockEarned({
+                                    progress: xpUnlockProgress,
+                                    planetId: rulePlanetId,
+                                    unlockKey: rule.unlockKey,
+                                    domain: "ship",
+                                    requiredXP: threshold,
+                                    currentPlanetXP: newPlanetXP,
+                                });
                             })
                             .map((rule) => String(rule.unlockKey || "").trim())
                             .filter(Boolean)
@@ -785,7 +818,21 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
                                 const oldPlanetXP = readPlanetXpValue(previousPlanetXPMap, rulePlanetId);
                                 const newPlanetXP = readPlanetXpValue(currentPlanetXPMap, rulePlanetId);
-                                return oldPlanetXP < threshold && newPlanetXP >= threshold;
+                                return !isXpUnlockEarned({
+                                    progress: xpUnlockProgress,
+                                    planetId: rulePlanetId,
+                                    unlockKey: rule.unlockKey,
+                                    domain: "avatar",
+                                    requiredXP: threshold,
+                                    currentPlanetXP: oldPlanetXP,
+                                }) && isXpUnlockEarned({
+                                    progress: xpUnlockProgress,
+                                    planetId: rulePlanetId,
+                                    unlockKey: rule.unlockKey,
+                                    domain: "avatar",
+                                    requiredXP: threshold,
+                                    currentPlanetXP: newPlanetXP,
+                                });
                             })
                             .map((rule) => String(rule.unlockKey || "").trim())
                             .filter(Boolean)

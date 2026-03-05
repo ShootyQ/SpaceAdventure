@@ -136,6 +136,7 @@ export interface UserData {
     lastXpReason?: string;
     visitedPlanets?: string[];
     planetXP?: Record<string, number>; // XP earned per planet (for unlocks)
+    xpUnlockProgress?: Record<string, Record<string, { baselineXP: number; requiredXP: number }>>;
     unlockedHats?: string[];
     completedMissions?: string[];
     missionProgress?: Record<string, MissionProgress>;
@@ -195,6 +196,7 @@ export interface Ship {
     flag?: FlagConfig;
     visitedPlanets?: string[];
     planetXP?: Record<string, number>;
+    xpUnlockProgress?: Record<string, Record<string, { baselineXP: number; requiredXP: number }>>;
     unlockedPetIds?: string[];
     selectedPetId?: string;
 }

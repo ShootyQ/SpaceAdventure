@@ -14,6 +14,7 @@ import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib
 import { UserAvatar } from "@/components/UserAvatar";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, type UnlockRule } from "@/lib/unlocks";
+import { isXpUnlockEarned, normalizeXpUnlockProgressMap, syncXpUnlockProgressForRules, type XpUnlockProgressMap } from "@/lib/xp-unlock-progress";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -64,6 +65,8 @@ const buildUnlockedShipIdSet = ({
     currentShipId,
     shipXpUnlockRules,
     planetShipUnlocks,
+    planetShipUnlockConfiguredAt,
+    xpUnlockProgress,
     planetXP,
     idAliases,
     shipCatalogIds,
@@ -74,6 +77,8 @@ const buildUnlockedShipIdSet = ({
     currentShipId?: string;
     shipXpUnlockRules: UnlockRule[];
     planetShipUnlocks: Record<string, Record<string, number>>;
+    planetShipUnlockConfiguredAt: Record<string, Record<string, number>>;
+    xpUnlockProgress: XpUnlockProgressMap;
     planetXP?: Record<string, number>;
     idAliases?: Record<string, string>;
     shipCatalogIds: Set<string>;
@@ -97,7 +102,15 @@ const buildUnlockedShipIdSet = ({
         const normalizedPlanetId = normalizePlanetId(rule.planetId);
         const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
         const requiredXP = Number(planetShipUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
-        if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+        if (isXpUnlockEarned({
+            progress: xpUnlockProgress,
+            planetId: normalizedPlanetId,
+            unlockKey: rule.unlockKey,
+            domain: "ship",
+            requiredXP,
+            currentPlanetXP,
+            configuredAt: Number(planetShipUnlockConfiguredAt?.[normalizedPlanetId]?.[rule.unlockKey] || 0),
+        })) {
             unlocked.add(resolveRuntimeUnlockId(rule.id, idAliases, shipCatalogIds));
         }
     });
@@ -856,7 +869,7 @@ export default function SettingsPage() {
     const [view, setView] = useState<'cockpit' | 'ship' | 'inventory' | 'flag'>('cockpit');
     const [ranks, setRanks] = useState<Rank[]>(DEFAULT_RANKS);
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
-    const SHIP_XP_UNLOCK_RULES = getXpUnlockRules(unlockConfig.ships);
+    const SHIP_XP_UNLOCK_RULES = useMemo(() => getXpUnlockRules(unlockConfig.ships), [unlockConfig.ships]);
     const shipCatalogIds = useMemo(() => new Set<string>(SHIP_OPTIONS.map((ship) => ship.id)), []);
     const STARTER_SHIP_IDS = useMemo(() => {
         const starters = unlockConfig.starters?.ships?.length ? unlockConfig.starters.ships : ["finalship"];
@@ -864,7 +877,13 @@ export default function SettingsPage() {
         return Array.from(new Set<string>(resolved.filter(Boolean)));
     }, [unlockConfig.starters?.ships, unlockConfig.idAliases, shipCatalogIds]);
     const [planetShipUnlocks, setPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
+    const [planetShipUnlockConfiguredAt, setPlanetShipUnlockConfiguredAt] = useState<Record<string, Record<string, number>>>({});
+    const [xpUnlockProgress, setXpUnlockProgress] = useState<XpUnlockProgressMap>(() => normalizeXpUnlockProgressMap(userData?.xpUnlockProgress || {}));
     const [unlockedShipIds, setUnlockedShipIds] = useState<Set<string>>(new Set(STARTER_SHIP_IDS));
+
+    useEffect(() => {
+        setXpUnlockProgress(normalizeXpUnlockProgressMap(userData?.xpUnlockProgress || {}));
+    }, [userData?.xpUnlockProgress]);
 
     useEffect(() => {
         const requestedView = String(searchParams?.get("view") || "").toLowerCase();
@@ -913,26 +932,37 @@ export default function SettingsPage() {
         const teacherId = userData?.teacherId;
         if (!teacherId) {
             setPlanetShipUnlocks({});
+            setPlanetShipUnlockConfiguredAt({});
             return;
         }
 
         const unsub = onSnapshot(collection(db, `users/${teacherId}/planets`), (snap) => {
             const shipMap: Record<string, Record<string, number>> = {};
+            const shipConfiguredAtMap: Record<string, Record<string, number>> = {};
             snap.forEach((d) => {
                 const data = d.data() as any;
                 const rawShipUnlocks = data?.unlocks?.ships || {};
+                const rawShipConfiguredAt = data?.unlockConfiguredAt?.ships || {};
                 const normalizedShips: Record<string, number> = {};
+                const normalizedShipConfiguredAt: Record<string, number> = {};
 
                 Object.keys(rawShipUnlocks).forEach((key) => {
                     const threshold = Number(rawShipUnlocks[key] || 0);
                     if (threshold > 0) normalizedShips[key] = threshold;
                 });
 
+                Object.keys(rawShipConfiguredAt).forEach((key) => {
+                    const timestamp = Math.floor(Number(rawShipConfiguredAt[key] || 0));
+                    if (timestamp > 0) normalizedShipConfiguredAt[key] = timestamp;
+                });
+
                 const normalizedPlanetId = normalizePlanetId(d.id);
                 shipMap[normalizedPlanetId] = normalizedShips;
+                shipConfiguredAtMap[normalizedPlanetId] = normalizedShipConfiguredAt;
             });
 
             setPlanetShipUnlocks(shipMap);
+            setPlanetShipUnlockConfiguredAt(shipConfiguredAtMap);
         });
 
         return () => unsub();
@@ -946,13 +976,36 @@ export default function SettingsPage() {
             currentShipId: userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship",
             shipXpUnlockRules: SHIP_XP_UNLOCK_RULES,
             planetShipUnlocks,
+            planetShipUnlockConfiguredAt,
+            xpUnlockProgress,
             planetXP: userData?.planetXP as Record<string, number> | undefined,
             idAliases: unlockConfig.idAliases,
             shipCatalogIds,
         });
 
         setUnlockedShipIds(unlocked);
-    }, [planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds, unlockConfig.idAliases, shipCatalogIds]);
+    }, [planetShipUnlockConfiguredAt, planetShipUnlocks, userData?.planetXP, userData?.spaceship?.id, userData?.spaceship?.modelId, userData?.shopUnlockedShipIds, userData?.purchasedShopItemIds, unlockConfig.idAliases, shipCatalogIds, xpUnlockProgress]);
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const shipSync = syncXpUnlockProgressForRules({
+            progress: xpUnlockProgress,
+            rules: SHIP_XP_UNLOCK_RULES,
+            unlockThresholds: planetShipUnlocks,
+            domain: "ship",
+            planetXP: userData?.planetXP as Record<string, number> | undefined,
+            unlockConfiguredAt: planetShipUnlockConfiguredAt,
+            readPlanetXpValue,
+        });
+
+        if (!shipSync.changed) return;
+
+        setXpUnlockProgress(shipSync.nextProgress);
+        updateDoc(doc(db, "users", user.uid), { xpUnlockProgress: shipSync.nextProgress }).catch((error) => {
+            console.error("Failed to sync ship XP unlock progress:", error);
+        });
+    }, [SHIP_XP_UNLOCK_RULES, planetShipUnlockConfiguredAt, planetShipUnlocks, user?.uid, userData?.planetXP, xpUnlockProgress]);
 
     // Breadcrumb / Title Logic
     const getTitle = () => {
