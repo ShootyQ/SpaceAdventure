@@ -12,10 +12,10 @@ export type AchievementMetric =
     | "ships_owned_excluding_starters"
     | "avatars_owned_excluding_starters"
     | "planets_landed_excluding_sun"
-    | "has_common_collectible"
-    | "has_uncommon_collectible"
-    | "has_rare_collectible"
-    | "has_extremely_rare_collectible";
+    | "common_collectibles_owned"
+    | "uncommon_collectibles_owned"
+    | "rare_collectibles_owned"
+    | "extremely_rare_collectibles_owned";
 
 export interface AchievementDefinition {
     id: string;
@@ -122,12 +122,34 @@ const buildCollectionTierDefinitions = ({
     description: string;
     metric: AchievementMetric;
 }): AchievementDefinition[] => {
-    const thresholds = [10, 20, 30, 40];
+    const thresholds = [1, 5, 10, 20];
     return thresholds.map((threshold, index) => ({
         id: `${prefix}-${threshold}`,
         title: `${title} ${index + 1}`,
         description: `${description} (${threshold})`,
         category: "collection",
+        metric,
+        threshold,
+        tier: index + 1,
+        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
+    }));
+};
+
+const buildRarityTierDefinitions = ({
+    prefix,
+    title,
+    metric,
+}: {
+    prefix: string;
+    title: string;
+    metric: AchievementMetric;
+}): AchievementDefinition[] => {
+    const thresholds = [1, 5, 10, 20];
+    return thresholds.map((threshold, index) => ({
+        id: `${prefix}-${threshold}`,
+        title: `${title} ${index + 1}`,
+        description: `Own ${threshold} ${title.replace(" Collector", "")} collectibles`,
+        category: "rarity",
         metric,
         threshold,
         tier: index + 1,
@@ -184,46 +206,26 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
         tier: 3,
         badgeImage: COLLECTION_BADGE_PLACEHOLDER,
     },
-    {
-        id: "rarity-common",
+    ...buildRarityTierDefinitions({
+        prefix: "rarity-common",
         title: "Common Collector",
-        description: "Own at least one Common collectible",
-        category: "rarity",
-        metric: "has_common_collectible",
-        threshold: 1,
-        tier: 1,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
-    },
-    {
-        id: "rarity-uncommon",
+        metric: "common_collectibles_owned",
+    }),
+    ...buildRarityTierDefinitions({
+        prefix: "rarity-uncommon",
         title: "Uncommon Collector",
-        description: "Own at least one Uncommon collectible",
-        category: "rarity",
-        metric: "has_uncommon_collectible",
-        threshold: 1,
-        tier: 2,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
-    },
-    {
-        id: "rarity-rare",
+        metric: "uncommon_collectibles_owned",
+    }),
+    ...buildRarityTierDefinitions({
+        prefix: "rarity-rare",
         title: "Rare Collector",
-        description: "Own at least one Rare collectible",
-        category: "rarity",
-        metric: "has_rare_collectible",
-        threshold: 1,
-        tier: 3,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
-    },
-    {
-        id: "rarity-extremely-rare",
+        metric: "rare_collectibles_owned",
+    }),
+    ...buildRarityTierDefinitions({
+        prefix: "rarity-extremely-rare",
         title: "Extremely Rare Collector",
-        description: "Own at least one Extremely Rare collectible",
-        category: "rarity",
-        metric: "has_extremely_rare_collectible",
-        threshold: 1,
-        tier: 4,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
-    },
+        metric: "extremely_rare_collectibles_owned",
+    }),
 ];
 
 const resolveUnlockedShipIds = ({
@@ -349,20 +351,27 @@ export const resolveAchievementMetrics = ({
     const ownedNonStarterAvatarCount = Array.from(unlockedAvatarIds).filter((id) => !starterAvatarIds.has(String(id || "").toLowerCase())).length;
     const ownedNonStarterPetCount = Array.from(unlockedPetIds).filter((id) => !starterPetIds.has(String(id || "").toLowerCase())).length;
 
-    const collectibleRarities = new Set<CollectibleRarity>();
+    const rarityCounts: Record<CollectibleRarity, number> = {
+        common: 0,
+        uncommon: 0,
+        rare: 0,
+        "extremely-rare": 0,
+    };
 
     Array.from(unlockedPetIds).forEach((petId) => {
         const pet = PET_OPTIONS.find((option) => option.id === petId);
         const rarity = pet ? resolveCatalogRarity(pet.rarity) : resolveRarityFromText(String(petId || ""));
-        if (rarity) collectibleRarities.add(rarity);
+        if (rarity) rarityCounts[rarity] += 1;
     });
 
     Array.from(unlockedShipIds).forEach((shipId) => {
-        collectibleRarities.add(resolveShipRarity(String(shipId || "")));
+        const rarity = resolveShipRarity(String(shipId || ""));
+        rarityCounts[rarity] += 1;
     });
 
     Array.from(unlockedAvatarIds).forEach((avatarId) => {
-        collectibleRarities.add(resolveAvatarRarity(String(avatarId || "")));
+        const rarity = resolveAvatarRarity(String(avatarId || ""));
+        rarityCounts[rarity] += 1;
     });
 
     const visitedPlanets = new Set(
@@ -376,10 +385,10 @@ export const resolveAchievementMetrics = ({
         ships_owned_excluding_starters: Math.max(0, ownedNonStarterShipCount),
         avatars_owned_excluding_starters: Math.max(0, ownedNonStarterAvatarCount),
         planets_landed_excluding_sun: visitedPlanets.size,
-        has_common_collectible: collectibleRarities.has("common") ? 1 : 0,
-        has_uncommon_collectible: collectibleRarities.has("uncommon") ? 1 : 0,
-        has_rare_collectible: collectibleRarities.has("rare") ? 1 : 0,
-        has_extremely_rare_collectible: collectibleRarities.has("extremely-rare") ? 1 : 0,
+        common_collectibles_owned: Math.max(0, rarityCounts.common),
+        uncommon_collectibles_owned: Math.max(0, rarityCounts.uncommon),
+        rare_collectibles_owned: Math.max(0, rarityCounts.rare),
+        extremely_rare_collectibles_owned: Math.max(0, rarityCounts["extremely-rare"]),
     };
 };
 

@@ -18,6 +18,20 @@ import {
 import { DEFAULT_UNLOCK_CONFIG, normalizeUnlockConfig } from "@/lib/unlocks";
 
 const categoryOrder = ["collection", "exploration", "rarity"] as const;
+const trackMetricOrder: Record<string, number> = {
+    pets_owned_excluding_starters: 1,
+    ships_owned_excluding_starters: 2,
+    avatars_owned_excluding_starters: 3,
+    planets_landed_excluding_sun: 1,
+    common_collectibles_owned: 1,
+    uncommon_collectibles_owned: 2,
+    rare_collectibles_owned: 3,
+    extremely_rare_collectibles_owned: 4,
+};
+
+const stripTierSuffix = (title: string) => String(title || "").replace(/\s+\d+$/, "").trim();
+
+const stripThresholdSuffix = (description: string) => String(description || "").replace(/\s*\(\d+\)\s*$/, "").trim();
 
 export default function StudentAchievementsPage() {
     const { user, userData, loading } = useAuth();
@@ -99,6 +113,31 @@ export default function StudentAchievementsPage() {
 
     const earnedCount = useMemo(() => cardStates.filter((card) => card.isEarned).length, [cardStates]);
 
+    const categoryTracks = useMemo(() => {
+        return categoryOrder.map((category) => {
+            const cards = cardStates.filter((card) => card.category === category);
+            const grouped = new Map<string, AchievementCardState[]>();
+
+            cards.forEach((card) => {
+                const key = `${card.category}:${card.metric}`;
+                const existing = grouped.get(key) || [];
+                existing.push(card);
+                grouped.set(key, existing);
+            });
+
+            const tracks = Array.from(grouped.values())
+                .map((cardsInTrack) => cardsInTrack.sort((a, b) => a.threshold - b.threshold))
+                .sort((a, b) => {
+                    const metricOrderA = trackMetricOrder[a[0].metric] || 99;
+                    const metricOrderB = trackMetricOrder[b[0].metric] || 99;
+                    if (metricOrderA !== metricOrderB) return metricOrderA - metricOrderB;
+                    return a[0].title.localeCompare(b[0].title);
+                });
+
+            return { category, tracks };
+        });
+    }, [cardStates]);
+
     const newlyEarnedIds = useMemo(() => {
         if (!userData) return [] as string[];
         const earnedMap = userData.achievementsEarned || {};
@@ -152,16 +191,16 @@ export default function StudentAchievementsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-space-950 text-cyan-300 font-mono p-4 md:p-6">
-            <div className="max-w-6xl mx-auto space-y-6">
-                <div className="border border-cyan-500/30 bg-black/40 rounded-2xl p-5 md:p-6">
+        <div className="min-h-screen bg-space-950 text-cyan-300 font-mono p-3 md:p-4">
+            <div className="max-w-5xl mx-auto space-y-4">
+                <div className="border border-cyan-500/30 bg-black/40 rounded-2xl p-4 md:p-5">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div>
                             <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-600">Hidden Terminal</div>
-                            <h1 className="mt-1 text-2xl md:text-3xl font-bold uppercase tracking-widest text-white flex items-center gap-2">
-                                <Trophy size={24} className="text-amber-300" /> Achievements
+                            <h1 className="mt-1 text-xl md:text-2xl font-bold uppercase tracking-widest text-white flex items-center gap-2">
+                                <Trophy size={22} className="text-amber-300" /> Achievements
                             </h1>
-                            <p className="text-xs text-cyan-500 mt-2">Earn badges by collecting, exploring, and finding rarity tiers.</p>
+                            <p className="text-[11px] text-cyan-500 mt-2">Compact mission board: unlock tiers across collection, exploration, and rarity.</p>
                         </div>
                         <Link
                             href="/student/studentnavigation"
@@ -171,18 +210,18 @@ export default function StudentAchievementsPage() {
                         </Link>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="rounded-xl border border-cyan-900/40 bg-black/30 p-4">
-                            <div className="text-xs uppercase tracking-wider text-cyan-600">Earned</div>
-                            <div className="text-2xl font-bold text-white mt-1">{earnedCount}</div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="rounded-xl border border-cyan-900/40 bg-black/30 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-cyan-600">Earned</div>
+                            <div className="text-xl font-bold text-white mt-1">{earnedCount}</div>
                         </div>
-                        <div className="rounded-xl border border-cyan-900/40 bg-black/30 p-4">
-                            <div className="text-xs uppercase tracking-wider text-cyan-600">Total</div>
-                            <div className="text-2xl font-bold text-white mt-1">{cardStates.length}</div>
+                        <div className="rounded-xl border border-cyan-900/40 bg-black/30 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-cyan-600">Total</div>
+                            <div className="text-xl font-bold text-white mt-1">{cardStates.length}</div>
                         </div>
-                        <div className="rounded-xl border border-cyan-900/40 bg-black/30 p-4">
-                            <div className="text-xs uppercase tracking-wider text-cyan-600">Completion</div>
-                            <div className="text-2xl font-bold text-white mt-1">
+                        <div className="rounded-xl border border-cyan-900/40 bg-black/30 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-cyan-600">Completion</div>
+                            <div className="text-xl font-bold text-white mt-1">
                                 {cardStates.length > 0 ? Math.round((earnedCount / cardStates.length) * 100) : 0}%
                             </div>
                         </div>
@@ -191,50 +230,68 @@ export default function StudentAchievementsPage() {
                     {saveError ? <p className="text-xs text-amber-300 mt-3">{saveError}</p> : null}
                 </div>
 
-                {categoryOrder.map((category) => {
-                    const categoryCards = cardStates.filter((card) => card.category === category);
-                    if (categoryCards.length === 0) return null;
+                {categoryTracks.map(({ category, tracks }) => {
+                    if (tracks.length === 0) return null;
 
                     return (
-                        <section key={category} className="border border-cyan-500/20 bg-black/40 rounded-2xl p-5">
-                            <h2 className="text-lg font-bold uppercase tracking-wider text-white mb-4">{getAchievementCategoryLabel(category)}</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                                {categoryCards.map((card) => {
-                                    const isLocked = !card.isEarned;
+                        <section key={category} className="border border-cyan-500/20 bg-black/40 rounded-2xl p-4 md:p-5">
+                            <h2 className="text-sm md:text-base font-bold uppercase tracking-[0.2em] text-white mb-3">{getAchievementCategoryLabel(category)}</h2>
+                            <div className="space-y-2.5">
+                                {tracks.map((trackCards) => {
+                                    const sample = trackCards[0];
+                                    const trackLabel = stripTierSuffix(sample.title);
+                                    const trackDescription = stripThresholdSuffix(sample.description);
+                                    const currentValue = sample.currentValue;
+                                    const maxThreshold = trackCards[trackCards.length - 1]?.threshold || 1;
+                                    const completedTiers = trackCards.filter((card) => card.isEarned).length;
                                     return (
                                         <article
-                                            key={card.id}
-                                            className={`rounded-xl border p-4 transition-colors ${isLocked ? "border-cyan-900/40 bg-black/30" : "border-green-500/40 bg-green-900/20"}`}
+                                            key={`${category}-${sample.metric}`}
+                                            className="rounded-xl border border-cyan-900/40 bg-black/25 px-3 py-3"
                                         >
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-14 h-14 rounded-lg border border-cyan-800/40 bg-black/40 flex items-center justify-center overflow-hidden">
-                                                    {card.badgeImage ? (
-                                                        <img src={getAssetPath(card.badgeImage)} alt={card.title} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <Trophy size={20} className="text-amber-300" />
-                                                    )}
+                                            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                                                <div className="lg:w-56 xl:w-64 shrink-0">
+                                                    <h3 className="text-sm font-bold text-white uppercase tracking-wide">{trackLabel}</h3>
+                                                    <p className="text-[11px] text-cyan-500 mt-0.5">{trackDescription}</p>
+                                                    <p className="text-[11px] text-cyan-400 mt-1.5">
+                                                        Progress {Math.min(currentValue, maxThreshold)} / {maxThreshold} - {completedTiers}/{trackCards.length} tiers
+                                                    </p>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-sm font-bold text-white uppercase tracking-wide truncate">{card.title}</h3>
-                                                    <p className="text-xs text-cyan-500 mt-1">{card.description}</p>
-                                                </div>
-                                                {card.isEarned ? (
-                                                    <CheckCircle2 size={16} className="text-green-300 shrink-0" />
-                                                ) : (
-                                                    <Lock size={16} className="text-cyan-700 shrink-0" />
-                                                )}
-                                            </div>
 
-                                            <div className="mt-3">
-                                                <div className="flex items-center justify-between text-[11px] text-cyan-500">
-                                                    <span>Progress</span>
-                                                    <span>{Math.min(card.currentValue, card.threshold)} / {card.threshold}</span>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
+                                                    {trackCards.map((card) => {
+                                                        const locked = !card.isEarned;
+                                                        const progressValue = Math.min(card.currentValue, card.threshold);
+                                                        return (
+                                                            <div
+                                                                key={card.id}
+                                                                className={`rounded-lg border p-2.5 ${locked ? "border-cyan-900/50 bg-black/35" : "border-emerald-400/40 bg-emerald-900/20"}`}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <div className="w-8 h-8 rounded-md border border-cyan-800/40 bg-black/40 overflow-hidden flex items-center justify-center">
+                                                                        {card.badgeImage ? (
+                                                                            <img src={getAssetPath(card.badgeImage)} alt={card.title} className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <Trophy size={14} className="text-amber-300" />
+                                                                        )}
+                                                                    </div>
+                                                                    {card.isEarned ? (
+                                                                        <CheckCircle2 size={14} className="text-emerald-300 shrink-0" />
+                                                                    ) : (
+                                                                        <Lock size={14} className="text-cyan-700 shrink-0" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="mt-2 text-[11px] font-bold text-white tracking-wide">Tier {card.tier}</div>
+                                                                <div className="text-[11px] text-cyan-500 mt-0.5">{progressValue} / {card.threshold}</div>
+                                                                <progress
+                                                                    value={progressValue}
+                                                                    max={card.threshold}
+                                                                    className="w-full h-1.5 mt-1.5 rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-black [&::-webkit-progress-value]:bg-cyan-500"
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
-                                                <progress
-                                                    value={Math.min(card.currentValue, card.threshold)}
-                                                    max={card.threshold}
-                                                    className="w-full h-2 mt-1 rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-black [&::-webkit-progress-value]:bg-cyan-500"
-                                                />
                                             </div>
                                         </article>
                                     );
