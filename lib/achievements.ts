@@ -150,10 +150,8 @@ const buildCollectionTierDefinitions = ({
     badgeImages?: string[];
 }): AchievementDefinition[] => {
     const thresholds = [10, 20, 30, 40];
-    const legacyIdThresholds = [1, 5, 10, 20];
     return thresholds.map((threshold, index) => ({
-        // Keep existing IDs stable so previously earned achievements still resolve.
-        id: `${prefix}-${legacyIdThresholds[index]}`,
+        id: `${prefix}-${threshold}`,
         title: `${title} ${index + 1}`,
         description: `${description} (${threshold})`,
         category: "collection",
@@ -174,10 +172,8 @@ const buildRarityTierDefinitions = ({
     metric: AchievementMetric;
 }): AchievementDefinition[] => {
     const thresholds = [10, 20, 30, 40];
-    const legacyIdThresholds = [1, 5, 10, 20];
     return thresholds.map((threshold, index) => ({
-        // Keep existing IDs stable so previously earned achievements still resolve.
-        id: `${prefix}-${legacyIdThresholds[index]}`,
+        id: `${prefix}-${threshold}`,
         title: `${title} ${index + 1}`,
         description: `Own ${threshold} ${title.replace(" Collector", "")} collectibles`,
         category: "rarity",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { PET_OPTIONS, normalizePetUnlockAssignments } from "@/lib/pets";
 import { resolveShipAssetPath } from "@/lib/ships";
+import { canonicalizeShopItemId, getCanonicalShopItemId } from "@/lib/shop-items";
 import { normalizeUnlockConfig } from "@/lib/unlocks";
 
 export const runtime = "nodejs";
@@ -118,7 +119,9 @@ async function getConfiguredPrices(): Promise<Record<string, number>> {
     Object.entries(raw).forEach(([itemId, value]) => {
       const numeric = Number(value);
       if (Number.isFinite(numeric)) {
-        prices[itemId] = Math.max(0, Math.round(numeric));
+        const canonicalId = canonicalizeShopItemId(String(itemId || ""));
+        if (!canonicalId) return;
+        prices[canonicalId] = Math.max(0, Math.round(numeric));
       }
     });
 
@@ -141,7 +144,7 @@ async function getConfiguredRarities(): Promise<Record<string, CollectibleRarity
     const rarities: Record<string, CollectibleRarity> = {};
 
     Object.entries(raw).forEach(([itemId, value]) => {
-      const normalizedId = String(itemId || "").trim().toLowerCase();
+      const normalizedId = canonicalizeShopItemId(String(itemId || ""));
       const rarity = String(value || "").trim().toLowerCase();
       if (!normalizedId) return;
       if (rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare") {
@@ -168,7 +171,7 @@ async function getConfiguredNameOverrides(): Promise<Record<string, string>> {
     const names: Record<string, string> = {};
 
     Object.entries(raw).forEach(([itemId, value]) => {
-      const normalizedId = String(itemId || "").trim().toLowerCase();
+      const normalizedId = canonicalizeShopItemId(String(itemId || ""));
       const nextName = String(value || "").trim();
       if (!normalizedId || !nextName) return;
       names[normalizedId] = nextName;
@@ -250,12 +253,12 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
 
       const normalizedRelativePath = normalizeCategoryRelativePath(category, relativePath);
 
-      const id = normalizeItemIdFromRelativePath(`${category}/${normalizedRelativePath}`);
-      const legacyId = normalizeItemIdFromRelativePath(`${category}/${relativePath}`);
+      const imagePath = `/images/collectibles/${category}/shop/${relativePath}`;
+      const id = canonicalizeShopItemId(normalizeItemIdFromRelativePath(`${category}/${normalizedRelativePath}`), imagePath);
+      const legacyId = canonicalizeShopItemId(normalizeItemIdFromRelativePath(`${category}/${relativePath}`), imagePath);
       if (dedupe.has(id)) return;
       dedupe.add(id);
 
-      const imagePath = `/images/collectibles/${category}/shop/${relativePath}`;
       const nameFromFile = normalizeNameFromFile((normalizedRelativePath || relativePath).split("/").pop() || relativePath);
       const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
       const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
@@ -285,13 +288,13 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
     const normalizedRelative = category !== "misc"
       ? normalizeCategoryRelativePath(category, segments.slice(1).join("/"))
       : relativePath;
-    const id = normalizeItemIdFromRelativePath(`${category}/${normalizedRelative}`);
+    const imagePath = `/images/collectibles/ships/shop/${relativePath}`;
+    const id = canonicalizeShopItemId(normalizeItemIdFromRelativePath(`${category}/${normalizedRelative}`), imagePath);
     if (dedupe.has(id)) return;
     dedupe.add(id);
 
-    const imagePath = `/images/collectibles/ships/shop/${relativePath}`;
     const nameFromFile = normalizeNameFromFile((normalizedRelative || relativePath).split("/").pop() || relativePath);
-    const legacyId = normalizeItemIdFromRelativePath(`${category}/${segments.slice(1).join("/")}`);
+    const legacyId = canonicalizeShopItemId(normalizeItemIdFromRelativePath(`${category}/${segments.slice(1).join("/")}`), imagePath);
     const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
     const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
     const configuredRarity = configuredRarities[id] ?? configuredRarities[legacyId];
@@ -320,7 +323,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
     const normalizedUnlockId = String(unlockId || "").trim().toLowerCase();
     if (!normalizedUnlockId) return;
 
-    const id = `${category}/${normalizedUnlockId}`;
+    const id = getCanonicalShopItemId({ category, rawId: normalizedUnlockId, imagePath });
     if (dedupe.has(id)) return;
     dedupe.add(id);
 

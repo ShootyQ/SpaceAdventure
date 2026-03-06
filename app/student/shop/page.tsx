@@ -11,6 +11,7 @@ import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { getAssetPath } from "@/lib/utils";
 import { DEFAULT_UNLOCK_CONFIG, normalizeUnlockConfig, ensurePrefixedUnlockId } from "@/lib/unlocks";
 import { normalizePetUnlockAssignments, PET_OPTIONS, type PetUnlockAssignment } from "@/lib/pets";
+import { canonicalizeShopItemId, getCanonicalShopItemId, normalizeShopPetId } from "@/lib/shop-items";
 
 type ShopItem = {
     id: string;
@@ -31,14 +32,6 @@ const CATEGORY_ORDER = ["pets", "ships", "avatars", "objects"];
 const DEFAULT_PRICE = 100;
 
 const getUnlockIdFromItem = (itemId: string) => String(itemId || "").split("/").pop() || "";
-
-const normalizeShopPetId = (petId: string) =>
-    String(petId || "")
-        .trim()
-        .toLowerCase()
-        .replace(/\.[^.]+$/g, "")
-        .replace(/[^a-z0-9._-]+/g, "-")
-        .replace(/^-+|-+$/g, "");
 
 const toCanonicalUnlockId = (category: string, unlockId: string) => {
     if (category === "ships") return ensurePrefixedUnlockId(unlockId, "ships");
@@ -131,7 +124,7 @@ export default function StudentShopPage() {
     }, [userData?.selectedPetId]);
 
     useEffect(() => {
-        const owned = new Set<string>(userData?.purchasedShopItemIds || []);
+        const owned = new Set<string>((userData?.purchasedShopItemIds || []).map((itemId) => canonicalizeShopItemId(String(itemId || ""))));
         const unlockedShipIds = new Set<string>(userData?.shopUnlockedShipIds || []);
         const unlockedAvatarIds = new Set<string>(userData?.shopUnlockedAvatarIds || []);
         const unlockedPetIds = new Set<string>(userData?.unlockedPetIds || []);
@@ -197,7 +190,7 @@ export default function StudentShopPage() {
             const normalizedPrices: Record<string, number> = {};
 
             Object.entries(rawPrices).forEach(([itemId, value]) => {
-                const key = String(itemId || "").trim().toLowerCase();
+                const key = canonicalizeShopItemId(String(itemId || ""));
                 if (!key) return;
                 const numeric = Number(value);
                 if (Number.isFinite(numeric)) {
@@ -208,7 +201,7 @@ export default function StudentShopPage() {
             const rawNames = data?.nameOverrides || {};
             const normalizedNames: Record<string, string> = {};
             Object.entries(rawNames).forEach(([itemId, value]) => {
-                const key = String(itemId || "").trim().toLowerCase();
+                const key = canonicalizeShopItemId(String(itemId || ""));
                 const name = String(value || "").trim();
                 if (!key || !name) return;
                 normalizedNames[key] = name;
@@ -242,7 +235,7 @@ export default function StudentShopPage() {
         const merged = new Map<string, ShopItem>();
 
         const upsert = (item: ShopItem) => {
-            const normalizedId = String(item.id || "").trim().toLowerCase();
+            const normalizedId = canonicalizeShopItemId(String(item.id || ""), item.imagePath);
             if (!normalizedId) return;
             merged.set(normalizedId, {
                 ...item,
@@ -259,7 +252,7 @@ export default function StudentShopPage() {
             const unlockId = String(rule.unlockKey || rule.id || "").trim().toLowerCase();
             if (!unlockId) return;
 
-            const itemId = `ships/${unlockId}`;
+            const itemId = getCanonicalShopItemId({ category: "ships", rawId: unlockId, imagePath: resolveShipAssetPath(unlockId) });
             const existing = merged.get(itemId);
             const fallbackName = String(rule.name || unlockId);
 
@@ -278,16 +271,17 @@ export default function StudentShopPage() {
             const unlockId = String(rule.unlockKey || rule.id || "").trim().toLowerCase();
             if (!unlockId) return;
 
-            const itemId = `avatars/${unlockId}`;
-            const existing = merged.get(itemId);
             const avatarOption = AVATAR_OPTIONS.find((avatar) => avatar.id === unlockId || avatar.id === String(rule.id || "").trim().toLowerCase());
+            const imagePath = String(avatarOption?.src || `/images/collectibles/avatars/shop/${unlockId}.png`);
+            const itemId = getCanonicalShopItemId({ category: "avatars", rawId: unlockId, imagePath });
+            const existing = merged.get(itemId);
             const fallbackName = String(rule.name || avatarOption?.name || unlockId);
 
             upsert({
                 id: itemId,
                 name: existing?.name || fallbackName,
                 category: "avatars",
-                imagePath: existing?.imagePath || String(avatarOption?.src || `/images/collectibles/avatars/shop/${unlockId}.png`),
+                imagePath: existing?.imagePath || imagePath,
                 price: Number.isFinite(existing?.price) ? Number(existing?.price) : DEFAULT_PRICE,
             });
         });
@@ -298,9 +292,9 @@ export default function StudentShopPage() {
             const normalizedPetId = normalizeShopPetId(petId);
             if (!normalizedPetId) return;
 
-            const itemId = `pets/${normalizedPetId}`;
-            const existing = merged.get(itemId);
             const petOption = PET_OPTIONS.find((pet) => normalizeShopPetId(pet.id) === normalizedPetId);
+            const itemId = getCanonicalShopItemId({ category: "pets", rawId: normalizedPetId, imagePath: petOption?.imageSrc });
+            const existing = merged.get(itemId);
             const fallbackName = String(petOption?.name || normalizedPetId);
 
             upsert({
