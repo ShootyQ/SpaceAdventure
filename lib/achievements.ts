@@ -514,7 +514,7 @@ export const evaluateAchievements = ({
         const threshold = Math.max(1, Number(definition.threshold || 1));
         const earned = safeEarnedMap[definition.id];
         const isMetricComplete = currentValue >= threshold;
-        const isEarned = Boolean(earned) || isMetricComplete;
+        const isEarned = isMetricComplete;
         const progressPercent = Math.max(0, Math.min(100, Math.round((currentValue / threshold) * 100)));
 
         return {
