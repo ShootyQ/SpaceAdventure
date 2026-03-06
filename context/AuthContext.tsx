@@ -29,6 +29,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 const TRIAL_DURATION_MS = TEACHER_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+const ADMIN_EMAIL = "andrewpcarlson85@gmail.com";
+const SAVANNAH_EMAIL = "savannahbcarlson@gmail.com";
+
+const normalizeEmail = (email?: string | null) => String(email || "").trim().toLowerCase();
 
 function toMillis(value: any): number | null {
   if (!value) return null;
@@ -72,7 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 let data = userSnap.data() as UserData;
                 
                 // Auto-correct Admin Role
-                const isAdminEmail = currentUser.email === "andrewpcarlson85@gmail.com";
+              const normalizedEmail = normalizeEmail(currentUser.email);
+              const isAdminEmail = normalizedEmail === ADMIN_EMAIL;
+              const isSavannahEmail = normalizedEmail === SAVANNAH_EMAIL;
                 let updates: Partial<UserData> = {};
 
                 if (isAdminEmail && data.role !== 'teacher') {
@@ -80,6 +86,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     data.role = 'teacher';
                     updates.role = 'teacher';
                 }
+
+              if (isSavannahEmail) {
+                if (data.displayName !== "Savannah") {
+                  data.displayName = "Savannah";
+                  updates.displayName = "Savannah";
+                }
+
+                if (data.role !== "teacher") {
+                  data.role = "teacher";
+                  updates.role = "teacher";
+                }
+
+                if (data.status !== "active") {
+                  data.status = "active";
+                  updates.status = "active";
+                }
+              }
 
                 if (data.role === 'teacher' && !data.classCode) {
                     console.log("Generating Class Code for existing teacher");
@@ -148,8 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Students should have been pre-created by teachers and signing in via Email/Pass,  
                 // so they would already exist in DB.
                 
-                const isSuperAdmin = currentUser.email === "andrewpcarlson85@gmail.com";
-                const safeDisplayName = sanitizeName(currentUser.displayName || 'Commander');
+                const normalizedEmail = normalizeEmail(currentUser.email);
+                const isSuperAdmin = normalizedEmail === ADMIN_EMAIL;
+                const isSavannahEmail = normalizedEmail === SAVANNAH_EMAIL;
+                const safeDisplayName = isSavannahEmail ? "Savannah" : sanitizeName(currentUser.displayName || 'Commander');
                 const baseShipWord = safeDisplayName.split(' ')[0] || 'Voyager';
                 const newUserData: UserData = {
                     uid: currentUser.uid,
@@ -181,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error("Error fetching user data", error);
             // Fallback for Admin if DB is locked
-             if (currentUser.email === "andrewpcarlson85@gmail.com") {
+             if (normalizeEmail(currentUser.email) === ADMIN_EMAIL) {
                   console.log("Using Fallback Admin Profile due to DB error");
                   setUserData({
                       uid: currentUser.uid,
