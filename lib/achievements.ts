@@ -116,22 +116,26 @@ const buildCollectionTierDefinitions = ({
     title,
     description,
     metric,
+    badgeImages,
 }: {
     prefix: string;
     title: string;
     description: string;
     metric: AchievementMetric;
+    badgeImages?: string[];
 }): AchievementDefinition[] => {
-    const thresholds = [1, 5, 10, 20];
+    const thresholds = [10, 20, 30, 40];
+    const legacyIdThresholds = [1, 5, 10, 20];
     return thresholds.map((threshold, index) => ({
-        id: `${prefix}-${threshold}`,
+        // Keep existing IDs stable so previously earned achievements still resolve.
+        id: `${prefix}-${legacyIdThresholds[index]}`,
         title: `${title} ${index + 1}`,
         description: `${description} (${threshold})`,
         category: "collection",
         metric,
         threshold,
         tier: index + 1,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
+        badgeImage: badgeImages?.[index] || COLLECTION_BADGE_PLACEHOLDER,
     }));
 };
 
@@ -144,9 +148,11 @@ const buildRarityTierDefinitions = ({
     title: string;
     metric: AchievementMetric;
 }): AchievementDefinition[] => {
-    const thresholds = [1, 5, 10, 20];
+    const thresholds = [10, 20, 30, 40];
+    const legacyIdThresholds = [1, 5, 10, 20];
     return thresholds.map((threshold, index) => ({
-        id: `${prefix}-${threshold}`,
+        // Keep existing IDs stable so previously earned achievements still resolve.
+        id: `${prefix}-${legacyIdThresholds[index]}`,
         title: `${title} ${index + 1}`,
         description: `Own ${threshold} ${title.replace(" Collector", "")} collectibles`,
         category: "rarity",
@@ -163,48 +169,87 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
         title: "Pet Collector",
         description: "Own non-starter pets",
         metric: "pets_owned_excluding_starters",
+        badgeImages: [
+            "/images/achievements/pets1.hatchlinghandler.10.png",
+            "/images/achievements/pets2.creaturekeeper.20.png",
+            "/images/achievements/pets3.beastbinder.30.png",
+            "/images/achievements/pets4.mythicmenagerie.40.png",
+        ],
+    }).map((achievement, index) => {
+        const tierTitles = ["Hatchling Handler", "Creature Keeper", "Beast Binder", "Mythic Menagerie"];
+        return {
+            ...achievement,
+            title: tierTitles[index] || achievement.title,
+            description: `Own ${achievement.threshold} non-starter pets`,
+        };
     }),
     ...buildCollectionTierDefinitions({
         prefix: "ships-owned",
         title: "Fleet Builder",
         description: "Own non-starter ships",
         metric: "ships_owned_excluding_starters",
+        badgeImages: [
+            "/images/achievements/ships1.hangarhand.10.png",
+            "/images/achievements/ships2.dockyardarchitect.20.png",
+            "/images/achievements/ships3.starshipsyndicate.30.png",
+            "/images/achievements/ships4.armadaascendant.40.png",
+        ],
+    }).map((achievement, index) => {
+        const tierTitles = ["Hangar Hand", "Dockyard Architect", "Starship Syndicate", "Armada Ascendant"];
+        return {
+            ...achievement,
+            title: tierTitles[index] || achievement.title,
+            description: `Own ${achievement.threshold} non-starter ships`,
+        };
     }),
     ...buildCollectionTierDefinitions({
         prefix: "avatars-owned",
         title: "Avatar Curator",
         description: "Own non-starter avatars",
         metric: "avatars_owned_excluding_starters",
+        badgeImages: [
+            "/images/achievements/avatar1.maskmaker.10.png",
+            "/images/achievements/avatar2.personakeeper.20.png",
+            "/images/achievements/avatar3.iconarchivist.30.png",
+            "/images/achievements/avatar4.legendloomright.40.png",
+        ],
+    }).map((achievement, index) => {
+        const tierTitles = ["Mask Maker", "Persona Keeper", "Icon Archivist", "Legend Loomright"];
+        return {
+            ...achievement,
+            title: tierTitles[index] || achievement.title,
+            description: `Own ${achievement.threshold} non-starter avatars`,
+        };
     }),
     {
         id: "landed-planets-1",
-        title: "First Contact",
+        title: "First Touchdown",
         description: "Land on 1 planet (sun excluded)",
         category: "exploration",
         metric: "planets_landed_excluding_sun",
         threshold: 1,
         tier: 1,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
+        badgeImage: "/images/achievements/planetexplorer.firsttouchdown.1.png",
     },
     {
         id: "landed-planets-4",
-        title: "Sector Scout",
+        title: "Orbit Hopper",
         description: "Land on 4 planets (sun excluded)",
         category: "exploration",
         metric: "planets_landed_excluding_sun",
         threshold: 4,
         tier: 2,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
+        badgeImage: "/images/achievements/planetexplorer.orbithopper.4.png",
     },
     {
         id: "landed-planets-all",
-        title: "System Cartographer",
-        description: "Land on all planets (sun excluded)",
+        title: "Celestial Pathfinder",
+        description: "Land on 8 planets (sun excluded)",
         category: "exploration",
         metric: "planets_landed_excluding_sun",
-        threshold: PLANET_IDS_EXCLUDING_SUN.size,
+        threshold: 8,
         tier: 3,
-        badgeImage: COLLECTION_BADGE_PLACEHOLDER,
+        badgeImage: "/images/achievements/planetexplorer.celestialpathfinder.8.png",
     },
     ...buildRarityTierDefinitions({
         prefix: "rarity-common",
