@@ -78,7 +78,7 @@ export default function StudentNavigationPage() {
         const nextValue = sanitizeProfileName(rawValue);
 
         if (!isValidProfileName(nextValue)) {
-            setNotice("Names must be 1-30 characters and use letters, numbers, or spaces.");
+            setNotice("Names must be 1-30 characters and use letters, numbers, spaces, or periods.");
             return;
         }
 
