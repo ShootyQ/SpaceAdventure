@@ -267,22 +267,28 @@ export default function StudentAchievementsPage() {
                                                                 key={card.id}
                                                                 className={`rounded-lg border p-2.5 ${locked ? "border-cyan-900/50 bg-black/35" : "border-emerald-400/40 bg-emerald-900/20"}`}
                                                             >
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <div className="w-8 h-8 rounded-md border border-cyan-800/40 bg-black/40 overflow-hidden flex items-center justify-center">
+                                                                <div className={`relative rounded-lg border overflow-hidden ${locked ? "border-cyan-900/40 bg-black/45" : "border-emerald-400/40 bg-emerald-950/40"}`}>
+                                                                    <div className="aspect-square w-full flex items-center justify-center p-2.5">
                                                                         {card.badgeImage ? (
-                                                                            <img src={getAssetPath(card.badgeImage)} alt={card.title} className="w-full h-full object-cover" />
+                                                                            <img
+                                                                                src={getAssetPath(card.badgeImage)}
+                                                                                alt={card.title}
+                                                                                className={`w-full h-full object-contain drop-shadow-[0_0_14px_rgba(34,211,238,0.35)] ${locked ? "opacity-80 saturate-75" : ""}`}
+                                                                            />
                                                                         ) : (
-                                                                            <Trophy size={14} className="text-amber-300" />
+                                                                            <Trophy size={28} className="text-amber-300" />
                                                                         )}
                                                                     </div>
                                                                     {card.isEarned ? (
-                                                                        <CheckCircle2 size={14} className="text-emerald-300 shrink-0" />
+                                                                        <CheckCircle2 size={16} className="absolute top-2 right-2 text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.45)]" />
                                                                     ) : (
-                                                                        <Lock size={14} className="text-cyan-700 shrink-0" />
+                                                                        <Lock size={16} className="absolute top-2 right-2 text-cyan-700" />
                                                                     )}
+                                                                    <div className="absolute left-2 bottom-2 text-[10px] font-bold uppercase tracking-wide text-white/90 bg-black/45 border border-cyan-900/40 rounded px-1.5 py-0.5">
+                                                                        Tier {card.tier}
+                                                                    </div>
                                                                 </div>
-                                                                <div className="mt-2 text-[11px] font-bold text-white tracking-wide">Tier {card.tier}</div>
-                                                                <div className="text-[11px] text-cyan-500 mt-0.5">{progressValue} / {card.threshold}</div>
+                                                                <div className="text-[11px] text-cyan-500 mt-2">{progressValue} / {card.threshold}</div>
                                                                 <progress
                                                                     value={progressValue}
                                                                     max={card.threshold}
