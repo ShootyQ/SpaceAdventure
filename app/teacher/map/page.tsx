@@ -8,7 +8,7 @@ export default function ClassroomMapDisplay() {
         
         {/* Full Screen Solar System with Award Overlays */}
         <div className="absolute inset-0 z-0">
-            <SolarSystem />
+            <SolarSystem classroomDisplay />
         </div>
     </div>
   );
