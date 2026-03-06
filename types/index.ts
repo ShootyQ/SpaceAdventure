@@ -136,6 +136,7 @@ export interface UserData {
     lastXpReason?: string;
     visitedPlanets?: string[];
     planetXP?: Record<string, number>; // XP earned per planet (for unlocks)
+    xpUnlockProgress?: Record<string, Record<string, { baselineXP: number; requiredXP: number }>>;
     unlockedHats?: string[];
     completedMissions?: string[];
     missionProgress?: Record<string, MissionProgress>;
@@ -145,6 +146,8 @@ export interface UserData {
     purchasedShopItemIds?: string[];
     shopUnlockedShipIds?: string[];
     shopUnlockedAvatarIds?: string[];
+    achievementsEarned?: Record<string, { earnedAt: number }>;
+    interiorAchievementSlots?: Record<string, string>;
     schoolName?: string;
     subscriptionStatus?: "trial" | "active";
     // Credentials for Print-outs (Optional/Classroom Management)
@@ -193,6 +196,7 @@ export interface Ship {
     flag?: FlagConfig;
     visitedPlanets?: string[];
     planetXP?: Record<string, number>;
+    xpUnlockProgress?: Record<string, Record<string, { baselineXP: number; requiredXP: number }>>;
     unlockedPetIds?: string[];
     selectedPetId?: string;
 }

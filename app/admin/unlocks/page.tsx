@@ -28,6 +28,7 @@ import {
   type PetUnlockMethod,
   type PetUnlockScope,
 } from "@/lib/pets";
+import { canonicalizeShopItemId, getCanonicalShopItemId } from "@/lib/shop-items";
 
 type ShopItem = {
   id: string;
@@ -91,13 +92,13 @@ const normalizePlanetValue = (value?: string) => {
   return PLANET_OPTIONS.some((planet) => planet.id === normalized) ? normalized : firstPlanetId;
 };
 
-const toShopConfigItemId = (category: string, id: string) => {
-  return `${String(category || "misc").trim().toLowerCase()}/${String(id || "").trim().toLowerCase()}`;
-};
-
 const getShopConfigIdForRow = (row: EditableRow) => {
-  if (row.domain === "shop") return String(row.id || "").trim().toLowerCase();
-  return toShopConfigItemId(row.category, row.id);
+  if (row.domain === "shop") return canonicalizeShopItemId(row.id, row.assetPath);
+  return getCanonicalShopItemId({
+    category: row.category,
+    rawId: row.id,
+    imagePath: row.assetPath,
+  });
 };
 
 const getRuleForItem = (rules: UnlockRule[], itemId: string, kind: "ships" | "avatars") => {
@@ -137,7 +138,7 @@ const buildUnlockRows = (
 
     const normalizedPlanet = normalizePlanetValue(rule?.planetId);
     const scope: ScopeMode = normalizedPlanet === "any" ? "any" : "planet";
-    const shopItemId = toShopConfigItemId("ships", ship.id);
+    const shopItemId = getCanonicalShopItemId({ category: "ships", rawId: ship.id, imagePath: ship.assetPath });
     const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
     const resolvedName = String(rule?.name || ship.name || ship.id);
 
@@ -169,7 +170,7 @@ const buildUnlockRows = (
 
     const normalizedPlanet = normalizePlanetValue(rule?.planetId);
     const scope: ScopeMode = normalizedPlanet === "any" ? "any" : "planet";
-    const shopItemId = toShopConfigItemId("avatars", avatar.id);
+    const shopItemId = getCanonicalShopItemId({ category: "avatars", rawId: avatar.id, imagePath: avatar.src });
     const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
     const resolvedName = String(rule?.name || avatar.name || avatar.id);
 
@@ -206,7 +207,7 @@ const buildPetRows = (
     const resolvedScope: PetUnlockScope = assignment?.scope || (pet.unlockPlanetId ? "planet" : "any");
     const resolvedPlanetId = normalizePlanetValue(assignment?.planetId || pet.unlockPlanetId || firstPlanetId);
     const resolvedChanceRarity = normalizeChanceRarity((assignment as any)?.rarity || pet.rarity);
-    const shopItemId = toShopConfigItemId("pets", pet.id);
+    const shopItemId = getCanonicalShopItemId({ category: "pets", rawId: pet.id, imagePath: pet.imageSrc });
     const shopPrice = toIntMin(shopPrices[shopItemId] ?? DEFAULT_SHOP_PRICE, 0);
     const resolvedBaseName = String(petNameOverrides[pet.id] || pet.name || pet.id);
 
@@ -233,7 +234,7 @@ const buildShopRows = (
   shopNameOverrides: Record<string, string>
 ): EditableRow[] => {
   return shopItems.map((item) => {
-    const normalizedItemId = String(item.id || "").trim().toLowerCase();
+    const normalizedItemId = canonicalizeShopItemId(item.id, item.imagePath);
     return {
     key: `shop:${item.id}`,
     domain: "shop",
@@ -334,7 +335,7 @@ export default function AdminUnlocksPage() {
       const rawPrices = raw?.prices || {};
       const normalizedPrices: Record<string, number> = {};
       Object.entries(rawPrices).forEach(([itemId, value]) => {
-        const key = String(itemId || "").trim().toLowerCase();
+        const key = canonicalizeShopItemId(String(itemId || ""));
         if (!key) return;
         normalizedPrices[key] = toIntMin(value, 0);
       });
@@ -343,7 +344,7 @@ export default function AdminUnlocksPage() {
       const rawNameOverrides = raw?.nameOverrides || {};
       const normalizedNames: Record<string, string> = {};
       Object.entries(rawNameOverrides).forEach(([itemId, value]) => {
-        const key = String(itemId || "").trim().toLowerCase();
+        const key = canonicalizeShopItemId(String(itemId || ""));
         const nextName = String(value || "").trim();
         if (key && nextName) normalizedNames[key] = nextName;
       });

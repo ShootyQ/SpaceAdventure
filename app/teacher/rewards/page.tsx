@@ -5,7 +5,6 @@ import { collection, query, where, onSnapshot, doc, increment, runTransaction, s
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useTeacherScope } from "@/context/TeacherScopeContext";
-import { getAssetPath } from "@/lib/utils";
 import { UserData, Rank } from "@/types";
 import { UserAvatar } from '@/components/UserAvatar';
 import { Star, X, Zap, Award, Check } from "lucide-react";
@@ -135,14 +134,6 @@ export default function RewardsPage() {
         const awardedStudents = targetIds.length;
         const totalAwardedPoints = xpAmount * awardedStudents;
         const creditsAwardValue = Math.max(0, Math.round(Number(creditsPerAward) || 0));
-
-        // Play notification sound immediately (User Interaction)
-        const audioElement = document.getElementById('notification-audio') as HTMLAudioElement;
-        if (audioElement) {
-            audioElement.currentTime = 0;
-            audioElement.volume = 0.5;
-            audioElement.play().catch(e => console.error("Audio playback failed:", e));
-        }
 
         try {
             // Process all selected students
@@ -299,9 +290,6 @@ export default function RewardsPage() {
 
     return (
         <div className="min-h-screen bg-space-950 p-2 md:p-4 font-mono text-cyan-400">
-            {/* Hidden Audio Element */}
-            <audio id="notification-audio" src={getAssetPath("/sounds/notification.m4a?v=1")} preload="auto" />
-
             <div className="max-w-7xl mx-auto min-h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] flex flex-col">
                 
                 {/* Header */}
@@ -576,9 +564,6 @@ export default function RewardsPage() {
                     )}
                 </AnimatePresence>
                 
-                {/* Audio Element for Notifications */}
-                <audio id="notification-audio" src={getAssetPath("/sounds/notification.m4a")} preload="auto" /> 
-
             </div>
         </div>
     );

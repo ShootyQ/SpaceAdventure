@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -17,8 +17,8 @@ interface PlanetData {
     id: string;
     xpGoal: number;
     currentXP: number;
-    rewardName: string;
-    rewardDescription: string;
+    rewardName?: string;
+    rewardDescription?: string;
     unlocks?: {
         ships?: Record<string, number>;
         avatars?: Record<string, number>;
@@ -69,10 +69,20 @@ export default function PlanetManagementPage() {
         const unsub = onSnapshot(q, (snapshot) => {
              const dynamicMap = new Map<string, PlanetData>();
              snapshot.forEach(d => {
-                 const data = d.data() as PlanetData;
+                 const data = d.data() as Partial<PlanetData>;
                  // Ensure ID is set (if not in data, use doc ID)
                  const normalizedPlanetId = normalizePlanetId(d.id);
-                 dynamicMap.set(normalizedPlanetId, { ...data, id: normalizedPlanetId });
+                 dynamicMap.set(normalizedPlanetId, {
+                     id: normalizedPlanetId,
+                     xpGoal: toIntMin(data.xpGoal, 1),
+                     currentXP: toIntMin(data.currentXP, 0),
+                     rewardName: String(data.rewardName || ""),
+                     rewardDescription: String(data.rewardDescription || ""),
+                     unlocks: {
+                         ships: { ...(data.unlocks?.ships || {}) },
+                         avatars: { ...(data.unlocks?.avatars || {}) },
+                     },
+                 });
              });
 
              const merged = PLANETS.map(staticPlanet => {
@@ -150,26 +160,53 @@ export default function PlanetManagementPage() {
             return next;
         });
         try {
+            const planetRef = doc(db, `users/${user.uid}/planets`, planet.id);
+            const previousSnapshot = await getDoc(planetRef);
+            const previousData = previousSnapshot.exists() ? previousSnapshot.data() : {};
+            const previousUnlocks = {
+                ships: (previousData as any)?.unlocks?.ships || {},
+                avatars: (previousData as any)?.unlocks?.avatars || {},
+            } as { ships: Record<string, number>; avatars: Record<string, number> };
+            const previousConfiguredAt = {
+                ships: (previousData as any)?.unlockConfiguredAt?.ships || {},
+                avatars: (previousData as any)?.unlockConfiguredAt?.avatars || {},
+            } as { ships: Record<string, number>; avatars: Record<string, number> };
+            const now = Date.now();
+
             const avatarUnlocks: Record<string, number> = {};
+            const avatarConfiguredAt: Record<string, number> = {};
             Object.entries(planet.unlocks?.avatars || {}).forEach(([key, value]) => {
                 const threshold = toIntMin(value, 1);
-                if (threshold > 0) avatarUnlocks[key] = threshold;
+                if (threshold > 0) {
+                    avatarUnlocks[key] = threshold;
+                    const previousThreshold = toIntMin(previousUnlocks.avatars?.[key], 0);
+                    const previousTimestamp = Math.floor(Number(previousConfiguredAt.avatars?.[key] || 0));
+                    avatarConfiguredAt[key] = previousThreshold === threshold && previousTimestamp > 0 ? previousTimestamp : now;
+                }
             });
             const shipUnlocks: Record<string, number> = {};
+            const shipConfiguredAt: Record<string, number> = {};
             Object.entries(planet.unlocks?.ships || {}).forEach(([key, value]) => {
                 const threshold = toIntMin(value, 1);
-                if (threshold > 0) shipUnlocks[key] = threshold;
+                if (threshold > 0) {
+                    shipUnlocks[key] = threshold;
+                    const previousThreshold = toIntMin(previousUnlocks.ships?.[key], 0);
+                    const previousTimestamp = Math.floor(Number(previousConfiguredAt.ships?.[key] || 0));
+                    shipConfiguredAt[key] = previousThreshold === threshold && previousTimestamp > 0 ? previousTimestamp : now;
+                }
             });
             const unlocksToSave = { ships: shipUnlocks, avatars: avatarUnlocks };
+            const unlockConfiguredAtToSave = { ships: shipConfiguredAt, avatars: avatarConfiguredAt };
 
             // Save to subcollection
-            await setDoc(doc(db, `users/${user.uid}/planets`, planet.id), {
+            await setDoc(planetRef, {
                 id: planet.id,
                 xpGoal: toIntMin(planet.xpGoal, 1),
                 currentXP: toIntMin(planet.currentXP, 0),
-                rewardName: planet.rewardName,
-                rewardDescription: planet.rewardDescription,
+                rewardName: String(planet.rewardName || ""),
+                rewardDescription: String(planet.rewardDescription || ""),
                 unlocks: unlocksToSave,
+                unlockConfiguredAt: unlockConfiguredAtToSave,
                 teacherId: user.uid
             }, { merge: true });
 
@@ -331,7 +368,7 @@ export default function PlanetManagementPage() {
                                                                     </div>
                                                                     <div className="min-w-0 flex-1">
                                                                         <div className="text-xs text-white font-bold">{rule.name}</div>
-                                                                        <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
+                                                                        <div className="text-[10px] text-gray-500 uppercase">+XP needed from now on {planet.name}</div>
                                                                     </div>
                                                                     <input
                                                                         type="number"
@@ -357,7 +394,7 @@ export default function PlanetManagementPage() {
                                                                     </div>
                                                                     <div className="min-w-0 flex-1">
                                                                         <div className="text-xs text-white font-bold">{rule.name}</div>
-                                                                        <div className="text-[10px] text-gray-500 uppercase">Unlock XP on {planet.name}</div>
+                                                                        <div className="text-[10px] text-gray-500 uppercase">+XP needed from now on {planet.name}</div>
                                                                     </div>
                                                                     <input
                                                                         type="number"

@@ -5,6 +5,10 @@ on:
     branches: ["main", "dev"]
   workflow_dispatch:
 
+concurrency:
+  group: firebase-hosting-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   id-token: write
@@ -61,17 +65,16 @@ jobs:
           NEXT_PUBLIC_FIREBASE_PROJECT_ID=spaceadventure-7d540
           EOF
 
+      - name: Create Firebase service account file (live)
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+
       - name: Deploy to Firebase Hosting (live)
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
-          firebaseToolsVersion: 13.31.2
-          projectId: spaceadventure-7d540
-          channelId: live
-          entryPoint: .
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
           NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}
           NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
@@ -79,6 +82,10 @@ jobs:
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: spaceadventure-7d540
+        run: |
+          npx firebase-tools@13.31.2 deploy \
+            --project spaceadventure-7d540 \
+            --only hosting
 
   deploy-dev-preview:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
@@ -122,17 +129,16 @@ jobs:
           NEXT_PUBLIC_FIREBASE_PROJECT_ID=spaceadventure-7d540
           EOF
 
+      - name: Create Firebase service account file (dev)
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+
       - name: 'Deploy to Firebase Hosting (preview: dev)'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPACEADVENTURE_7D540 }}
-          firebaseToolsVersion: 13.31.2
-          projectId: spaceadventure-7d540
-          channelId: dev
-          entryPoint: .
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
           NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY }}
           NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
@@ -140,3 +146,6 @@ jobs:
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: spaceadventure-7d540
+        run: |
+          npx firebase-tools@13.31.2 hosting:channel:deploy dev \
+            --project spaceadventure-7d540

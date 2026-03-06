@@ -17,6 +17,7 @@ import { getTeacherStudentLimit, isSubscriptionActive, isTeacherTrialActive } fr
 import { DEFAULT_PET_ID, PET_OPTIONS, STARTER_PET_IDS } from "@/lib/pets";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId } from "@/lib/unlocks";
+import { isXpUnlockEarned, normalizeXpUnlockProgressMap } from "@/lib/xp-unlock-progress";
 
 const STARTER_PET_OPTIONS = PET_OPTIONS.filter((pet) => STARTER_PET_IDS.includes(pet.id));
 const DEFAULT_STARTER_PET = STARTER_PET_OPTIONS[0]?.id || DEFAULT_PET_ID;
@@ -80,6 +81,7 @@ export default function RosterPage() {
     const [editPassword, setEditPassword] = useState("");
     const [passwordResetLoading, setPasswordResetLoading] = useState(false);
     const [teacherPlanetShipUnlocks, setTeacherPlanetShipUnlocks] = useState<Record<string, Record<string, number>>>({});
+    const [teacherPlanetShipUnlockConfiguredAt, setTeacherPlanetShipUnlockConfiguredAt] = useState<Record<string, Record<string, number>>>({});
 
     const hasActiveSubscription = isSubscriptionActive(userData);
     const hasTrialAccess = isTeacherTrialActive(userData);
@@ -136,20 +138,34 @@ export default function RosterPage() {
           try {
               const snapshot = await getDocs(collection(db, `users/${teacherScopeId}/planets`));
               const nextMap: Record<string, Record<string, number>> = {};
+              const nextConfiguredAtMap: Record<string, Record<string, number>> = {};
 
               snapshot.forEach((planetDoc) => {
-                  const rawUnlocks = (planetDoc.data() as any)?.unlocks?.ships || {};
+                  const data = planetDoc.data() as any;
+                  const rawUnlocks = data?.unlocks?.ships || {};
+                  const rawConfiguredAt = data?.unlockConfiguredAt?.ships || {};
                   const normalized: Record<string, number> = {};
+                  const normalizedConfiguredAt: Record<string, number> = {};
 
                   Object.keys(rawUnlocks).forEach((key) => {
                       const threshold = Number(rawUnlocks[key] || 0);
                       if (threshold > 0) normalized[key] = threshold;
                   });
 
-                  nextMap[normalizePlanetId(planetDoc.id)] = normalized;
+                  Object.keys(rawConfiguredAt).forEach((key) => {
+                      const timestamp = Math.floor(Number(rawConfiguredAt[key] || 0));
+                      if (timestamp > 0) normalizedConfiguredAt[key] = timestamp;
+                  });
+
+                  const normalizedPlanetId = normalizePlanetId(planetDoc.id);
+                  nextMap[normalizedPlanetId] = normalized;
+                  nextConfiguredAtMap[normalizedPlanetId] = normalizedConfiguredAt;
               });
 
-              if (!cancelled) setTeacherPlanetShipUnlocks(nextMap);
+              if (!cancelled) {
+                  setTeacherPlanetShipUnlocks(nextMap);
+                  setTeacherPlanetShipUnlockConfiguredAt(nextConfiguredAtMap);
+              }
           } catch (error) {
               console.error("Error fetching teacher planet ship unlocks:", error);
           }
@@ -178,11 +194,20 @@ export default function RosterPage() {
       if (currentShipId) unlocked.add(String(currentShipId));
 
       const planetXP = (student?.planetXP || {}) as Record<string, number>;
+      const xpUnlockProgress = normalizeXpUnlockProgressMap(student?.xpUnlockProgress || {});
       SHIP_XP_UNLOCK_RULES.forEach((rule) => {
           const normalizedPlanetId = normalizePlanetId(rule.planetId);
           const requiredXP = Number(teacherPlanetShipUnlocks?.[normalizedPlanetId]?.[rule.unlockKey] || 0);
           const currentPlanetXP = readPlanetXpValue(planetXP, normalizedPlanetId);
-          if (requiredXP > 0 && currentPlanetXP >= requiredXP) {
+          if (isXpUnlockEarned({
+              progress: xpUnlockProgress,
+              planetId: normalizedPlanetId,
+              unlockKey: rule.unlockKey,
+              domain: "ship",
+              requiredXP,
+              currentPlanetXP,
+              configuredAt: Number(teacherPlanetShipUnlockConfiguredAt?.[normalizedPlanetId]?.[rule.unlockKey] || 0),
+          })) {
               unlocked.add(resolveRuntimeUnlockId(rule.id, unlockConfig.idAliases, shipCatalogIds));
           }
       });
