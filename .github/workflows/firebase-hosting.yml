@@ -5,6 +5,10 @@ on:
     branches: ["main", "dev"]
   workflow_dispatch:
 
+concurrency:
+  group: firebase-hosting-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   id-token: write
@@ -81,8 +85,7 @@ jobs:
         run: |
           npx firebase-tools@13.31.2 deploy \
             --project spaceadventure-7d540 \
-            --only hosting \
-            --force
+            --only hosting
 
   deploy-dev-preview:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
@@ -145,5 +148,4 @@ jobs:
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: spaceadventure-7d540
         run: |
           npx firebase-tools@13.31.2 hosting:channel:deploy dev \
-            --project spaceadventure-7d540 \
-            --force
+            --project spaceadventure-7d540
