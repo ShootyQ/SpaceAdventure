@@ -30,7 +30,6 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 const TRIAL_DURATION_MS = TEACHER_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 const ADMIN_EMAIL = "andrewpcarlson85@gmail.com";
-const SAVANNAH_EMAIL = "savannahbcarlson@gmail.com";
 
 const normalizeEmail = (email?: string | null) => String(email || "").trim().toLowerCase();
 
@@ -78,7 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Auto-correct Admin Role
               const normalizedEmail = normalizeEmail(currentUser.email);
               const isAdminEmail = normalizedEmail === ADMIN_EMAIL;
-              const isSavannahEmail = normalizedEmail === SAVANNAH_EMAIL;
                 let updates: Partial<UserData> = {};
 
                 if (isAdminEmail && data.role !== 'teacher') {
@@ -86,23 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     data.role = 'teacher';
                     updates.role = 'teacher';
                 }
-
-              if (isSavannahEmail) {
-                if (data.displayName !== "Savannah") {
-                  data.displayName = "Savannah";
-                  updates.displayName = "Savannah";
-                }
-
-                if (data.role !== "teacher") {
-                  data.role = "teacher";
-                  updates.role = "teacher";
-                }
-
-                if (data.status !== "active") {
-                  data.status = "active";
-                  updates.status = "active";
-                }
-              }
 
                 if (data.role === 'teacher' && !data.classCode) {
                     console.log("Generating Class Code for existing teacher");
@@ -173,8 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 const normalizedEmail = normalizeEmail(currentUser.email);
                 const isSuperAdmin = normalizedEmail === ADMIN_EMAIL;
-                const isSavannahEmail = normalizedEmail === SAVANNAH_EMAIL;
-                const safeDisplayName = isSavannahEmail ? "Savannah" : sanitizeName(currentUser.displayName || 'Commander');
+                const safeDisplayName = sanitizeName(currentUser.displayName || 'Commander');
                 const baseShipWord = safeDisplayName.split(' ')[0] || 'Voyager';
                 const newUserData: UserData = {
                     uid: currentUser.uid,

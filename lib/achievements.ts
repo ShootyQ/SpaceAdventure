@@ -44,7 +44,8 @@ export interface AchievementCardState extends AchievementDefinition {
 
 export type PlanetUnlockMap = Record<string, Record<string, number>>;
 
-type CollectibleRarity = "common" | "uncommon" | "rare" | "extremely-rare";
+export type CollectibleRarity = "common" | "uncommon" | "rare" | "extremely-rare";
+export type ShopItemRarityMap = Record<string, CollectibleRarity>;
 
 const PLANET_IDS_EXCLUDING_SUN = new Set(
     PLANETS.filter((planet) => planet.id !== "sun").map((planet) => String(planet.id || "").toLowerCase())
@@ -91,24 +92,48 @@ const resolveCatalogRarity = (value: string): CollectibleRarity | null => {
     return null;
 };
 
-const resolveRarityFromText = (value: string): CollectibleRarity => {
-    const normalized = String(value || "").toLowerCase();
-    if (normalized.includes("extremely-rare") || normalized.includes("extremelyrare")) return "extremely-rare";
-    if (normalized.includes("/rare/") || normalized.includes("-rare")) return "rare";
-    if (normalized.includes("uncommon")) return "uncommon";
-    return "common";
+const normalizeShopItemId = (itemId: string) => String(itemId || "").trim().toLowerCase();
+
+const toEntityKey = (category: string, itemId: string) => {
+    const normalizedCategory = String(category || "").trim().toLowerCase();
+    const normalizedItemId = String(itemId || "").trim().toLowerCase();
+    if (!normalizedCategory || !normalizedItemId) return "";
+    return `${normalizedCategory}:${normalizedItemId}`;
 };
 
-const resolveShipRarity = (shipId: string): CollectibleRarity => {
-    const option = SHIP_OPTIONS.find((ship) => ship.id === shipId);
-    if (option?.assetPath) return resolveRarityFromText(option.assetPath);
-    return resolveRarityFromText(shipId);
+const normalizeShopRarityMap = (shopItemRarities: Record<string, string | CollectibleRarity> | undefined): ShopItemRarityMap => {
+    const normalized: ShopItemRarityMap = {};
+    Object.entries(shopItemRarities || {}).forEach(([itemId, rarity]) => {
+        const normalizedItemId = normalizeShopItemId(itemId);
+        const parsed = resolveCatalogRarity(String(rarity || ""));
+        if (!normalizedItemId || !parsed) return;
+        normalized[normalizedItemId] = parsed;
+    });
+    return normalized;
 };
 
-const resolveAvatarRarity = (avatarId: string): CollectibleRarity => {
-    const option = AVATAR_OPTIONS.find((avatar) => avatar.id === avatarId);
-    if (option?.src) return resolveRarityFromText(option.src);
-    return resolveRarityFromText(avatarId);
+const buildExplicitRarityRuleMap = (
+    rules: Array<{ id?: string; unlockKey?: string; rarity?: string }> | undefined,
+    catalogIds: Set<string>,
+    idAliases: Record<string, string>
+) => {
+    const map = new Map<string, CollectibleRarity>();
+    (rules || []).forEach((rule) => {
+        const parsedRarity = resolveCatalogRarity(String(rule?.rarity || ""));
+        if (!parsedRarity) return;
+
+        const candidates = [String(rule?.unlockKey || ""), String(rule?.id || "")]
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+            .map((value) => resolveRuntimeUnlockId(value, idAliases, catalogIds));
+
+        candidates.forEach((candidate) => {
+            const normalizedCandidate = String(candidate || "").trim();
+            if (!normalizedCandidate) return;
+            map.set(normalizedCandidate, parsedRarity);
+        });
+    });
+    return map;
 };
 
 const buildCollectionTierDefinitions = ({
@@ -372,11 +397,13 @@ export const resolveAchievementMetrics = ({
     unlockConfig,
     planetShipUnlocks,
     planetAvatarUnlocks,
+    shopItemRarities,
 }: {
     userData: UserData;
     unlockConfig: UnlockConfig;
     planetShipUnlocks: PlanetUnlockMap;
     planetAvatarUnlocks: PlanetUnlockMap;
+    shopItemRarities?: Record<string, string | CollectibleRarity>;
 }): Record<AchievementMetric, number> => {
     const unlockedShipIds = resolveUnlockedShipIds({ userData, unlockConfig, planetShipUnlocks });
     const unlockedAvatarIds = resolveUnlockedAvatarIds({ userData, unlockConfig, planetAvatarUnlocks });
@@ -403,19 +430,49 @@ export const resolveAchievementMetrics = ({
         "extremely-rare": 0,
     };
 
+    const explicitEntityRarities = new Map<string, CollectibleRarity>();
+    const shipCatalogIds = new Set(SHIP_OPTIONS.map((ship) => String(ship.id || "")));
+    const avatarCatalogIds = new Set(AVATAR_OPTIONS.map((avatar) => String(avatar.id || "")));
+    const explicitShipRarities = buildExplicitRarityRuleMap(unlockConfig.ships || [], shipCatalogIds, unlockConfig.idAliases || {});
+    const explicitAvatarRarities = buildExplicitRarityRuleMap(unlockConfig.avatars || [], avatarCatalogIds, unlockConfig.idAliases || {});
+    const normalizedShopRarities = normalizeShopRarityMap(shopItemRarities);
+
     Array.from(unlockedPetIds).forEach((petId) => {
         const pet = PET_OPTIONS.find((option) => option.id === petId);
-        const rarity = pet ? resolveCatalogRarity(pet.rarity) : resolveRarityFromText(String(petId || ""));
-        if (rarity) rarityCounts[rarity] += 1;
+        const rarity = pet ? resolveCatalogRarity(pet.rarity) : null;
+        const entityKey = toEntityKey("pets", String(petId || ""));
+        if (rarity && entityKey) explicitEntityRarities.set(entityKey, rarity);
     });
 
     Array.from(unlockedShipIds).forEach((shipId) => {
-        const rarity = resolveShipRarity(String(shipId || ""));
-        rarityCounts[rarity] += 1;
+        const normalizedShipId = String(shipId || "").trim();
+        const rarity = explicitShipRarities.get(normalizedShipId);
+        const entityKey = toEntityKey("ships", normalizedShipId);
+        if (rarity && entityKey) explicitEntityRarities.set(entityKey, rarity);
     });
 
     Array.from(unlockedAvatarIds).forEach((avatarId) => {
-        const rarity = resolveAvatarRarity(String(avatarId || ""));
+        const normalizedAvatarId = String(avatarId || "").trim();
+        const rarity = explicitAvatarRarities.get(normalizedAvatarId);
+        const entityKey = toEntityKey("avatars", normalizedAvatarId);
+        if (rarity && entityKey) explicitEntityRarities.set(entityKey, rarity);
+    });
+
+    Object.entries(normalizedShopRarities).forEach(([shopItemId, rarity]) => {
+        if (!(userData.purchasedShopItemIds || []).some((id) => normalizeShopItemId(id) === shopItemId)) return;
+
+        const [rawCategory, ...rest] = shopItemId.split("/");
+        const category = String(rawCategory || "").trim().toLowerCase();
+        const nestedId = rest.join("/").trim();
+        if (!category || !nestedId) return;
+
+        const entityKey = toEntityKey(category, nestedId);
+        if (!entityKey) return;
+        // Shop-configured rarity should be authoritative for purchased shop finds.
+        explicitEntityRarities.set(entityKey, rarity);
+    });
+
+    explicitEntityRarities.forEach((rarity) => {
         rarityCounts[rarity] += 1;
     });
 

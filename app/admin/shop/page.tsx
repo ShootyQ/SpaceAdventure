@@ -11,6 +11,7 @@ type ShopItem = {
   category: string;
   imagePath: string;
   price: number;
+  rarity?: "common" | "uncommon" | "rare" | "extremely-rare";
 };
 
 type ShopResponse = {
@@ -19,12 +20,16 @@ type ShopResponse = {
 };
 
 const getAssetPath = (asset: string) => asset;
+const RARITY_OPTIONS = ["", "common", "uncommon", "rare", "extremely-rare"] as const;
+type CollectibleRarity = Exclude<(typeof RARITY_OPTIONS)[number], "">;
 
 export default function AdminShopPage() {
   const [items, setItems] = useState<ShopItem[]>([]);
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({});
   const [defaultPrice, setDefaultPrice] = useState(100);
+  const [rarityOverrides, setRarityOverrides] = useState<Record<string, CollectibleRarity>>({});
+  const [draftRarities, setDraftRarities] = useState<Record<string, "" | CollectibleRarity>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,10 +49,18 @@ export default function AdminShopPage() {
       setDefaultPrice(Number.isFinite(loadedDefaultPrice) ? Math.max(0, Math.round(loadedDefaultPrice)) : 100);
 
       const priceMap: Record<string, number> = {};
+      const rarityMap: Record<string, "" | CollectibleRarity> = {};
       loadedItems.forEach((item) => {
         priceMap[item.id] = Number.isFinite(Number(item.price)) ? Math.max(0, Math.round(Number(item.price))) : 100;
+        const rarity = String(item.rarity || "").trim().toLowerCase();
+        if (rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare") {
+          rarityMap[item.id] = rarity;
+        } else {
+          rarityMap[item.id] = "";
+        }
       });
       setDraftPrices(priceMap);
+      setDraftRarities(rarityMap);
     } catch (error) {
       console.error(error);
       alert("Failed to load shop items.");
@@ -65,6 +78,7 @@ export default function AdminShopPage() {
     const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
       const raw = (snapshot.data() as any)?.prices || {};
       const normalized: Record<string, number> = {};
+      const normalizedRarities: Record<string, CollectibleRarity> = {};
 
       Object.entries(raw).forEach(([itemId, value]) => {
         const numeric = Number(value);
@@ -73,7 +87,18 @@ export default function AdminShopPage() {
         }
       });
 
+      const rawRarities = (snapshot.data() as any)?.rarities || {};
+      Object.entries(rawRarities).forEach(([itemId, value]) => {
+        const normalizedItemId = String(itemId || "").trim().toLowerCase();
+        const rarity = String(value || "").trim().toLowerCase();
+        if (!normalizedItemId) return;
+        if (rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare") {
+          normalizedRarities[normalizedItemId] = rarity;
+        }
+      });
+
       setPriceOverrides(normalized);
+      setRarityOverrides(normalizedRarities);
     });
 
     return () => unsub();
@@ -85,16 +110,24 @@ export default function AdminShopPage() {
       return {
         ...item,
         price: Number.isFinite(override) ? override : item.price,
+        rarity: rarityOverrides[item.id] || item.rarity,
       };
     });
-  }, [items, priceOverrides]);
+  }, [items, priceOverrides, rarityOverrides]);
 
   useEffect(() => {
     const nextDraft: Record<string, number> = {};
+    const nextRarityDraft: Record<string, "" | CollectibleRarity> = {};
     resolvedItems.forEach((item) => {
       nextDraft[item.id] = item.price;
+      const rarity = String(item.rarity || "").trim().toLowerCase();
+      nextRarityDraft[item.id] =
+        rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare"
+          ? (rarity as CollectibleRarity)
+          : "";
     });
     setDraftPrices(nextDraft);
+    setDraftRarities(nextRarityDraft);
   }, [resolvedItems]);
 
   const categorySummary = useMemo(() => {
@@ -107,15 +140,25 @@ export default function AdminShopPage() {
   const savePrices = async () => {
     try {
       setSaving(true);
+      const sanitizedRarities: Record<string, CollectibleRarity> = {};
+      Object.entries(draftRarities).forEach(([itemId, rarity]) => {
+        const normalizedItemId = String(itemId || "").trim().toLowerCase();
+        if (!normalizedItemId) return;
+        if (rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare") {
+          sanitizedRarities[normalizedItemId] = rarity;
+        }
+      });
+
       await setDoc(
         doc(db, "game-config", "shop"),
         {
           prices: draftPrices,
+          rarities: sanitizedRarities,
           updatedAt: Date.now(),
         },
         { merge: true }
       );
-      alert("Shop prices saved.");
+      alert("Shop prices and rarities saved.");
     } catch (error) {
       console.error(error);
       alert("Failed to save shop prices.");
@@ -132,12 +175,22 @@ export default function AdminShopPage() {
     }));
   };
 
+  const updateRarity = (itemId: string, value: string) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    setDraftRarities((prev) => ({
+      ...prev,
+      [itemId]: normalized === "common" || normalized === "uncommon" || normalized === "rare" || normalized === "extremely-rare"
+        ? (normalized as CollectibleRarity)
+        : "",
+    }));
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 text-slate-900">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Shop Items</h1>
-          <p className="mt-1 text-sm text-slate-600">All shop images auto-appear here. New images default to {defaultPrice} GC until you change them.</p>
+          <p className="mt-1 text-sm text-slate-600">All shop images auto-appear here. New images default to {defaultPrice} GC until you change them. Set rarity to include shop finds in rarity achievements.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -154,7 +207,7 @@ export default function AdminShopPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Save Prices
+            Save Shop Config
           </button>
         </div>
       </div>
@@ -177,13 +230,14 @@ export default function AdminShopPage() {
               Shop inventory map
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
+              <table className="w-full min-w-[1120px] text-left text-sm">
                 <thead className="border-b border-slate-200 bg-white text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Preview</th>
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">ID</th>
                     <th className="px-3 py-2">Category</th>
+                    <th className="px-3 py-2">Rarity</th>
                     <th className="px-3 py-2">Asset</th>
                     <th className="px-3 py-2">Price (GC)</th>
                   </tr>
@@ -202,6 +256,20 @@ export default function AdminShopPage() {
                         <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                           {item.category}
                         </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={draftRarities[item.id] ?? ""}
+                          onChange={(e) => updateRarity(item.id, e.target.value)}
+                          className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs uppercase text-slate-900 outline-none"
+                          aria-label={`Rarity for ${item.name}`}
+                        >
+                          {RARITY_OPTIONS.map((rarity) => (
+                            <option key={`${item.id}-rarity-${rarity || "none"}`} value={rarity}>
+                              {rarity || "not set"}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-600 break-all">{item.imagePath}</td>
                       <td className="px-3 py-2">

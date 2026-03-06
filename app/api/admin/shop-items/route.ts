@@ -13,7 +13,10 @@ type ShopItem = {
   category: string;
   imagePath: string;
   price: number;
+  rarity?: "common" | "uncommon" | "rare" | "extremely-rare";
 };
+
+type CollectibleRarity = "common" | "uncommon" | "rare" | "extremely-rare";
 
 const SHOP_CONFIG_PATH = "game-config/shop";
 const DEFAULT_PRICE = 100;
@@ -126,6 +129,33 @@ async function getConfiguredPrices(): Promise<Record<string, number>> {
   }
 }
 
+async function getConfiguredRarities(): Promise<Record<string, CollectibleRarity>> {
+  try {
+    const adminDb = await getAdminDbSafe();
+    if (!adminDb) return {};
+
+    const snapshot = await adminDb.doc(SHOP_CONFIG_PATH).get();
+    if (!snapshot.exists) return {};
+
+    const raw = (snapshot.data() as any)?.rarities || {};
+    const rarities: Record<string, CollectibleRarity> = {};
+
+    Object.entries(raw).forEach(([itemId, value]) => {
+      const normalizedId = String(itemId || "").trim().toLowerCase();
+      const rarity = String(value || "").trim().toLowerCase();
+      if (!normalizedId) return;
+      if (rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare") {
+        rarities[normalizedId] = rarity;
+      }
+    });
+
+    return rarities;
+  } catch (error) {
+    console.error("Failed to read shop rarity config; using unassigned defaults:", error);
+    return {};
+  }
+}
+
 async function getConfiguredNameOverrides(): Promise<Record<string, string>> {
   try {
     const adminDb = await getAdminDbSafe();
@@ -192,9 +222,10 @@ async function getCollectiblesConfigSafe() {
 
 async function getDiscoveredShopItems(): Promise<ShopItem[]> {
   const path = await import("node:path");
-  const [configuredPrices, configuredNameOverrides, unlockConfig, collectiblesConfig, legacyRoot, categoryRoots] = await Promise.all([
+  const [configuredPrices, configuredNameOverrides, configuredRarities, unlockConfig, collectiblesConfig, legacyRoot, categoryRoots] = await Promise.all([
     getConfiguredPrices(),
     getConfiguredNameOverrides(),
+    getConfiguredRarities(),
     getUnlockConfigSafe(),
     getCollectiblesConfigSafe(),
     resolveShopAssetRoot(),
@@ -228,6 +259,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       const nameFromFile = normalizeNameFromFile((normalizedRelativePath || relativePath).split("/").pop() || relativePath);
       const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
       const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
+      const configuredRarity = configuredRarities[id] ?? configuredRarities[legacyId];
 
       items.push({
         id,
@@ -235,6 +267,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
         category,
         imagePath,
         price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
+        rarity: configuredRarity,
       });
     });
   });
@@ -261,6 +294,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
     const legacyId = normalizeItemIdFromRelativePath(`${category}/${segments.slice(1).join("/")}`);
     const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
     const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
+    const configuredRarity = configuredRarities[id] ?? configuredRarities[legacyId];
 
     items.push({
       id,
@@ -268,6 +302,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       category,
       imagePath,
       price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
+      rarity: configuredRarity,
     });
   });
 
@@ -291,6 +326,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
 
     const configuredPrice = configuredPrices[id];
     const configuredName = configuredNameOverrides[id];
+    const configuredRarity = configuredRarities[id];
 
     items.push({
       id,
@@ -298,6 +334,7 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       category,
       imagePath,
       price: Number.isFinite(configuredPrice) ? configuredPrice : DEFAULT_PRICE,
+      rarity: configuredRarity,
     });
   };
 
@@ -365,6 +402,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const rawPrices = (body as any)?.prices || {};
+    const rawRarities = (body as any)?.rarities || {};
 
     const sanitizedPrices: Record<string, number> = {};
     Object.entries(rawPrices).forEach(([itemId, value]) => {
@@ -375,9 +413,20 @@ export async function POST(request: Request) {
       sanitizedPrices[normalizedId] = Math.max(0, Math.round(numeric));
     });
 
+    const sanitizedRarities: Record<string, CollectibleRarity> = {};
+    Object.entries(rawRarities).forEach(([itemId, value]) => {
+      const normalizedId = String(itemId || "").trim().toLowerCase();
+      const rarity = String(value || "").trim().toLowerCase();
+      if (!normalizedId) return;
+      if (rarity === "common" || rarity === "uncommon" || rarity === "rare" || rarity === "extremely-rare") {
+        sanitizedRarities[normalizedId] = rarity;
+      }
+    });
+
     await adminDb.doc(SHOP_CONFIG_PATH).set(
       {
         prices: sanitizedPrices,
+        rarities: sanitizedRarities,
         updatedAt: Date.now(),
       },
       { merge: true }

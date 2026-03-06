@@ -13,6 +13,7 @@ import {
     getAchievementCategoryLabel,
     resolveAchievementMetrics,
     type AchievementCardState,
+    type ShopItemRarityMap,
     type PlanetUnlockMap,
 } from "@/lib/achievements";
 import { DEFAULT_UNLOCK_CONFIG, normalizeUnlockConfig } from "@/lib/unlocks";
@@ -38,6 +39,7 @@ export default function StudentAchievementsPage() {
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const [planetShipUnlocks, setPlanetShipUnlocks] = useState<PlanetUnlockMap>({});
     const [planetAvatarUnlocks, setPlanetAvatarUnlocks] = useState<PlanetUnlockMap>({});
+    const [shopItemRarities, setShopItemRarities] = useState<ShopItemRarityMap>({});
     const [saveError, setSaveError] = useState<string>("");
     const pendingPersistRef = useRef<Set<string>>(new Set());
 
@@ -92,6 +94,26 @@ export default function StudentAchievementsPage() {
         return () => unsub();
     }, [userData?.role, userData?.teacherId, userData?.uid]);
 
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "game-config", "shop"), (snapshot) => {
+            const raw = ((snapshot.data() as any) || {}).rarities || {};
+            const next: ShopItemRarityMap = {};
+
+            Object.entries(raw).forEach(([itemId, rarity]) => {
+                const normalizedItemId = String(itemId || "").trim().toLowerCase();
+                const normalizedRarity = String(rarity || "").trim().toLowerCase();
+                if (!normalizedItemId) return;
+                if (normalizedRarity === "common" || normalizedRarity === "uncommon" || normalizedRarity === "rare" || normalizedRarity === "extremely-rare") {
+                    next[normalizedItemId] = normalizedRarity;
+                }
+            });
+
+            setShopItemRarities(next);
+        });
+
+        return () => unsub();
+    }, []);
+
     const metrics = useMemo(() => {
         if (!userData || userData.role !== "student") return null;
         return resolveAchievementMetrics({
@@ -99,8 +121,9 @@ export default function StudentAchievementsPage() {
             unlockConfig,
             planetShipUnlocks,
             planetAvatarUnlocks,
+            shopItemRarities,
         });
-    }, [planetAvatarUnlocks, planetShipUnlocks, unlockConfig, userData]);
+    }, [planetAvatarUnlocks, planetShipUnlocks, shopItemRarities, unlockConfig, userData]);
 
     const cardStates = useMemo(() => {
         if (!metrics) return [] as AchievementCardState[];
