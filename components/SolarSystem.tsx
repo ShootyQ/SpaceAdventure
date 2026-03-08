@@ -1305,15 +1305,15 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   const lerpNumber = (start: number, end: number, alpha: number) => start + ((end - start) * alpha);
 
   const getPlanetSpotlightZoom = (shipCount: number) => {
-      if (shipCount >= 10) return 0.24;
-      if (shipCount >= 5) return 0.28;
-      return 0.32;
+      if (shipCount >= 10) return 0.85;
+      if (shipCount >= 5) return 1.15;
+      return 1.45;
   };
 
   const getShipSpotlightZoom = (shipCount: number) => {
-      if (shipCount >= 10) return 0.32;
-      if (shipCount >= 5) return 0.4;
-      return 0.52;
+      if (shipCount >= 10) return 3.2;
+      if (shipCount >= 5) return 4.8;
+      return 6.4;
   };
 
   const getDockedShipPosition = (shipId: string, timestamp: number) => {
@@ -1394,7 +1394,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                   shipId: ship.id,
                   planetId: ship.destinationId,
                   dwellMs: CLASSROOM_SPOTLIGHT_TRAVEL_DWELL_MS,
-                  zoom: 0.38,
+                  zoom: 4.8,
               });
           });
 
@@ -2261,20 +2261,21 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
            </>
        )}
 
+       {isTeacherClassroomDisplay && (
+           <div className="absolute right-6 top-52 z-[60] w-[220px] rounded-xl border border-cyan-500/30 bg-black/75 px-4 py-3 text-white shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-md">
+               <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300">Classroom Tour</div>
+               <div className="mt-1 text-sm font-semibold text-white">{activeSpotlightTarget?.label || 'Ready to spotlight'}</div>
+               <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/60">
+                   {activeSpotlightTarget ? (activeSpotlightTarget.type === 'planet' ? 'Planet Overview' : activeSpotlightTarget.type === 'traveling' ? 'Transit Spotlight' : 'Ship Spotlight') : 'Standby'}
+               </div>
+               <div className="mt-2 text-xs text-cyan-200/90">
+                   {!isSpotlightMode ? 'Paused' : isSpotlightBlocked ? 'Holding current frame' : `${Math.max(1, Math.ceil(spotlightRemainingMs / 1000))}s remaining`}
+               </div>
+           </div>
+       )}
+
        {/* View Controls */}
        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-[60]">
-           {isTeacherClassroomDisplay && activeSpotlightTarget && (
-               <div className="max-w-[220px] rounded-xl border border-cyan-500/30 bg-black/70 px-4 py-3 text-white shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-md">
-                   <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300">Classroom Tour</div>
-                   <div className="mt-1 text-sm font-semibold text-white">{activeSpotlightTarget.label}</div>
-                   <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/60">
-                       {activeSpotlightTarget.type === 'planet' ? 'Planet Overview' : activeSpotlightTarget.type === 'traveling' ? 'Transit Spotlight' : 'Ship Spotlight'}
-                   </div>
-                   <div className="mt-2 text-xs text-cyan-200/90">
-                       {isSpotlightMode ? (isSpotlightBlocked ? 'Paused' : `${Math.max(1, Math.ceil(spotlightRemainingMs / 1000))}s remaining`) : 'Stopped'}
-                   </div>
-               </div>
-           )}
 
            {isTeacherClassroomDisplay && (
                <div id="map-btn-spotlight">
