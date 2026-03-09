@@ -166,6 +166,20 @@
       "channel": "shop"
     },
     {
+      "id": "axol",
+      "name": "Axol",
+      "planetId": "any",
+      "unlockKey": "axol",
+      "channel": "shop"
+    },
+    {
+      "id": "clocksworth",
+      "name": "Clocksworth",
+      "planetId": "any",
+      "unlockKey": "clocksworth",
+      "channel": "shop"
+    },
+    {
       "id": "clockworkbeetle",
       "name": "Clockwork Beetle",
       "planetId": "any",
@@ -177,6 +191,20 @@
       "name": "Kitedagon",
       "planetId": "any",
       "unlockKey": "kitedagon",
+      "channel": "shop"
+    },
+    {
+      "id": "lizzy",
+      "name": "Lizzy",
+      "planetId": "any",
+      "unlockKey": "lizzy",
+      "channel": "shop"
+    },
+    {
+      "id": "turtlefinder",
+      "name": "Turtlefinder",
+      "planetId": "any",
+      "unlockKey": "turtlefinder",
       "channel": "shop"
     }
   ],

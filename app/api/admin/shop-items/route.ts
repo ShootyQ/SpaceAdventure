@@ -28,6 +28,9 @@ const FILE_NAME_NAME_OVERRIDES: Record<string, string> = {
   skateboardsquirrell: "Kickflip Comet Squirrel",
 };
 
+const SHOP_FILE_SUFFIX_PATTERN = /([._-](avatar|pet))?[._-]shop$/i;
+const SHOP_ROLE_SUFFIX_PATTERN = /[._-](avatar|pet)$/i;
+
 const toTitleCase = (value: string) =>
   value
     .split(" ")
@@ -37,11 +40,37 @@ const toTitleCase = (value: string) =>
 
 const normalizeNameFromFile = (fileName: string) => {
   const stem = fileName.replace(/\.[^.]+$/, "");
-  const normalizedStem = stem.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+  const cleanedStem = stem
+    .replace(SHOP_FILE_SUFFIX_PATTERN, "")
+    .replace(SHOP_ROLE_SUFFIX_PATTERN, "")
+    .trim();
+  const normalizedStem = cleanedStem.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
   const override = FILE_NAME_NAME_OVERRIDES[normalizedStem];
   if (override) return override;
-  const spaced = stem.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const spaced = cleanedStem.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
   return toTitleCase(spaced) || "Unnamed Item";
+};
+
+const getUnlockIdFromShopItemId = (itemId: string) =>
+  String(itemId || "")
+    .trim()
+    .toLowerCase()
+    .split("/")
+    .pop() || "";
+
+const getKnownShopDisplayName = (category: string, itemId: string) => {
+  const unlockId = getUnlockIdFromShopItemId(itemId);
+  if (!unlockId) return "";
+
+  if (category === "avatars") {
+    return AVATAR_OPTIONS.find((avatar) => String(avatar.id || "").trim().toLowerCase() === unlockId)?.name || "";
+  }
+
+  if (category === "pets") {
+    return PET_OPTIONS.find((pet) => String(pet.id || "").trim().toLowerCase() === unlockId)?.name || "";
+  }
+
+  return "";
 };
 
 const normalizeItemIdFromRelativePath = (relativeFilePath: string) => {
@@ -260,7 +289,8 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
       dedupe.add(id);
 
       const nameFromFile = normalizeNameFromFile((normalizedRelativePath || relativePath).split("/").pop() || relativePath);
-      const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
+      const knownName = getKnownShopDisplayName(category, id) || getKnownShopDisplayName(category, legacyId);
+      const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? knownName ?? nameFromFile;
       const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
       const configuredRarity = configuredRarities[id] ?? configuredRarities[legacyId];
 
@@ -295,7 +325,8 @@ async function getDiscoveredShopItems(): Promise<ShopItem[]> {
 
     const nameFromFile = normalizeNameFromFile((normalizedRelative || relativePath).split("/").pop() || relativePath);
     const legacyId = canonicalizeShopItemId(normalizeItemIdFromRelativePath(`${category}/${segments.slice(1).join("/")}`), imagePath);
-    const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? nameFromFile;
+    const knownName = getKnownShopDisplayName(category, id) || getKnownShopDisplayName(category, legacyId);
+    const name = configuredNameOverrides[id] ?? configuredNameOverrides[legacyId] ?? knownName ?? nameFromFile;
     const configuredPrice = configuredPrices[id] ?? configuredPrices[legacyId];
     const configuredRarity = configuredRarities[id] ?? configuredRarities[legacyId];
 

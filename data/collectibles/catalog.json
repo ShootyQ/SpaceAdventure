@@ -93,6 +93,60 @@
       "tags": ["testing", "any-planet", "pet"]
     },
     {
+      "id": "blinkbun",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Blinkbun",
+      "asset": "/images/collectibles/pets/shop/blinkbun.pet.shop.png",
+      "active": true,
+      "tags": ["pet", "shop"]
+    },
+    {
+      "id": "floofin",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Floofin",
+      "asset": "/images/collectibles/pets/shop/floofin.pet.shop.png",
+      "active": true,
+      "tags": ["pet", "shop"]
+    },
+    {
+      "id": "nibblorb",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Nibblorb",
+      "asset": "/images/collectibles/pets/shop/nibblorb.pet.shop.png",
+      "active": true,
+      "tags": ["pet", "shop"]
+    },
+    {
+      "id": "sheriffcorgi",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Sheriffcorgi",
+      "asset": "/images/collectibles/pets/shop/sheriffcorgi-shop.png",
+      "active": true,
+      "tags": ["pet", "shop"]
+    },
+    {
+      "id": "skateboardsquirrell",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Kickflip Comet Squirrel",
+      "asset": "/images/collectibles/pets/shop/skateboardsquirrell.png",
+      "active": true,
+      "tags": ["pet", "shop"]
+    },
+    {
+      "id": "slimepet",
+      "type": "pet",
+      "rarity": "rare",
+      "name": "Nebula Goo",
+      "asset": "/images/collectibles/pets/shop/slimepet.png",
+      "active": true,
+      "tags": ["pet", "shop"]
+    },
+    {
       "id": "avatar_placeholder_neptune_scout",
       "type": "avatar",
       "rarity": "rare",
@@ -255,6 +309,24 @@
       "tags": ["avatar", "shop"]
     },
     {
+      "id": "axol",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Axol",
+      "asset": "/images/collectibles/avatars/shop/axol.pet.shop.png",
+      "active": true,
+      "tags": ["avatar", "shop"]
+    },
+    {
+      "id": "clocksworth",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Clocksworth",
+      "asset": "/images/collectibles/avatars/shop/clocksworth.avatar.shop.png",
+      "active": true,
+      "tags": ["avatar", "shop"]
+    },
+    {
       "id": "clockworkbeetle",
       "type": "avatar",
       "rarity": "rare",
@@ -269,6 +341,24 @@
       "rarity": "rare",
       "name": "Kitedagon",
       "asset": "/images/collectibles/avatars/shop/kitedagon_avatar.png",
+      "active": true,
+      "tags": ["avatar", "shop"]
+    },
+    {
+      "id": "lizzy",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Lizzy",
+      "asset": "/images/collectibles/avatars/shop/lizzy.pet.shop.png",
+      "active": true,
+      "tags": ["avatar", "shop"]
+    },
+    {
+      "id": "turtlefinder",
+      "type": "avatar",
+      "rarity": "rare",
+      "name": "Turtlefinder",
+      "asset": "/images/collectibles/avatars/shop/turtlefinder.avatar.shop.png",
       "active": true,
       "tags": ["avatar", "shop"]
     },
