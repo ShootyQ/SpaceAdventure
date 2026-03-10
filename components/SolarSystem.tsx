@@ -152,6 +152,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const isStudentPersonalView = studentView && userData?.role === 'student';
     const isTeacherClassroomDisplay = classroomDisplay && !studentView && userData?.role === 'teacher';
+        const preferStableMapRendering = isTeacherClassroomDisplay;
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
     const [planetVisitors, setPlanetVisitors] = useState<Ship[]>([]);
@@ -543,7 +544,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     setMounted(true);
     let frameId: number;
     let lastTime = 0;
-    const FPS = 30;
+        const FPS = isTeacherClassroomDisplay ? 24 : 30;
     const interval = 1000 / FPS;
 
     const animate = (time: number) => {
@@ -557,7 +558,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     // Pause animation if the Manifest Overlay is open to save resources
     if(isOrbiting && !isGridVisible && !awardQueue.length) frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-  }, [isOrbiting, isGridVisible, awardQueue.length]);
+    }, [isOrbiting, isGridVisible, awardQueue.length, isTeacherClassroomDisplay]);
 
   
   // Panning State
@@ -1855,7 +1856,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   const [stars, setStars] = useState<{id: number, top: string, left: string, size: string, opacity: number, animationDuration: string}[]>([]);
 
   useEffect(() => {
-    setStars(Array.from({ length: 100 }, (_, i) => ({
+        const starCount = preferStableMapRendering ? 60 : 100;
+        setStars(Array.from({ length: starCount }, (_, i) => ({
         id: i,
         top: `${Math.random() * 100}%`,
         left: `${Math.random() * 100}%`,
@@ -1863,7 +1865,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         opacity: 0.2 + Math.random() * 0.5,
         animationDuration: `${Math.random() * 3 + 2}s`
     })));
-  }, []);
+    }, [preferStableMapRendering]);
 
   const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
     const landingPlanetId = normalizePlanetId(selectedPlanet?.id);
@@ -1964,7 +1966,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           {stars.map(star => (
             <div 
                 key={star.id}
-                className={`absolute bg-white rounded-full ${star.size} animate-pulse`}
+                                className={`absolute bg-white rounded-full ${star.size} ${preferStableMapRendering ? '' : 'animate-pulse'}`}
                 style={{ 
                     top: star.top, 
                     left: star.left, 
@@ -1977,8 +1979,13 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
        
        {/* Solar System Container with Pan & Zoom */}
        <div 
-          className="relative flex items-center justify-center transition-transform duration-75 ease-linear"
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+                    className="relative flex items-center justify-center transform-gpu"
+                        style={{
+                                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                                transformOrigin: 'center center',
+                                willChange: 'transform',
+                                backfaceVisibility: 'hidden'
+                        }}
         >
           
           {/* Traveling Ships Layer - Render BEHIND planets but atop orbits */}
@@ -2045,7 +2052,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                               </div>
                           )}
                           <span
-                              className="absolute top-full left-1/2 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded whitespace-nowrap mt-1 border border-cyan-500/30"
+                              className={`absolute top-full left-1/2 text-[10px] text-white px-2 py-0.5 rounded whitespace-nowrap mt-1 border border-cyan-500/30 ${preferStableMapRendering ? 'bg-slate-950/90' : 'bg-black/60'}`}
                               style={{ transform: `translateX(-50%) scale(${shipNameScale})`, transformOrigin: 'top center' }}
                           >
                               {ship.cadetName} ({Math.round(progress * 100)}%)
@@ -2127,7 +2134,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                               {/* Label Wrapper - No inverse rotation needed now as the planet div itself is counter-rotated */}
                               <div>
                                  <span 
-                                    className="text-white/60 text-xs uppercase tracking-widest font-bold group-hover:text-white transition-all shadow-black drop-shadow-md bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/10"
+                                                className={`text-white/60 text-xs uppercase tracking-widest font-bold group-hover:text-white shadow-black px-2 py-0.5 rounded-full border border-white/10 ${preferStableMapRendering ? 'bg-slate-950/90' : 'transition-all drop-shadow-md bg-black/50 backdrop-blur-sm'}`}
                                     style={{
                                         // Dynamic scaling based on zoom level to ensure readability
                                         // If zoom is small (e.g. 0.1), we want label to be larger to be seen.
@@ -2186,7 +2193,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                                 >
                                     {arr.length <= 8 && (
                                         <span
-                                            className="text-[10px] font-bold text-white bg-black/70 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm"
+                                            className={`text-[10px] font-bold text-white px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap mb-1 ${preferStableMapRendering ? 'bg-slate-950/90' : 'bg-black/70 shadow-lg backdrop-blur-sm'}`}
                                             style={{ transform: `scale(${shipNameScale})`, transformOrigin: 'bottom center' }}
                                         >
                                             {ship.cadetName}
