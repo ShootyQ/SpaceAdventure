@@ -41,8 +41,12 @@ export const AVATAR_OPTIONS = [
     { id: 'uranus-extremely-rare-avatar', name: 'Obliquity Oracle', src: '/images/collectibles/avatars/extremely-rare/avatar.uranus.extremely-rare.png' },
     { id: 'venus-extremely-rare-avatar', name: 'Venus Sky Empress', src: '/images/collectibles/avatars/extremely-rare/avatar.venus.extremely-rare.png' },
     { id: 'avatar-shop', name: 'Galactic Quartermaster', src: '/images/collectibles/avatars/shop/avatar.shop.png' },
+    { id: 'axol', name: 'Axol', src: '/images/collectibles/avatars/shop/axol.pet.shop.png' },
+    { id: 'clocksworth', name: 'Clocksworth', src: '/images/collectibles/avatars/shop/clocksworth.avatar.shop.png' },
     { id: 'clockworkbeetle', name: 'Clockwork Beetle', src: '/images/collectibles/avatars/shop/clockworkbeetle_avatar.png' },
     { id: 'kitedagon', name: 'Kitedagon', src: '/images/collectibles/avatars/shop/kitedagon_avatar.png' },
+    { id: 'lizzy', name: 'Lizzy', src: '/images/collectibles/avatars/shop/lizzy.pet.shop.png' },
+    { id: 'turtlefinder', name: 'Turtlefinder', src: '/images/collectibles/avatars/shop/turtlefinder.avatar.shop.png' },
 ];
 
 export const SECRET_AVATAR_IDS = new Set([
@@ -67,8 +71,12 @@ export const SECRET_AVATAR_IDS = new Set([
     'uranus-extremely-rare-avatar',
     'venus-extremely-rare-avatar',
     'avatar-shop',
+    'axol',
+    'clocksworth',
     'clockworkbeetle',
     'kitedagon',
+    'lizzy',
+    'turtlefinder',
 ]);
 export const PUBLIC_AVATAR_OPTIONS = AVATAR_OPTIONS.filter(a => !SECRET_AVATAR_IDS.has(a.id));
 

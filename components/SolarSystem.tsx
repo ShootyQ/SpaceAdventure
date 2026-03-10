@@ -1,10 +1,10 @@
 "use client";
 
 import { resolveShipAssetPath } from "@/lib/ships";
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
-import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft } from "lucide-react";
+import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft, Play, Pause } from "lucide-react";
 import Link from 'next/link';
 import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
@@ -54,6 +54,12 @@ const DUMMY_SHIPS: Ship[] = [];
 
 const MIN_MAP_ZOOM = 0.05;
 const MAX_MAP_ZOOM = 10;
+const CLASSROOM_SPOTLIGHT_PLANET_DWELL_MS = 7000;
+const CLASSROOM_SPOTLIGHT_SHIP_DWELL_MS = 20000;
+const CLASSROOM_SPOTLIGHT_TRAVEL_DWELL_MS = 12000;
+const CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS = 15000;
+const CLASSROOM_SPOTLIGHT_PAN_SMOOTHING = 0.18;
+const CLASSROOM_SPOTLIGHT_ZOOM_SMOOTHING = 0.14;
 
 // Revamped SmallFlag to handle shapes without clipPath IDs collision risk (by just not using clipPath or generated IDs)
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
@@ -100,6 +106,7 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
 interface SolarSystemProps {
         studentView?: boolean;
+    classroomDisplay?: boolean;
 }
 
 type PlanetDiscoveredUnlocks = {
@@ -123,6 +130,16 @@ type SeenXpUnlockState = {
     avatars: Set<string>;
 };
 
+type SpotlightTarget = {
+    key: string;
+    type: 'planet' | 'ship' | 'traveling';
+    label: string;
+    planetId?: string;
+    shipId?: string;
+    dwellMs: number;
+    zoom: number;
+};
+
 const XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX = "spaceAdventure:seen-xp-unlocks:v1";
 
 const buildXpUnlockSeenStorageKey = (ownerId?: string) => {
@@ -130,10 +147,11 @@ const buildXpUnlockSeenStorageKey = (ownerId?: string) => {
     return `${XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX}:${normalizedOwnerId || "unknown"}`;
 };
 
-export default function SolarSystem({ studentView = false }: SolarSystemProps) {
+export default function SolarSystem({ studentView = false, classroomDisplay = false }: SolarSystemProps) {
   const { userData } = useAuth();
         const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const isStudentPersonalView = studentView && userData?.role === 'student';
+    const isTeacherClassroomDisplay = classroomDisplay && !studentView && userData?.role === 'teacher';
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
     const [planetVisitors, setPlanetVisitors] = useState<Ship[]>([]);
@@ -170,6 +188,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   const [isGridVisible, setIsGridVisible] = useState(false);
   const [isCommandMode, setIsCommandMode] = useState(false); // Teacher Control Mode
   const [controlledShipId, setControlledShipId] = useState<string | null>(null);
+    const [isSpotlightMode, setIsSpotlightMode] = useState(classroomDisplay);
+    const [activeSpotlightKey, setActiveSpotlightKey] = useState<string | null>(null);
+    const [spotlightStepStartedAt, setSpotlightStepStartedAt] = useState(0);
+    const [spotlightHoldUntil, setSpotlightHoldUntil] = useState(0);
   const [asteroidEvent, setAsteroidEvent] = useState<AsteroidEvent | null>(null);
     const [petUnlockChanceConfig, setPetUnlockChanceConfig] = useState<PetUnlockChanceConfig>(DEFAULT_PET_UNLOCK_CHANCE_CONFIG);
     const [petUnlockAssignments, setPetUnlockAssignments] = useState<Record<string, PetUnlockAssignment>>({});
@@ -401,6 +423,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   // Refs for Coordinate Calcs inside Snapshot
   const panRef = useRef({ x: 0, y: 0 });
+    const spotlightPausedAtRef = useRef<number | null>(null);
   
   // Sync Rank Ref
     useEffect(() => {
@@ -470,6 +493,19 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+    useEffect(() => {
+        if (!isTeacherClassroomDisplay) {
+                spotlightPausedAtRef.current = null;
+                setActiveSpotlightKey(null);
+                setSpotlightStepStartedAt(0);
+                return;
+        }
+
+        if (!classroomDisplay) {
+                setIsSpotlightMode(false);
+        }
+    }, [classroomDisplay, isTeacherClassroomDisplay]);
 
   // Auto-fit Logic
   useEffect(() => {
@@ -1266,6 +1302,251 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
       };
   };
 
+  const lerpNumber = (start: number, end: number, alpha: number) => start + ((end - start) * alpha);
+
+  const getPlanetSpotlightZoom = (shipCount: number) => {
+      if (shipCount >= 10) return 0.85;
+      if (shipCount >= 5) return 1.15;
+      return 1.45;
+  };
+
+  const getShipSpotlightZoom = (shipCount: number) => {
+      if (shipCount >= 10) return 3.2;
+      if (shipCount >= 5) return 4.8;
+      return 6.4;
+  };
+
+  const getDockedShipPosition = (shipId: string, timestamp: number) => {
+      const ship = ships.find((candidate) => candidate.id === shipId && candidate.status !== 'traveling');
+      if (!ship) return null;
+
+      const planet = PLANETS.find((candidate) => candidate.id === ship.locationId);
+      if (!planet) return null;
+
+      const dockedShips = ships.filter((candidate) => candidate.locationId === ship.locationId && candidate.status !== 'traveling');
+      const shipIndex = dockedShips.findIndex((candidate) => candidate.id === ship.id);
+      if (shipIndex < 0) return getPlanetPosition(ship.locationId, timestamp);
+
+      const orbitSpeed = 15;
+      const currentAngle = (shipIndex * (360 / Math.max(dockedShips.length, 1))) - 90 + ((timestamp / 1000) * orbitSpeed);
+      const angleRad = currentAngle * (Math.PI / 180);
+      const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
+      const crowdPadding = dockedShips.length > 10 ? 20 : dockedShips.length > 6 ? 12 : 0;
+      const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
+      const planetCenter = getPlanetPosition(ship.locationId, timestamp);
+
+      return {
+          x: planetCenter.x + (Math.cos(angleRad) * radius),
+          y: planetCenter.y + (Math.sin(angleRad) * radius),
+      };
+  };
+
+  const getShipTravelPosition = (shipId: string, timestamp: number) => {
+      const ship = ships.find((candidate) => candidate.id === shipId && candidate.status === 'traveling' && candidate.destinationId && candidate.travelStart && candidate.travelEnd);
+      if (!ship || !ship.travelStart || !ship.travelEnd) return null;
+
+      const totalDuration = ship.travelEnd - ship.travelStart;
+      if (totalDuration <= 0) return null;
+
+      const progress = Math.min(Math.max((timestamp - ship.travelStart) / totalDuration, 0), 1);
+      const travelCurve = getTravelCurve(ship);
+      return getQuadraticBezierPoint(travelCurve.start, travelCurve.control, travelCurve.end, progress);
+  };
+
+  const spotlightTargets = useMemo(() => {
+      if (!classroomDisplay || studentView) return [] as SpotlightTarget[];
+
+      const targets: SpotlightTarget[] = [];
+
+      PLANETS.forEach((planet) => {
+          const dockedShips = ships.filter((ship) => ship.locationId === planet.id && ship.status !== 'traveling');
+          if (dockedShips.length === 0) return;
+
+          targets.push({
+              key: `planet:${planet.id}`,
+              type: 'planet',
+              label: `${planet.name} overview`,
+              planetId: planet.id,
+              dwellMs: CLASSROOM_SPOTLIGHT_PLANET_DWELL_MS,
+              zoom: getPlanetSpotlightZoom(dockedShips.length),
+          });
+
+          dockedShips.forEach((ship) => {
+              targets.push({
+                  key: `ship:${ship.id}`,
+                  type: 'ship',
+                  label: ship.cadetName,
+                  planetId: planet.id,
+                  shipId: ship.id,
+                  dwellMs: CLASSROOM_SPOTLIGHT_SHIP_DWELL_MS,
+                  zoom: getShipSpotlightZoom(dockedShips.length),
+              });
+          });
+      });
+
+      ships
+          .filter((ship) => ship.status === 'traveling' && ship.destinationId && ship.travelStart && ship.travelEnd)
+          .forEach((ship) => {
+              targets.push({
+                  key: `traveling:${ship.id}`,
+                  type: 'traveling',
+                  label: `${ship.cadetName} in transit`,
+                  shipId: ship.id,
+                  planetId: ship.destinationId,
+                  dwellMs: CLASSROOM_SPOTLIGHT_TRAVEL_DWELL_MS,
+                  zoom: 4.8,
+              });
+          });
+
+      return targets;
+  }, [classroomDisplay, ships, studentView]);
+
+  const activeSpotlightTarget = useMemo(
+      () => spotlightTargets.find((target) => target.key === activeSpotlightKey) || null,
+      [activeSpotlightKey, spotlightTargets]
+  );
+
+  const isSpotlightBlocked = !isTeacherClassroomDisplay
+      || !isSpotlightMode
+      || spotlightTargets.length === 0
+      || isGridVisible
+      || awardQueue.length > 0
+      || Boolean(activeUnlockReveal)
+      || unlockRevealQueue.length > 0
+      || Boolean(activePlanetCompletions)
+      || planetCompletionQueue.length > 0
+      || isLanded
+      || Boolean(selectedPlanet)
+      || spotlightHoldUntil > now;
+
+  const spotlightRemainingMs = activeSpotlightTarget && spotlightStepStartedAt > 0
+      ? Math.max(activeSpotlightTarget.dwellMs - Math.max(now - spotlightStepStartedAt, 0), 0)
+      : 0;
+
+  const getSpotlightPosition = (target: SpotlightTarget, timestamp: number) => {
+      if (target.type === 'planet' && target.planetId) {
+          return getPlanetPosition(target.planetId, timestamp);
+      }
+
+      if (target.type === 'ship' && target.shipId) {
+          return getDockedShipPosition(target.shipId, timestamp);
+      }
+
+      if (target.type === 'traveling' && target.shipId) {
+          return getShipTravelPosition(target.shipId, timestamp);
+      }
+
+      return null;
+  };
+
+  const getSpotlightCameraState = (target: SpotlightTarget, timestamp: number) => {
+      const position = getSpotlightPosition(target, timestamp);
+      if (!position) return null;
+
+      const targetZoom = Math.min(Math.max(target.zoom, MIN_MAP_ZOOM), MAX_MAP_ZOOM);
+      return {
+          pan: {
+              x: -position.x * targetZoom,
+              y: -position.y * targetZoom,
+          },
+          zoom: targetZoom,
+      };
+  };
+
+  const advanceSpotlightTarget = useCallback(() => {
+      if (spotlightTargets.length === 0) {
+          setActiveSpotlightKey(null);
+          return;
+      }
+
+      setActiveSpotlightKey((previousKey) => {
+          const currentIndex = spotlightTargets.findIndex((target) => target.key === previousKey);
+          const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % spotlightTargets.length;
+          return spotlightTargets[nextIndex]?.key || spotlightTargets[0].key;
+      });
+  }, [spotlightTargets]);
+
+  const holdSpotlight = useCallback((durationMs = CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS) => {
+      if (!isTeacherClassroomDisplay || !isSpotlightMode) return;
+      setSpotlightHoldUntil(Date.now() + durationMs);
+  }, [isSpotlightMode, isTeacherClassroomDisplay]);
+
+  useEffect(() => {
+      if (!isTeacherClassroomDisplay || !isSpotlightMode || spotlightTargets.length === 0) {
+          setActiveSpotlightKey(null);
+          return;
+      }
+
+      setActiveSpotlightKey((previousKey) => {
+          if (previousKey && spotlightTargets.some((target) => target.key === previousKey)) {
+              return previousKey;
+          }
+
+          return spotlightTargets[0].key;
+      });
+  }, [isSpotlightMode, isTeacherClassroomDisplay, spotlightTargets]);
+
+  useEffect(() => {
+      if (!activeSpotlightKey) {
+          setSpotlightStepStartedAt(0);
+          return;
+      }
+
+      setSpotlightStepStartedAt(Date.now());
+  }, [activeSpotlightKey]);
+
+  useEffect(() => {
+      if (!activeSpotlightKey || !isSpotlightMode) {
+          spotlightPausedAtRef.current = null;
+          return;
+      }
+
+      if (isSpotlightBlocked) {
+          if (spotlightPausedAtRef.current === null) {
+              spotlightPausedAtRef.current = Date.now();
+          }
+          return;
+      }
+
+      if (spotlightPausedAtRef.current !== null) {
+          const pausedForMs = Date.now() - spotlightPausedAtRef.current;
+          spotlightPausedAtRef.current = null;
+          setSpotlightStepStartedAt((previousStartedAt) => previousStartedAt > 0 ? previousStartedAt + pausedForMs : previousStartedAt);
+      }
+  }, [activeSpotlightKey, isSpotlightBlocked, isSpotlightMode]);
+
+  useEffect(() => {
+      if (isSpotlightBlocked || !activeSpotlightTarget || spotlightStepStartedAt <= 0) return;
+
+      const elapsedMs = Date.now() - spotlightStepStartedAt;
+      const remainingMs = Math.max(activeSpotlightTarget.dwellMs - elapsedMs, 0);
+      const timerId = setTimeout(() => {
+          advanceSpotlightTarget();
+      }, remainingMs);
+
+      return () => clearTimeout(timerId);
+  }, [activeSpotlightTarget, advanceSpotlightTarget, isSpotlightBlocked, spotlightStepStartedAt]);
+
+  useEffect(() => {
+      if (isSpotlightBlocked || !activeSpotlightTarget) return;
+
+      const cameraState = getSpotlightCameraState(activeSpotlightTarget, now);
+      if (!cameraState) return;
+
+      setIsAutoFit(false);
+      setPan((previousPan) => ({
+          x: Math.abs(cameraState.pan.x - previousPan.x) < 0.5
+              ? cameraState.pan.x
+              : lerpNumber(previousPan.x, cameraState.pan.x, CLASSROOM_SPOTLIGHT_PAN_SMOOTHING),
+          y: Math.abs(cameraState.pan.y - previousPan.y) < 0.5
+              ? cameraState.pan.y
+              : lerpNumber(previousPan.y, cameraState.pan.y, CLASSROOM_SPOTLIGHT_PAN_SMOOTHING),
+      }));
+      setZoom((previousZoom) => Math.abs(cameraState.zoom - previousZoom) < 0.002
+          ? cameraState.zoom
+          : lerpNumber(previousZoom, cameraState.zoom, CLASSROOM_SPOTLIGHT_ZOOM_SMOOTHING));
+  }, [activeSpotlightTarget, isSpotlightBlocked, now]);
+
   // Helper to format duration
   const formatDuration = (minutes: number) => {
       if (minutes < 60) return `${Math.round(minutes)} mins`;
@@ -1519,6 +1800,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
   // Handle mouse wheel zoom
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
+                holdSpotlight();
         setIsAutoFit(false);
 
         const viewport = containerRef.current;
@@ -1549,6 +1831,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   // Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+      holdSpotlight();
       setIsAutoFit(false);
       setIsDragging(true);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -1556,6 +1839,7 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
 
   const handleMouseMove = (e: React.MouseEvent) => {
       if (!isDragging) return;
+      holdSpotlight();
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
       
@@ -1977,8 +2261,39 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
            </>
        )}
 
+       {isTeacherClassroomDisplay && (
+           <div className="absolute right-6 top-52 z-[60] w-[220px] rounded-xl border border-cyan-500/30 bg-black/75 px-4 py-3 text-white shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-md">
+               <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300">Classroom Tour</div>
+               <div className="mt-1 text-sm font-semibold text-white">{activeSpotlightTarget?.label || 'Ready to spotlight'}</div>
+               <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/60">
+                   {activeSpotlightTarget ? (activeSpotlightTarget.type === 'planet' ? 'Planet Overview' : activeSpotlightTarget.type === 'traveling' ? 'Transit Spotlight' : 'Ship Spotlight') : 'Standby'}
+               </div>
+               <div className="mt-2 text-xs text-cyan-200/90">
+                   {!isSpotlightMode ? 'Paused' : isSpotlightBlocked ? 'Holding current frame' : `${Math.max(1, Math.ceil(spotlightRemainingMs / 1000))}s remaining`}
+               </div>
+           </div>
+       )}
+
        {/* View Controls */}
        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-[60]">
+
+           {isTeacherClassroomDisplay && (
+               <div id="map-btn-spotlight">
+                   <button
+                        onClick={() => {
+                            if (!isSpotlightMode) {
+                                setSpotlightHoldUntil(0);
+                            }
+                            setIsSpotlightMode((previous) => !previous);
+                        }}
+                        className={`p-3 rounded-lg border backdrop-blur transition-colors flex items-center justify-center ${isSpotlightMode ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'bg-black/50 border-white/20 text-emerald-300 hover:bg-white/10'}`}
+                        title={isSpotlightMode ? 'Pause Classroom Tour' : 'Start Classroom Tour'}
+                   >
+                    {isSpotlightMode ? <Pause size={24} /> : <Play size={24} />}
+                   </button>
+               </div>
+           )}
+
            {/* Teacher Command Toggle */}
            {(userData?.role === 'teacher' || userData?.email === 'andrewpcarlson85@gmail.com') && (
                <div id="map-btn-command">
@@ -2006,10 +2321,10 @@ export default function SolarSystem({ studentView = false }: SolarSystemProps) {
            )}
 
            <div className="bg-black/50 backdrop-blur border border-white/20 rounded-lg p-2 flex flex-col gap-2">
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, MAX_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
-               <button onClick={() => { setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, MIN_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
+               <button onClick={() => { holdSpotlight(); setIsAutoFit(false); setZoom(z => Math.min(z + 0.1, MAX_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom In"><Plus /></button>
+               <button onClick={() => { holdSpotlight(); setIsAutoFit(false); setZoom(z => Math.max(z - 0.1, MIN_MAP_ZOOM)); }} className="p-2 hover:bg-white/10 rounded text-white" title="Zoom Out"><Minus /></button>
                <div className="w-full h-px bg-white/20 my-1" />
-               <button onClick={() => { setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
+               <button onClick={() => { holdSpotlight(); setPan({x:0, y:0}); setIsAutoFit(true); }} className="p-2 hover:bg-white/10 rounded text-white" title="Reset View"><Move size={20} /></button>
            </div>
            
            <button 
