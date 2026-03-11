@@ -91,12 +91,13 @@ export default function AwardOverlay({ awards, activeUnlockReveal, ranks, onDism
                 const isUltraDense = awardCount > 10;
                 const isDense = awardCount > 6;
                 const isMedium = awardCount >= 3 && awardCount <= 6;
+                const isBatchLayout = awardCount > 6;
                 const cols = awardCount > 16 ? 6 : awardCount > 10 ? 5 : awardCount > 6 ? 4 : undefined;
 
                 return (
                     <div
-                        className={`${cols ? 'grid' : 'flex flex-wrap'} items-center justify-center ${isSuperDense ? 'gap-1 p-1' : isUltraDense ? 'gap-1.5 p-1.5' : isDense ? 'gap-2 p-2' : isMedium ? 'gap-3 p-4' : 'gap-6 p-8'} max-h-[100dvh] overflow-hidden cursor-default justify-items-center content-center`}
-                        style={cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
+                        className={`${cols ? 'grid' : 'flex flex-wrap'} items-center justify-center ${isSuperDense ? 'gap-1 p-1' : isUltraDense ? 'gap-1.5 p-2' : isDense ? 'gap-2 p-3' : isMedium ? 'gap-3 p-4' : 'gap-6 p-8'} max-h-[100dvh] overflow-hidden cursor-default justify-items-center content-center`}
+                        style={cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, width: awardCount > 10 ? 'min(96vw, 1080px)' : 'min(96vw, 1180px)' } : undefined}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {awards.map((award) => {
@@ -107,6 +108,8 @@ export default function AwardOverlay({ awards, activeUnlockReveal, ranks, onDism
                             const isDenseAward = isDense;
                             const isUltraDenseAward = isUltraDense;
                             const useLightAnimation = isDense;
+                            const showPromotionPanel = Boolean(award.newRank) && !isBatchLayout;
+                            const showPromotionBadge = Boolean(award.newRank) && isBatchLayout;
                             const selectedPet = getPetById(award.ship.selectedPetId);
                             return (
                                 <motion.div
@@ -121,12 +124,33 @@ export default function AwardOverlay({ awards, activeUnlockReveal, ranks, onDism
                                         duration: useLightAnimation ? 0.16 : undefined,
                                         delay: 0
                                     }}
-                                    className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                        ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isMediumAward ? 'w-[220px] p-3 rounded-2xl' : isSingleAward ? 'w-[95vw] max-w-[980px] max-h-[92dvh] overflow-hidden p-6 sm:w-[90vw] sm:p-8 lg:p-10' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
+                                    className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center justify-between shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
+                                        ${isSuperDense ? 'w-[132px] h-[168px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[152px] h-[190px] p-2.5 rounded-xl' : isDenseAward ? 'w-[176px] h-[224px] p-3 rounded-2xl' : isMediumAward ? 'w-[220px] h-[252px] p-3 rounded-2xl' : isSingleAward ? 'w-[95vw] max-w-[980px] max-h-[92dvh] overflow-hidden p-6 sm:w-[90vw] sm:p-8 lg:p-10' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
                                     `}
                                 >
                                     {/* Background Shine */}
                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
+
+                                    {showPromotionBadge && (() => {
+                                        const rank = ranks.find((rk) => rk.name === award.newRank);
+                                        return (
+                                            <div className={`absolute z-30 right-1.5 bottom-1.5 border border-yellow-400/50 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 shadow-[0_0_24px_rgba(234,179,8,0.35)] ${isSuperDense ? 'w-8 h-12 rounded-lg p-1' : isUltraDenseAward ? 'w-9 h-14 rounded-lg p-1' : 'w-11 h-16 rounded-xl p-1.5'} flex flex-col items-center justify-between overflow-hidden`}>
+                                                <div className="absolute inset-0 bg-yellow-400/10 animate-pulse" />
+                                                <span className={`relative z-10 text-yellow-200 font-black uppercase tracking-widest ${isSuperDense ? 'text-[5px]' : 'text-[6px]'}`}>Up</span>
+                                                {rank?.image ? (
+                                                    <motion.img
+                                                        initial={{ scale: 0, rotate: 180 }}
+                                                        animate={{ scale: [1, 1.12, 1], rotate: 0 }}
+                                                        transition={{ type: "spring", bounce: 0.45, scale: { repeat: Infinity, duration: 1.4, ease: "easeInOut" } }}
+                                                        src={getAssetPath(rank.image)}
+                                                        alt="Rank Badge"
+                                                        className={`${isSuperDense ? 'w-4 h-4' : isUltraDenseAward ? 'w-5 h-5' : 'w-6 h-6'} object-contain drop-shadow-[0_0_14px_rgba(234,179,8,0.8)] relative z-10`}
+                                                    />
+                                                ) : null}
+                                                <span className={`relative z-10 font-black text-yellow-50 leading-none ${isSuperDense ? 'text-[7px]' : isUltraDenseAward ? 'text-[8px]' : 'text-[9px]'}`}>R+</span>
+                                            </div>
+                                        );
+                                    })()}
 
                                     <h2 className={`${isSuperDense ? 'text-[9px]' : isUltraDenseAward ? 'text-[10px]' : isDenseAward ? 'text-xs' : isMediumAward ? 'text-xs' : isCompactAward ? 'text-sm' : isSingleAward ? 'text-xl sm:text-2xl lg:text-[2rem]' : 'text-xl'} text-cyan-300 font-mono tracking-widest ${isSuperDense ? 'mb-1.5' : isSingleAward ? 'mb-3' : 'mb-2'} uppercase relative z-10`}>Training Milestone</h2>
 
@@ -141,20 +165,20 @@ export default function AwardOverlay({ awards, activeUnlockReveal, ranks, onDism
                                             duration: 4,
                                             ease: "easeInOut"
                                         }}
-                                        className={`relative z-10 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : isSingleAward ? 'mb-4' : 'mb-4'}`}
+                                        className={`relative z-10 shrink-0 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : isSingleAward ? 'mb-4' : 'mb-4'}`}
                                     >
-                                        <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-32 h-12' : isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isMediumAward ? 'w-52 h-[5.5rem]' : isCompactAward ? 'w-56 h-24' : isSingleAward ? 'w-[18rem] h-[10rem] sm:w-[24rem] sm:h-[14rem] lg:w-[26rem] lg:h-[14rem]' : 'w-80 h-36'}`}>
+                                        <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-[7.25rem] h-10' : isUltraDenseAward ? 'w-[8.25rem] h-12' : isDenseAward ? 'w-[9.5rem] h-16' : isMediumAward ? 'w-52 h-[5.5rem]' : isCompactAward ? 'w-56 h-24' : isSingleAward ? 'w-[18rem] h-[10rem] sm:w-[24rem] sm:h-[14rem] lg:w-[26rem] lg:h-[14rem]' : 'w-80 h-36'}`}>
                                             {award.ship.flag && (
                                                 <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : isSingleAward ? '-top-3 right-[41%] scale-95 sm:scale-110' : '-top-3 right-[38%] scale-95'}`}>
                                                     <TinyFlag config={award.ship.flag} />
                                                 </div>
                                             )}
 
-                                            <div className={`absolute left-1 z-30 flex items-center justify-center ${isMediumAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[90px] h-[90px] top-[62%] -translate-y-1/2 sm:w-[112px] sm:h-[112px] lg:w-[112px] lg:h-[112px]' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
+                                            <div className={`absolute left-1 z-30 flex items-center justify-center ${isSuperDense ? 'w-8 h-8 top-[62%] -translate-y-1/2' : isUltraDenseAward ? 'w-9 h-9 top-[62%] -translate-y-1/2' : isDenseAward ? 'w-11 h-11 top-[60%] -translate-y-1/2' : isMediumAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[90px] h-[90px] top-[62%] -translate-y-1/2 sm:w-[112px] sm:h-[112px] lg:w-[112px] lg:h-[112px]' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
                                                 <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full" />
                                             </div>
 
-                                            <div className={`relative z-20 ${isMediumAward ? 'w-20 h-20' : isCompactAward ? 'w-24 h-24' : isSingleAward ? 'w-44 h-44 sm:w-56 sm:h-56 lg:w-52 lg:h-52' : 'w-40 h-40'}`}>
+                                            <div className={`relative z-20 ${isSuperDense ? 'w-16 h-16' : isUltraDenseAward ? 'w-[4.5rem] h-[4.5rem]' : isDenseAward ? 'w-[5.5rem] h-[5.5rem]' : isMediumAward ? 'w-20 h-20' : isCompactAward ? 'w-24 h-24' : isSingleAward ? 'w-44 h-44 sm:w-56 sm:h-56 lg:w-52 lg:h-52' : 'w-40 h-40'}`}>
                                                 <img
                                                     src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))}
                                                     onError={(event) => {
@@ -166,7 +190,7 @@ export default function AwardOverlay({ awards, activeUnlockReveal, ranks, onDism
                                                 />
                                             </div>
 
-                                            <div className={`absolute right-1 z-30 flex items-center justify-center ${isMediumAward ? 'w-[46px] h-[46px] top-[60%] -translate-y-1/2' : isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[82px] h-[82px] top-[62%] -translate-y-1/2 sm:w-[98px] sm:h-[98px] lg:w-[100px] lg:h-[100px]' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
+                                            <div className={`absolute right-1 z-30 flex items-center justify-center ${isSuperDense ? 'w-7 h-7 top-[62%] -translate-y-1/2' : isUltraDenseAward ? 'w-8 h-8 top-[62%] -translate-y-1/2' : isDenseAward ? 'w-10 h-10 top-[60%] -translate-y-1/2' : isMediumAward ? 'w-[46px] h-[46px] top-[60%] -translate-y-1/2' : isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[82px] h-[82px] top-[62%] -translate-y-1/2 sm:w-[98px] sm:h-[98px] lg:w-[100px] lg:h-[100px]' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
                                                 {selectedPet.imageSrc ? (
                                                     <img
                                                         src={getAssetPath(selectedPet.imageSrc)}
@@ -180,25 +204,25 @@ export default function AwardOverlay({ awards, activeUnlockReveal, ranks, onDism
                                         </div>
                                     </motion.div>
 
-                                    <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isDenseAward ? 'text-xl' : isMediumAward ? 'text-xl mb-1' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.55rem] sm:text-5xl lg:text-5xl mb-3' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
+                                    <div className={`${isSuperDense ? 'text-sm h-8 mb-1 pr-8' : isUltraDenseAward ? 'text-base h-9 pr-8' : isDenseAward ? 'text-lg h-10 pr-10' : isMediumAward ? 'text-xl h-11 mb-1' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.55rem] sm:text-5xl lg:text-5xl mb-3' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 flex items-center justify-center ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full leading-tight'}`}>
                                         {award.ship.cadetName}
                                     </div>
 
                                     {award.reason && (
-                                        <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[8px]' : isUltraDenseAward ? 'text-[9px]' : isDenseAward ? 'text-[10px]' : isMediumAward ? 'text-[11px]' : isCompactAward ? 'text-xs' : isSingleAward ? 'text-base sm:text-lg' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-1.5' : isSingleAward ? 'mb-4' : 'mb-3'} relative z-10`}>
+                                        <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[7px] h-5' : isUltraDenseAward ? 'text-[8px] h-6' : isDenseAward ? 'text-[9px] h-7' : isMediumAward ? 'text-[11px]' : isCompactAward ? 'text-xs' : isSingleAward ? 'text-base sm:text-lg' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-1.5' : isSingleAward ? 'mb-4' : 'mb-3'} relative z-10 flex items-start justify-center overflow-hidden text-ellipsis ${isBatchLayout ? 'px-1' : ''}`}>
                                             {award.reason}
                                         </div>
                                     )}
 
-                                    {!award.reason && <div className={isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-1.5' : isSingleAward ? 'mb-4' : 'mb-3'} />}
+                                    {!award.reason && <div className={isSuperDense ? 'h-5 mb-1' : isUltraDenseAward ? 'h-6 mb-1.5' : isBatchLayout ? 'h-7 mb-3' : isSingleAward ? 'mb-4' : 'mb-3'} />}
 
-                                    <div className={`flex items-center justify-center ${isSuperDense ? 'gap-2' : 'gap-4'} w-full relative z-10`}>
-                                        <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg' : isSingleAward ? 'p-4 sm:p-5 rounded-2xl' : 'p-3 rounded-xl'} border border-green-500/30`}>
-                                            <span className={`block text-green-400 ${isSuperDense ? 'text-[8px]' : 'text-[10px]'} font-bold uppercase tracking-wider mb-1`}>XP Gained</span>
-                                            <span className={`${isUltraDenseAward ? 'text-lg' : isSingleAward ? 'text-4xl sm:text-5xl' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
+                                    <div className={`flex items-center justify-center ${showPromotionPanel ? (isSuperDense ? 'gap-2' : 'gap-4') : 'gap-0'} w-full relative z-10 mt-auto`}>
+                                        <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg min-h-[3rem]' : isUltraDenseAward ? 'p-2 rounded-lg min-h-[3.4rem]' : isDenseAward ? 'p-2.5 rounded-xl min-h-[4.2rem]' : isSingleAward ? 'p-4 sm:p-5 rounded-2xl' : 'p-3 rounded-xl'} border border-green-500/30 ${showPromotionBadge ? 'pr-8' : ''}`}>
+                                            <span className={`block text-green-400 ${isSuperDense ? 'text-[7px]' : isUltraDenseAward ? 'text-[8px]' : 'text-[10px]'} font-bold uppercase tracking-wider mb-1`}>XP Gained</span>
+                                            <span className={`${isSuperDense ? 'text-xl' : isUltraDenseAward ? 'text-2xl' : isSingleAward ? 'text-4xl sm:text-5xl' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
                                         </div>
 
-                                        {award.newRank && (
+                                        {showPromotionPanel && award.newRank && (
                                             <div
                                                 className={`flex-1 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 ${isSingleAward ? 'p-3 sm:p-4 rounded-2xl max-h-32' : 'p-2 rounded-xl'} border border-yellow-500/50 flex flex-col items-center gap-1 shadow-[0_0_30px_rgba(234,179,8,0.4)] relative overflow-hidden`}
                                             >

@@ -62,6 +62,15 @@ const CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS = 15000;
 const CLASSROOM_SPOTLIGHT_PAN_SMOOTHING = 0.18;
 const CLASSROOM_SPOTLIGHT_ZOOM_SMOOTHING = 0.14;
 
+const shuffleArray = <T,>(items: T[]) => {
+    const next = [...items];
+    for (let index = next.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    }
+    return next;
+};
+
 // Revamped SmallFlag to handle shapes without clipPath IDs collision risk (by just not using clipPath or generated IDs)
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
     const getColor = (id: string) => {
@@ -426,6 +435,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   // Refs for Coordinate Calcs inside Snapshot
   const panRef = useRef({ x: 0, y: 0 });
     const spotlightPausedAtRef = useRef<number | null>(null);
+        const spotlightSequenceRef = useRef<string[]>([]);
   
   // Sync Rank Ref
     useEffect(() => {
@@ -1421,9 +1431,12 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
       || Boolean(selectedPlanet)
       || spotlightHoldUntil > now;
 
-  const spotlightRemainingMs = activeSpotlightTarget && spotlightStepStartedAt > 0
-      ? Math.max(activeSpotlightTarget.dwellMs - Math.max(now - spotlightStepStartedAt, 0), 0)
-      : 0;
+  const buildSpotlightSequence = useCallback((deferredKey?: string | null) => {
+      const availableKeys = spotlightTargets.map((target) => target.key);
+      const deferred = deferredKey && availableKeys.includes(deferredKey) ? deferredKey : null;
+      const shuffledKeys = shuffleArray(availableKeys.filter((key) => key !== deferred));
+      return deferred ? [...shuffledKeys, deferred] : shuffledKeys;
+  }, [spotlightTargets]);
 
   const getSpotlightPosition = (target: SpotlightTarget, timestamp: number) => {
       if (target.type === 'planet' && target.planetId) {
@@ -1457,16 +1470,27 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   const advanceSpotlightTarget = useCallback(() => {
       if (spotlightTargets.length === 0) {
+          spotlightSequenceRef.current = [];
           setActiveSpotlightKey(null);
           return;
       }
 
       setActiveSpotlightKey((previousKey) => {
-          const currentIndex = spotlightTargets.findIndex((target) => target.key === previousKey);
-          const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % spotlightTargets.length;
-          return spotlightTargets[nextIndex]?.key || spotlightTargets[0].key;
+          if (spotlightSequenceRef.current.length === 0) {
+              spotlightSequenceRef.current = buildSpotlightSequence(previousKey);
+          }
+
+          const currentIndex = spotlightSequenceRef.current.findIndex((key) => key === previousKey);
+          const nextIndex = currentIndex + 1;
+
+          if (currentIndex >= 0 && nextIndex < spotlightSequenceRef.current.length) {
+              return spotlightSequenceRef.current[nextIndex];
+          }
+
+          spotlightSequenceRef.current = buildSpotlightSequence(previousKey);
+          return spotlightSequenceRef.current[0] || previousKey || null;
       });
-  }, [spotlightTargets]);
+  }, [buildSpotlightSequence, spotlightTargets.length]);
 
   const holdSpotlight = useCallback((durationMs = CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS) => {
       if (!isTeacherClassroomDisplay || !isSpotlightMode) return;
@@ -1475,8 +1499,21 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   useEffect(() => {
       if (!isTeacherClassroomDisplay || !isSpotlightMode || spotlightTargets.length === 0) {
+          spotlightSequenceRef.current = [];
           setActiveSpotlightKey(null);
           return;
+      }
+
+      const availableKeys = new Set(spotlightTargets.map((target) => target.key));
+      const preservedSequence = spotlightSequenceRef.current.filter((key) => availableKeys.has(key));
+      const missingKeys = spotlightTargets
+          .map((target) => target.key)
+          .filter((key) => !preservedSequence.includes(key));
+
+      spotlightSequenceRef.current = [...preservedSequence, ...shuffleArray(missingKeys)];
+
+      if (spotlightSequenceRef.current.length === 0) {
+          spotlightSequenceRef.current = buildSpotlightSequence();
       }
 
       setActiveSpotlightKey((previousKey) => {
@@ -1484,9 +1521,9 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
               return previousKey;
           }
 
-          return spotlightTargets[0].key;
+          return spotlightSequenceRef.current[0] || null;
       });
-  }, [isSpotlightMode, isTeacherClassroomDisplay, spotlightTargets]);
+  }, [buildSpotlightSequence, isSpotlightMode, isTeacherClassroomDisplay, spotlightTargets]);
 
   useEffect(() => {
       if (!activeSpotlightKey) {
@@ -2267,19 +2304,6 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                     <span className="font-bold tracking-widest uppercase text-sm">Cockpit</span>
                 </Link>
            </>
-       )}
-
-       {isTeacherClassroomDisplay && (
-           <div className="absolute right-6 top-52 z-[60] w-[220px] rounded-xl border border-cyan-500/30 bg-black/75 px-4 py-3 text-white shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-md">
-               <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300">Classroom Tour</div>
-               <div className="mt-1 text-sm font-semibold text-white">{activeSpotlightTarget?.label || 'Ready to spotlight'}</div>
-               <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/60">
-                   {activeSpotlightTarget ? (activeSpotlightTarget.type === 'planet' ? 'Planet Overview' : activeSpotlightTarget.type === 'traveling' ? 'Transit Spotlight' : 'Ship Spotlight') : 'Standby'}
-               </div>
-               <div className="mt-2 text-xs text-cyan-200/90">
-                   {!isSpotlightMode ? 'Paused' : isSpotlightBlocked ? 'Holding current frame' : `${Math.max(1, Math.ceil(spotlightRemainingMs / 1000))}s remaining`}
-               </div>
-           </div>
        )}
 
        {/* View Controls */}
