@@ -1,7 +1,7 @@
 "use client";
 
 import { resolveShipAssetPath } from "@/lib/ships";
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft, Play, Pause } from "lucide-react";
@@ -62,6 +62,15 @@ const CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS = 15000;
 const CLASSROOM_SPOTLIGHT_PAN_SMOOTHING = 0.18;
 const CLASSROOM_SPOTLIGHT_ZOOM_SMOOTHING = 0.14;
 
+type StarfieldPoint = {
+    id: number;
+    top: string;
+    left: string;
+    size: string;
+    opacity: number;
+    animationDuration: string;
+};
+
 const shuffleArray = <T,>(items: T[]) => {
     const next = [...items];
     for (let index = next.length - 1; index > 0; index -= 1) {
@@ -73,6 +82,7 @@ const shuffleArray = <T,>(items: T[]) => {
 
 // Revamped SmallFlag to handle shapes without clipPath IDs collision risk (by just not using clipPath or generated IDs)
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
+    const clipPathId = useId();
     const getColor = (id: string) => {
         const colors: Record<string, string> = {
             red: '#ef4444', blue: '#3b82f6', green: '#22c55e', yellow: '#eab308',
@@ -87,21 +97,20 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
     const c1 = getColor(config.primaryColor);
     const c2 = getColor(config.secondaryColor);
-    const uniqueId = `clip-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, '');
 
     return (
         <svg width="24" height="30" viewBox="0 0 24 30" className="drop-shadow-md">
             <rect x="2" y="2" width="2" height="28" rx="1" fill={poleColors[config.pole] || '#cbd5e1'} />
             <g transform="translate(4, 3)">
                 <defs>
-                   <clipPath id={uniqueId}>
+                   <clipPath id={clipPathId}>
                         {config.shape === 'rectangle' && <rect x="0" y="0" width="20" height="12" />}
                         {config.shape === 'pennant' && <polygon points="0,0 20,6 0,12" />}
                         {config.shape === 'triangle' && <polygon points="0,0 20,0 10,12 0,0" />} 
                         {config.shape === 'swallowtail' && <polygon points="0,0 20,0 20,12 10,6 0,12" />} 
                    </clipPath>
                 </defs>
-                <g clipPath={`url(#${uniqueId})`}>
+                <g clipPath={`url(#${clipPathId})`}>
                      {config.pattern === 'solid' && <rect x="0" y="0" width="20" height="12" fill={c1} />}
                      {config.pattern === 'stripe-h' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
                      {config.pattern === 'stripe-v' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
@@ -150,12 +159,25 @@ type SpotlightTarget = {
     zoom: number;
 };
 
+type TravelingShip = Ship & {
+    destinationId: string;
+    travelStart: number;
+    travelEnd: number;
+};
+
 const XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX = "spaceAdventure:seen-xp-unlocks:v1";
 
 const buildXpUnlockSeenStorageKey = (ownerId?: string) => {
     const normalizedOwnerId = String(ownerId || "").trim();
     return `${XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX}:${normalizedOwnerId || "unknown"}`;
 };
+
+const isTravelingShip = (ship: Ship): ship is TravelingShip => (
+    ship.status === 'traveling'
+    && Boolean(ship.destinationId)
+    && typeof ship.travelStart === 'number'
+    && typeof ship.travelEnd === 'number'
+);
 
 export default function SolarSystem({ studentView = false, classroomDisplay = false }: SolarSystemProps) {
   const { userData } = useAuth();
@@ -367,7 +389,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           award.unlocks?.objects?.length
       );
 
-      if (!hasUnlocks || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
+      if (!hasUnlocks || dismissedUnlockRevealAwardIdsRef.current.has(award.id) || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
 
       scheduledUnlockRevealAwardIdsRef.current.add(award.id);
       const timerId = setTimeout(() => {
@@ -434,6 +456,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   // Refs for Coordinate Calcs inside Snapshot
   const panRef = useRef({ x: 0, y: 0 });
+        const isDocumentVisibleRef = useRef(true);
+        const dismissedUnlockRevealAwardIdsRef = useRef<Set<string>>(new Set());
     const spotlightPausedAtRef = useRef<number | null>(null);
         const spotlightSequenceRef = useRef<string[]>([]);
   
@@ -503,6 +527,18 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+      if (typeof document === "undefined") return;
+
+      const handleVisibilityChange = () => {
+          isDocumentVisibleRef.current = document.visibilityState !== "hidden";
+      };
+
+      handleVisibilityChange();
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
 
@@ -555,10 +591,20 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     setMounted(true);
     let frameId: number;
     let lastTime = 0;
-        const FPS = isTeacherClassroomDisplay ? 24 : 30;
+        const FPS = preferStableMapRendering ? 24 : 30;
     const interval = 1000 / FPS;
+    const shouldAnimateMap = isOrbiting
+        && !isGridVisible
+        && !awardQueue.length
+        && !activeUnlockReveal
+        && !activePlanetCompletions;
 
     const animate = (time: number) => {
+        if (!isDocumentVisibleRef.current) {
+            frameId = requestAnimationFrame(animate);
+            return;
+        }
+
         const delta = time - lastTime;
         if (delta > interval) {
             setNow(Date.now());
@@ -567,9 +613,9 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         frameId = requestAnimationFrame(animate);
     };
     // Pause animation if the Manifest Overlay is open to save resources
-    if(isOrbiting && !isGridVisible && !awardQueue.length) frameId = requestAnimationFrame(animate);
+    if (shouldAnimateMap) frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-    }, [isOrbiting, isGridVisible, awardQueue.length, isTeacherClassroomDisplay]);
+    }, [activePlanetCompletions, activeUnlockReveal, awardQueue.length, isGridVisible, isOrbiting, preferStableMapRendering]);
 
   
   // Panning State
@@ -602,7 +648,14 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   const dismissCurrentOverlay = useCallback(() => {
       if (activeUnlockReveal) {
+          dismissedUnlockRevealAwardIdsRef.current.add(activeUnlockReveal.id);
           scheduledUnlockRevealAwardIdsRef.current.delete(activeUnlockReveal.id);
+          const pendingTimer = unlockRevealTimerMapRef.current.get(activeUnlockReveal.id);
+          if (pendingTimer) {
+              clearTimeout(pendingTimer);
+              unlockRevealTimerMapRef.current.delete(activeUnlockReveal.id);
+          }
+          setUnlockRevealQueue((prev) => prev.filter((award) => award.id !== activeUnlockReveal.id));
           setActiveUnlockReveal(null);
           return;
       }
@@ -624,8 +677,15 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   useEffect(() => {
       if (activeUnlockReveal || unlockRevealQueue.length === 0 || awardQueue.length > 0 || Boolean(activePlanetCompletions)) return;
-      setActiveUnlockReveal(unlockRevealQueue[0]);
-      setUnlockRevealQueue((prev) => prev.slice(1));
+
+      const nextReveal = unlockRevealQueue.find((award) => !dismissedUnlockRevealAwardIdsRef.current.has(award.id));
+      if (!nextReveal) {
+          setUnlockRevealQueue([]);
+          return;
+      }
+
+      setActiveUnlockReveal(nextReveal);
+      setUnlockRevealQueue((prev) => prev.filter((award) => award.id !== nextReveal.id));
   }, [activeUnlockReveal, unlockRevealQueue, awardQueue.length, activePlanetCompletions]);
 
   useEffect(() => {
@@ -705,6 +765,48 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           unlockRevealTimerMapRef.current.clear();
       };
   }, []);
+
+  const planetById = useMemo(() => new Map(PLANETS.map((planet) => [planet.id, planet])), []);
+
+  const shipsById = useMemo(() => {
+      const next = new Map<string, Ship>();
+      ships.forEach((ship) => next.set(ship.id, ship));
+      return next;
+  }, [ships]);
+
+  const dockedShipsByPlanet = useMemo(() => {
+      const next = new Map<string, Ship[]>();
+      ships.forEach((ship) => {
+          if (ship.status === 'traveling') return;
+          const existing = next.get(ship.locationId);
+          if (existing) {
+              existing.push(ship);
+              return;
+          }
+          next.set(ship.locationId, [ship]);
+      });
+      return next;
+  }, [ships]);
+
+  const visitedShipsByPlanet = useMemo(() => {
+      const next = new Map<string, Ship[]>();
+      ships.forEach((ship) => {
+          ship.visitedPlanets?.forEach((planetId) => {
+              const existing = next.get(planetId);
+              if (existing) {
+                  existing.push(ship);
+                  return;
+              }
+              next.set(planetId, [ship]);
+          });
+      });
+      return next;
+  }, [ships]);
+
+  const travelingShips = useMemo(
+      () => ships.filter(isTravelingShip),
+      [ships]
+  );
 
   // Real-time subscription to all star travelers
   useEffect(() => {
@@ -1211,7 +1313,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   const getPlanetOrbitEdgePosition = (planetId: string, timestamp: number, padding?: number) => {
       const center = getPlanetPosition(planetId, timestamp);
-      const planet = PLANETS.find((p) => p.id === planetId);
+      const planet = planetById.get(planetId);
       if (!planet) return center;
 
       const outward = normalizeVector(center);
@@ -1249,7 +1351,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           y: (start.y + end.y) / 2,
       };
 
-      const sun = PLANETS.find((planet) => planet.id === 'sun');
+    const sun = planetById.get('sun');
       const sunAvoidRadius = ((sun?.pixelSize || 128) / 2) + 120;
       const straightClearance = distancePointToSegment({ x: 0, y: 0 }, start, end);
 
@@ -1329,13 +1431,13 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   };
 
   const getDockedShipPosition = (shipId: string, timestamp: number) => {
-      const ship = ships.find((candidate) => candidate.id === shipId && candidate.status !== 'traveling');
-      if (!ship) return null;
+      const ship = shipsById.get(shipId);
+      if (!ship || ship.status === 'traveling') return null;
 
-      const planet = PLANETS.find((candidate) => candidate.id === ship.locationId);
+      const planet = planetById.get(ship.locationId);
       if (!planet) return null;
 
-      const dockedShips = ships.filter((candidate) => candidate.locationId === ship.locationId && candidate.status !== 'traveling');
+      const dockedShips = dockedShipsByPlanet.get(ship.locationId) || [];
       const shipIndex = dockedShips.findIndex((candidate) => candidate.id === ship.id);
       if (shipIndex < 0) return getPlanetPosition(ship.locationId, timestamp);
 
@@ -1354,8 +1456,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   };
 
   const getShipTravelPosition = (shipId: string, timestamp: number) => {
-      const ship = ships.find((candidate) => candidate.id === shipId && candidate.status === 'traveling' && candidate.destinationId && candidate.travelStart && candidate.travelEnd);
-      if (!ship || !ship.travelStart || !ship.travelEnd) return null;
+      const ship = shipsById.get(shipId);
+      if (!ship || ship.status !== 'traveling' || !ship.destinationId || !ship.travelStart || !ship.travelEnd) return null;
 
       const totalDuration = ship.travelEnd - ship.travelStart;
       if (totalDuration <= 0) return null;
@@ -1371,7 +1473,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
       const targets: SpotlightTarget[] = [];
 
       PLANETS.forEach((planet) => {
-          const dockedShips = ships.filter((ship) => ship.locationId === planet.id && ship.status !== 'traveling');
+          const dockedShips = dockedShipsByPlanet.get(planet.id) || [];
           if (dockedShips.length === 0) return;
 
           targets.push({
@@ -1396,9 +1498,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           });
       });
 
-      ships
-          .filter((ship) => ship.status === 'traveling' && ship.destinationId && ship.travelStart && ship.travelEnd)
-          .forEach((ship) => {
+      travelingShips.forEach((ship) => {
               targets.push({
                   key: `traveling:${ship.id}`,
                   type: 'traveling',
@@ -1411,7 +1511,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           });
 
       return targets;
-  }, [classroomDisplay, ships, studentView]);
+  }, [classroomDisplay, dockedShipsByPlanet, studentView, travelingShips]);
 
   const activeSpotlightTarget = useMemo(
       () => spotlightTargets.find((target) => target.key === activeSpotlightKey) || null,
@@ -1606,7 +1706,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     const isOverride = !!overrideId;
 
     // 1. Determine Start Location (Use real-time ships data first, fallback to userdata)
-    const ship = ships.find(s => s.id === targetId);
+    const ship = shipsById.get(targetId);
     
     // Safety check for override
     if (!ship && isOverride) {
@@ -1622,7 +1722,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     }
 
     // 2. Calculate Distance & Duration
-    const startPlanet = PLANETS.find(p => p.id === currentLocId);
+    const startPlanet = planetById.get(currentLocId);
     const endPlanet = selectedPlanet; 
     
     if (!startPlanet) {
@@ -1891,7 +1991,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   };
 
   // Generate static stars for background (Client-side only to avoid hydration mismatch)
-  const [stars, setStars] = useState<{id: number, top: string, left: string, size: string, opacity: number, animationDuration: string}[]>([]);
+    const [stars, setStars] = useState<StarfieldPoint[]>([]);
 
   useEffect(() => {
         const starCount = preferStableMapRendering ? 60 : 100;
@@ -1905,12 +2005,12 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     })));
     }, [preferStableMapRendering]);
 
-  const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+    const landingSubject = (isCommandMode && controlledShipId) ? shipsById.get(controlledShipId) : userData;
     const landingPlanetId = normalizePlanetId(selectedPlanet?.id);
     const isEarthLanding = landingPlanetId === 'earth';
     const landingSurfacePath = `/images/landingsurface/${landingPlanetId || 'earth'}surface.png`;
     const visitorsForSelectedPlanet = selectedPlanet
-        ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
+        ? (isStudentPersonalView ? planetVisitors : (visitedShipsByPlanet.get(selectedPlanet.id) || []))
         : [];
 
   const getSubjectLocationId = (subject: unknown): string | undefined => {
@@ -2027,9 +2127,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         >
           
           {/* Traveling Ships Layer - Render BEHIND planets but atop orbits */}
-          {ships.map(ship => {
-              if (ship.status !== 'traveling' || !ship.destinationId || !ship.travelStart || !ship.travelEnd) return null;
-
+          {travelingShips.map(ship => {
                             const travelCurve = getTravelCurve(ship);
               const totalDuration = ship.travelEnd - ship.travelStart;
                             if (totalDuration <= 0) return null;
@@ -2152,15 +2250,15 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
                           {/* VISITED FLAGS (Map View) */}
                           {/* Show small markers for visitors */}
-                          {ships.some(s => s.visitedPlanets?.includes(planet.id)) && (
+                          {((visitedShipsByPlanet.get(planet.id) || []).length > 0) && (
                               <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-end justify-center gap-0.5 h-4 opacity-70 group-hover:opacity-100 transition-opacity">
-                                  {ships.filter(s => s.visitedPlanets?.includes(planet.id)).slice(0, 3).map((v, i) => (
+                                  {(visitedShipsByPlanet.get(planet.id) || []).slice(0, 3).map((v) => (
                                       <div 
                                         key={v.id} 
                                         className={`w-0.5 h-2 ${v.avatarColor?.replace('text', 'bg').replace('400', '500') || 'bg-white'} rounded-t-full shadow-[0_0_5px_rgba(255,255,255,0.8)]`} 
                                       />
                                   ))}
-                                  {ships.filter(s => s.visitedPlanets?.includes(planet.id)).length > 3 && (
+                                  {(visitedShipsByPlanet.get(planet.id) || []).length > 3 && (
                                       <div className="w-0.5 h-1 bg-white rounded-full" />
                                   )}
                               </div>
@@ -2190,8 +2288,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                        {/* Docked Ships Indicators */}
                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
                           {/* Parking Orbit Ring */}
-                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length > 0 && (() => {
-                              const dockedCount = ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length;
+                          {(dockedShipsByPlanet.get(planet.id) || []).length > 0 && (() => {
+                              const dockedCount = (dockedShipsByPlanet.get(planet.id) || []).length;
                               const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
                               const crowdPadding = dockedCount > 10 ? 20 : dockedCount > 6 ? 12 : 0;
                               const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
@@ -2208,7 +2306,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                               );
                           })()}
 
-                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').map((ship, idx, arr) => {
+                          {(dockedShipsByPlanet.get(planet.id) || []).map((ship, idx, arr) => {
                               // Distribute ships evenly around the planet + Animation
                               const orbitSpeed = 15; // Degrees per second
                               const timeOffset = (now / 1000) * orbitSpeed;
@@ -2405,7 +2503,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                {isCommandMode && controlledShipId && (
                    <div className="bg-orange-500/20 border border-orange-500/50 p-2 rounded mb-4 text-center">
                        <p className="text-orange-400 text-xs font-bold uppercase tracking-widest">RELAYING COMMAND TO</p>
-                       <p className="text-white font-bold">{ships.find(s => s.id === controlledShipId)?.cadetName || "Unknown Unit"}</p>
+                       <p className="text-white font-bold">{(controlledShipId ? shipsById.get(controlledShipId)?.cadetName : undefined) || "Unknown Unit"}</p>
                    </div>
                )}
 
@@ -2633,7 +2731,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                                 <div>
                                     <div className="font-bold text-sm">{ship.cadetName}</div>
                                     <div className="text-[10px] uppercase tracking-wider opacity-70">
-                                        AT: {PLANETS.find(p => p.id === ship.locationId)?.name || 'Deep Space'}
+                                        AT: {planetById.get(ship.locationId)?.name || 'Deep Space'}
                                     </div>
                                 </div>
                                 {controlledShipId === ship.id && (

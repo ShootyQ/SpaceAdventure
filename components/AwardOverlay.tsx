@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Award } from "lucide-react";
 import { resolveShipAssetPath } from "@/lib/ships";
@@ -11,6 +11,7 @@ import { getPetById } from "@/lib/pets";
 
 // TinyFlag inlined here to avoid circular deps with SolarSystem
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
+    const clipPathId = useId();
     const getColor = (id: string) => {
         const colors: Record<string, string> = {
             red: '#ef4444', blue: '#3b82f6', green: '#22c55e', yellow: '#eab308',
@@ -23,21 +24,20 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
     };
     const c1 = getColor(config.primaryColor);
     const c2 = getColor(config.secondaryColor);
-    const uniqueId = `clip-ao-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, '');
 
     return (
         <svg width="24" height="30" viewBox="0 0 24 30" className="drop-shadow-md">
             <rect x="2" y="2" width="2" height="28" rx="1" fill={poleColors[config.pole] || '#cbd5e1'} />
             <g transform="translate(4, 3)">
                 <defs>
-                   <clipPath id={uniqueId}>
+                   <clipPath id={clipPathId}>
                         {config.shape === 'rectangle' && <rect x="0" y="0" width="20" height="12" />}
                         {config.shape === 'pennant' && <polygon points="0,0 20,6 0,12" />}
                         {config.shape === 'triangle' && <polygon points="0,0 20,0 10,12 0,0" />}
                         {config.shape === 'swallowtail' && <polygon points="0,0 20,0 20,12 10,6 0,12" />}
                    </clipPath>
                 </defs>
-                <g clipPath={`url(#${uniqueId})`}>
+                <g clipPath={`url(#${clipPathId})`}>
                      {config.pattern === 'solid' && <rect x="0" y="0" width="20" height="12" fill={c1} />}
                      {config.pattern === 'stripe-h' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
                      {config.pattern === 'stripe-v' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
