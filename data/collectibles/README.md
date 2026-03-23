@@ -10,7 +10,7 @@ Runtime uses a hybrid model:
 ## Files
 
 - `catalog.json`: Collectible identity/metadata (active items and assets).
-- `xp-unlocks.json`: Baseline unlock config for starter + XP channels.
+- `xp-unlocks.json`: Baseline unlock config for starter, chance, XP, and shop channels.
 - `unlock-rules.json`: Legacy chance rule definitions (transitioning to unified config).
 - `pools.json`: Legacy weighted pools (transitioning to unified config).
 

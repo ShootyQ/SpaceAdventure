@@ -1,31 +1,10 @@
 {
-  "generatedAt": "2026-03-09T13:49:37.833Z",
+  "generatedAt": "2026-03-23T18:17:44.075Z",
   "mode": "standard",
   "summary": {
     "errors": 0,
-    "warnings": 20
+    "warnings": 0
   },
   "errors": [],
-  "warnings": [
-    "Avatar rule 'venus-common-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'stellix' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'jupiter-uncommon-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'mercury-uncommon-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'uranus-uncommon-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'earth-rare-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'jupiter-rare-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'saturn-rare-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'jellylanternavatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'jupiter-extremely-rare-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'uranus-extremely-rare-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'venus-extremely-rare-avatar' channel is 'chance' in xp-unlocks.json.",
-    "Avatar rule 'avatar-shop' channel is 'shop' in xp-unlocks.json.",
-    "Avatar rule 'axol' channel is 'shop' in xp-unlocks.json.",
-    "Avatar rule 'clocksworth' channel is 'shop' in xp-unlocks.json.",
-    "Avatar rule 'clockworkbeetle' channel is 'shop' in xp-unlocks.json.",
-    "Avatar rule 'kitedagon' channel is 'shop' in xp-unlocks.json.",
-    "Avatar rule 'lizzy' channel is 'shop' in xp-unlocks.json.",
-    "Avatar rule 'turtlefinder' channel is 'shop' in xp-unlocks.json.",
-    "AVATAR_OPTIONS:candor: filename contains uppercase letters (Candor.Avatar.Mercury.Extremely-rare.png)."
-  ]
+  "warnings": []
 }
