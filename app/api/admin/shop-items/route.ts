@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AVATAR_OPTIONS } from "@/components/UserAvatar";
 import { PET_OPTIONS, normalizePetUnlockAssignments } from "@/lib/pets";
-import { resolveShipAssetPath } from "@/lib/ships";
+import { resolveShipAssetPath, SHIP_OPTIONS } from "@/lib/ships";
 import { canonicalizeShopItemId, getCanonicalShopItemId } from "@/lib/shop-items";
 import { normalizeUnlockConfig } from "@/lib/unlocks";
 
@@ -68,6 +68,10 @@ const getKnownShopDisplayName = (category: string, itemId: string) => {
 
   if (category === "pets") {
     return PET_OPTIONS.find((pet) => String(pet.id || "").trim().toLowerCase() === unlockId)?.name || "";
+  }
+
+  if (category === "ships") {
+    return SHIP_OPTIONS.find((ship) => String(ship.id || "").trim().toLowerCase() === unlockId)?.name || "";
   }
 
   return "";

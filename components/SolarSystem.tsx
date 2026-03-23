@@ -1,7 +1,7 @@
 "use client";
 
 import { resolveShipAssetPath } from "@/lib/ships";
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Rocket, User, Navigation, Plus, Minus, Lock, Unlock, Move, Crown, Star, Medal, LayoutGrid, Settings, Save, Trash2, ShieldCheck, Check, Flag, Gamepad2, Radio, Volume2, VolumeX, Award, Zap, ArrowLeft, Play, Pause } from "lucide-react";
@@ -13,6 +13,7 @@ import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, o
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
+import AwardOverlay from "@/components/AwardOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
 import {
@@ -61,8 +62,27 @@ const CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS = 15000;
 const CLASSROOM_SPOTLIGHT_PAN_SMOOTHING = 0.18;
 const CLASSROOM_SPOTLIGHT_ZOOM_SMOOTHING = 0.14;
 
+type StarfieldPoint = {
+    id: number;
+    top: string;
+    left: string;
+    size: string;
+    opacity: number;
+    animationDuration: string;
+};
+
+const shuffleArray = <T,>(items: T[]) => {
+    const next = [...items];
+    for (let index = next.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    }
+    return next;
+};
+
 // Revamped SmallFlag to handle shapes without clipPath IDs collision risk (by just not using clipPath or generated IDs)
 const TinyFlag = ({ config }: { config: FlagConfig }) => {
+    const clipPathId = useId();
     const getColor = (id: string) => {
         const colors: Record<string, string> = {
             red: '#ef4444', blue: '#3b82f6', green: '#22c55e', yellow: '#eab308',
@@ -77,21 +97,20 @@ const TinyFlag = ({ config }: { config: FlagConfig }) => {
 
     const c1 = getColor(config.primaryColor);
     const c2 = getColor(config.secondaryColor);
-    const uniqueId = `clip-${config.primaryColor}-${config.secondaryColor}-${config.pattern}-${config.shape}`.replace(/[^a-z0-9]/gi, '');
 
     return (
         <svg width="24" height="30" viewBox="0 0 24 30" className="drop-shadow-md">
             <rect x="2" y="2" width="2" height="28" rx="1" fill={poleColors[config.pole] || '#cbd5e1'} />
             <g transform="translate(4, 3)">
                 <defs>
-                   <clipPath id={uniqueId}>
+                   <clipPath id={clipPathId}>
                         {config.shape === 'rectangle' && <rect x="0" y="0" width="20" height="12" />}
                         {config.shape === 'pennant' && <polygon points="0,0 20,6 0,12" />}
                         {config.shape === 'triangle' && <polygon points="0,0 20,0 10,12 0,0" />} 
                         {config.shape === 'swallowtail' && <polygon points="0,0 20,0 20,12 10,6 0,12" />} 
                    </clipPath>
                 </defs>
-                <g clipPath={`url(#${uniqueId})`}>
+                <g clipPath={`url(#${clipPathId})`}>
                      {config.pattern === 'solid' && <rect x="0" y="0" width="20" height="12" fill={c1} />}
                      {config.pattern === 'stripe-h' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="0" y="6" width="20" height="6" fill={c2} /></>}
                      {config.pattern === 'stripe-v' && <><rect x="0" y="0" width="20" height="12" fill={c1} /><rect x="10" y="0" width="10" height="12" fill={c2} /></>}
@@ -140,6 +159,12 @@ type SpotlightTarget = {
     zoom: number;
 };
 
+type TravelingShip = Ship & {
+    destinationId: string;
+    travelStart: number;
+    travelEnd: number;
+};
+
 const XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX = "spaceAdventure:seen-xp-unlocks:v1";
 
 const buildXpUnlockSeenStorageKey = (ownerId?: string) => {
@@ -147,11 +172,19 @@ const buildXpUnlockSeenStorageKey = (ownerId?: string) => {
     return `${XP_UNLOCK_SEEN_STORAGE_KEY_PREFIX}:${normalizedOwnerId || "unknown"}`;
 };
 
+const isTravelingShip = (ship: Ship): ship is TravelingShip => (
+    ship.status === 'traveling'
+    && Boolean(ship.destinationId)
+    && typeof ship.travelStart === 'number'
+    && typeof ship.travelEnd === 'number'
+);
+
 export default function SolarSystem({ studentView = false, classroomDisplay = false }: SolarSystemProps) {
   const { userData } = useAuth();
         const { activeTeacherId, setActiveTeacherId, teacherOptions, loadingTeacherOptions } = useTeacherScope();
     const isStudentPersonalView = studentView && userData?.role === 'student';
     const isTeacherClassroomDisplay = classroomDisplay && !studentView && userData?.role === 'teacher';
+        const preferStableMapRendering = isTeacherClassroomDisplay;
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
     const [planetVisitors, setPlanetVisitors] = useState<Ship[]>([]);
@@ -356,7 +389,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           award.unlocks?.objects?.length
       );
 
-      if (!hasUnlocks || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
+      if (!hasUnlocks || dismissedUnlockRevealAwardIdsRef.current.has(award.id) || scheduledUnlockRevealAwardIdsRef.current.has(award.id)) return;
 
       scheduledUnlockRevealAwardIdsRef.current.add(award.id);
       const timerId = setTimeout(() => {
@@ -423,7 +456,10 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   // Refs for Coordinate Calcs inside Snapshot
   const panRef = useRef({ x: 0, y: 0 });
+        const isDocumentVisibleRef = useRef(true);
+        const dismissedUnlockRevealAwardIdsRef = useRef<Set<string>>(new Set());
     const spotlightPausedAtRef = useRef<number | null>(null);
+        const spotlightSequenceRef = useRef<string[]>([]);
   
   // Sync Rank Ref
     useEffect(() => {
@@ -491,6 +527,18 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+      if (typeof document === "undefined") return;
+
+      const handleVisibilityChange = () => {
+          isDocumentVisibleRef.current = document.visibilityState !== "hidden";
+      };
+
+      handleVisibilityChange();
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
 
@@ -543,10 +591,20 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     setMounted(true);
     let frameId: number;
     let lastTime = 0;
-    const FPS = 30;
+        const FPS = preferStableMapRendering ? 24 : 30;
     const interval = 1000 / FPS;
+    const shouldAnimateMap = isOrbiting
+        && !isGridVisible
+        && !awardQueue.length
+        && !activeUnlockReveal
+        && !activePlanetCompletions;
 
     const animate = (time: number) => {
+        if (!isDocumentVisibleRef.current) {
+            frameId = requestAnimationFrame(animate);
+            return;
+        }
+
         const delta = time - lastTime;
         if (delta > interval) {
             setNow(Date.now());
@@ -555,9 +613,9 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         frameId = requestAnimationFrame(animate);
     };
     // Pause animation if the Manifest Overlay is open to save resources
-    if(isOrbiting && !isGridVisible && !awardQueue.length) frameId = requestAnimationFrame(animate);
+    if (shouldAnimateMap) frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-  }, [isOrbiting, isGridVisible, awardQueue.length]);
+    }, [activePlanetCompletions, activeUnlockReveal, awardQueue.length, isGridVisible, isOrbiting, preferStableMapRendering]);
 
   
   // Panning State
@@ -590,7 +648,14 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   const dismissCurrentOverlay = useCallback(() => {
       if (activeUnlockReveal) {
+          dismissedUnlockRevealAwardIdsRef.current.add(activeUnlockReveal.id);
           scheduledUnlockRevealAwardIdsRef.current.delete(activeUnlockReveal.id);
+          const pendingTimer = unlockRevealTimerMapRef.current.get(activeUnlockReveal.id);
+          if (pendingTimer) {
+              clearTimeout(pendingTimer);
+              unlockRevealTimerMapRef.current.delete(activeUnlockReveal.id);
+          }
+          setUnlockRevealQueue((prev) => prev.filter((award) => award.id !== activeUnlockReveal.id));
           setActiveUnlockReveal(null);
           return;
       }
@@ -612,8 +677,15 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   useEffect(() => {
       if (activeUnlockReveal || unlockRevealQueue.length === 0 || awardQueue.length > 0 || Boolean(activePlanetCompletions)) return;
-      setActiveUnlockReveal(unlockRevealQueue[0]);
-      setUnlockRevealQueue((prev) => prev.slice(1));
+
+      const nextReveal = unlockRevealQueue.find((award) => !dismissedUnlockRevealAwardIdsRef.current.has(award.id));
+      if (!nextReveal) {
+          setUnlockRevealQueue([]);
+          return;
+      }
+
+      setActiveUnlockReveal(nextReveal);
+      setUnlockRevealQueue((prev) => prev.filter((award) => award.id !== nextReveal.id));
   }, [activeUnlockReveal, unlockRevealQueue, awardQueue.length, activePlanetCompletions]);
 
   useEffect(() => {
@@ -693,6 +765,48 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           unlockRevealTimerMapRef.current.clear();
       };
   }, []);
+
+  const planetById = useMemo(() => new Map(PLANETS.map((planet) => [planet.id, planet])), []);
+
+  const shipsById = useMemo(() => {
+      const next = new Map<string, Ship>();
+      ships.forEach((ship) => next.set(ship.id, ship));
+      return next;
+  }, [ships]);
+
+  const dockedShipsByPlanet = useMemo(() => {
+      const next = new Map<string, Ship[]>();
+      ships.forEach((ship) => {
+          if (ship.status === 'traveling') return;
+          const existing = next.get(ship.locationId);
+          if (existing) {
+              existing.push(ship);
+              return;
+          }
+          next.set(ship.locationId, [ship]);
+      });
+      return next;
+  }, [ships]);
+
+  const visitedShipsByPlanet = useMemo(() => {
+      const next = new Map<string, Ship[]>();
+      ships.forEach((ship) => {
+          ship.visitedPlanets?.forEach((planetId) => {
+              const existing = next.get(planetId);
+              if (existing) {
+                  existing.push(ship);
+                  return;
+              }
+              next.set(planetId, [ship]);
+          });
+      });
+      return next;
+  }, [ships]);
+
+  const travelingShips = useMemo(
+      () => ships.filter(isTravelingShip),
+      [ships]
+  );
 
   // Real-time subscription to all star travelers
   useEffect(() => {
@@ -1199,7 +1313,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   const getPlanetOrbitEdgePosition = (planetId: string, timestamp: number, padding?: number) => {
       const center = getPlanetPosition(planetId, timestamp);
-      const planet = PLANETS.find((p) => p.id === planetId);
+      const planet = planetById.get(planetId);
       if (!planet) return center;
 
       const outward = normalizeVector(center);
@@ -1237,7 +1351,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           y: (start.y + end.y) / 2,
       };
 
-      const sun = PLANETS.find((planet) => planet.id === 'sun');
+    const sun = planetById.get('sun');
       const sunAvoidRadius = ((sun?.pixelSize || 128) / 2) + 120;
       const straightClearance = distancePointToSegment({ x: 0, y: 0 }, start, end);
 
@@ -1317,13 +1431,13 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   };
 
   const getDockedShipPosition = (shipId: string, timestamp: number) => {
-      const ship = ships.find((candidate) => candidate.id === shipId && candidate.status !== 'traveling');
-      if (!ship) return null;
+      const ship = shipsById.get(shipId);
+      if (!ship || ship.status === 'traveling') return null;
 
-      const planet = PLANETS.find((candidate) => candidate.id === ship.locationId);
+      const planet = planetById.get(ship.locationId);
       if (!planet) return null;
 
-      const dockedShips = ships.filter((candidate) => candidate.locationId === ship.locationId && candidate.status !== 'traveling');
+      const dockedShips = dockedShipsByPlanet.get(ship.locationId) || [];
       const shipIndex = dockedShips.findIndex((candidate) => candidate.id === ship.id);
       if (shipIndex < 0) return getPlanetPosition(ship.locationId, timestamp);
 
@@ -1342,8 +1456,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   };
 
   const getShipTravelPosition = (shipId: string, timestamp: number) => {
-      const ship = ships.find((candidate) => candidate.id === shipId && candidate.status === 'traveling' && candidate.destinationId && candidate.travelStart && candidate.travelEnd);
-      if (!ship || !ship.travelStart || !ship.travelEnd) return null;
+      const ship = shipsById.get(shipId);
+      if (!ship || ship.status !== 'traveling' || !ship.destinationId || !ship.travelStart || !ship.travelEnd) return null;
 
       const totalDuration = ship.travelEnd - ship.travelStart;
       if (totalDuration <= 0) return null;
@@ -1359,7 +1473,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
       const targets: SpotlightTarget[] = [];
 
       PLANETS.forEach((planet) => {
-          const dockedShips = ships.filter((ship) => ship.locationId === planet.id && ship.status !== 'traveling');
+          const dockedShips = dockedShipsByPlanet.get(planet.id) || [];
           if (dockedShips.length === 0) return;
 
           targets.push({
@@ -1384,9 +1498,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           });
       });
 
-      ships
-          .filter((ship) => ship.status === 'traveling' && ship.destinationId && ship.travelStart && ship.travelEnd)
-          .forEach((ship) => {
+      travelingShips.forEach((ship) => {
               targets.push({
                   key: `traveling:${ship.id}`,
                   type: 'traveling',
@@ -1399,7 +1511,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           });
 
       return targets;
-  }, [classroomDisplay, ships, studentView]);
+  }, [classroomDisplay, dockedShipsByPlanet, studentView, travelingShips]);
 
   const activeSpotlightTarget = useMemo(
       () => spotlightTargets.find((target) => target.key === activeSpotlightKey) || null,
@@ -1419,9 +1531,12 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
       || Boolean(selectedPlanet)
       || spotlightHoldUntil > now;
 
-  const spotlightRemainingMs = activeSpotlightTarget && spotlightStepStartedAt > 0
-      ? Math.max(activeSpotlightTarget.dwellMs - Math.max(now - spotlightStepStartedAt, 0), 0)
-      : 0;
+  const buildSpotlightSequence = useCallback((deferredKey?: string | null) => {
+      const availableKeys = spotlightTargets.map((target) => target.key);
+      const deferred = deferredKey && availableKeys.includes(deferredKey) ? deferredKey : null;
+      const shuffledKeys = shuffleArray(availableKeys.filter((key) => key !== deferred));
+      return deferred ? [...shuffledKeys, deferred] : shuffledKeys;
+  }, [spotlightTargets]);
 
   const getSpotlightPosition = (target: SpotlightTarget, timestamp: number) => {
       if (target.type === 'planet' && target.planetId) {
@@ -1455,16 +1570,27 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   const advanceSpotlightTarget = useCallback(() => {
       if (spotlightTargets.length === 0) {
+          spotlightSequenceRef.current = [];
           setActiveSpotlightKey(null);
           return;
       }
 
       setActiveSpotlightKey((previousKey) => {
-          const currentIndex = spotlightTargets.findIndex((target) => target.key === previousKey);
-          const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % spotlightTargets.length;
-          return spotlightTargets[nextIndex]?.key || spotlightTargets[0].key;
+          if (spotlightSequenceRef.current.length === 0) {
+              spotlightSequenceRef.current = buildSpotlightSequence(previousKey);
+          }
+
+          const currentIndex = spotlightSequenceRef.current.findIndex((key) => key === previousKey);
+          const nextIndex = currentIndex + 1;
+
+          if (currentIndex >= 0 && nextIndex < spotlightSequenceRef.current.length) {
+              return spotlightSequenceRef.current[nextIndex];
+          }
+
+          spotlightSequenceRef.current = buildSpotlightSequence(previousKey);
+          return spotlightSequenceRef.current[0] || previousKey || null;
       });
-  }, [spotlightTargets]);
+  }, [buildSpotlightSequence, spotlightTargets.length]);
 
   const holdSpotlight = useCallback((durationMs = CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS) => {
       if (!isTeacherClassroomDisplay || !isSpotlightMode) return;
@@ -1473,8 +1599,21 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
   useEffect(() => {
       if (!isTeacherClassroomDisplay || !isSpotlightMode || spotlightTargets.length === 0) {
+          spotlightSequenceRef.current = [];
           setActiveSpotlightKey(null);
           return;
+      }
+
+      const availableKeys = new Set(spotlightTargets.map((target) => target.key));
+      const preservedSequence = spotlightSequenceRef.current.filter((key) => availableKeys.has(key));
+      const missingKeys = spotlightTargets
+          .map((target) => target.key)
+          .filter((key) => !preservedSequence.includes(key));
+
+      spotlightSequenceRef.current = [...preservedSequence, ...shuffleArray(missingKeys)];
+
+      if (spotlightSequenceRef.current.length === 0) {
+          spotlightSequenceRef.current = buildSpotlightSequence();
       }
 
       setActiveSpotlightKey((previousKey) => {
@@ -1482,9 +1621,9 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
               return previousKey;
           }
 
-          return spotlightTargets[0].key;
+          return spotlightSequenceRef.current[0] || null;
       });
-  }, [isSpotlightMode, isTeacherClassroomDisplay, spotlightTargets]);
+  }, [buildSpotlightSequence, isSpotlightMode, isTeacherClassroomDisplay, spotlightTargets]);
 
   useEffect(() => {
       if (!activeSpotlightKey) {
@@ -1567,7 +1706,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     const isOverride = !!overrideId;
 
     // 1. Determine Start Location (Use real-time ships data first, fallback to userdata)
-    const ship = ships.find(s => s.id === targetId);
+    const ship = shipsById.get(targetId);
     
     // Safety check for override
     if (!ship && isOverride) {
@@ -1583,7 +1722,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     }
 
     // 2. Calculate Distance & Duration
-    const startPlanet = PLANETS.find(p => p.id === currentLocId);
+    const startPlanet = planetById.get(currentLocId);
     const endPlanet = selectedPlanet; 
     
     if (!startPlanet) {
@@ -1852,10 +1991,11 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   };
 
   // Generate static stars for background (Client-side only to avoid hydration mismatch)
-  const [stars, setStars] = useState<{id: number, top: string, left: string, size: string, opacity: number, animationDuration: string}[]>([]);
+    const [stars, setStars] = useState<StarfieldPoint[]>([]);
 
   useEffect(() => {
-    setStars(Array.from({ length: 100 }, (_, i) => ({
+        const starCount = preferStableMapRendering ? 60 : 100;
+        setStars(Array.from({ length: starCount }, (_, i) => ({
         id: i,
         top: `${Math.random() * 100}%`,
         left: `${Math.random() * 100}%`,
@@ -1863,14 +2003,14 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         opacity: 0.2 + Math.random() * 0.5,
         animationDuration: `${Math.random() * 3 + 2}s`
     })));
-  }, []);
+    }, [preferStableMapRendering]);
 
-  const landingSubject = (isCommandMode && controlledShipId) ? ships.find(s => s.id === controlledShipId) : userData;
+    const landingSubject = (isCommandMode && controlledShipId) ? shipsById.get(controlledShipId) : userData;
     const landingPlanetId = normalizePlanetId(selectedPlanet?.id);
     const isEarthLanding = landingPlanetId === 'earth';
     const landingSurfacePath = `/images/landingsurface/${landingPlanetId || 'earth'}surface.png`;
     const visitorsForSelectedPlanet = selectedPlanet
-        ? ((isStudentPersonalView ? planetVisitors : ships).filter(s => s.visitedPlanets?.includes(selectedPlanet.id)))
+        ? (isStudentPersonalView ? planetVisitors : (visitedShipsByPlanet.get(selectedPlanet.id) || []))
         : [];
 
   const getSubjectLocationId = (subject: unknown): string | undefined => {
@@ -1964,7 +2104,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
           {stars.map(star => (
             <div 
                 key={star.id}
-                className={`absolute bg-white rounded-full ${star.size} animate-pulse`}
+                                className={`absolute bg-white rounded-full ${star.size} ${preferStableMapRendering ? '' : 'animate-pulse'}`}
                 style={{ 
                     top: star.top, 
                     left: star.left, 
@@ -1977,14 +2117,17 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
        
        {/* Solar System Container with Pan & Zoom */}
        <div 
-          className="relative flex items-center justify-center transition-transform duration-75 ease-linear"
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+                    className="relative flex items-center justify-center transform-gpu"
+                        style={{
+                                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                                transformOrigin: 'center center',
+                                willChange: 'transform',
+                                backfaceVisibility: 'hidden'
+                        }}
         >
           
           {/* Traveling Ships Layer - Render BEHIND planets but atop orbits */}
-          {ships.map(ship => {
-              if (ship.status !== 'traveling' || !ship.destinationId || !ship.travelStart || !ship.travelEnd) return null;
-
+          {travelingShips.map(ship => {
                             const travelCurve = getTravelCurve(ship);
               const totalDuration = ship.travelEnd - ship.travelStart;
                             if (totalDuration <= 0) return null;
@@ -2045,7 +2188,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                               </div>
                           )}
                           <span
-                              className="absolute top-full left-1/2 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded whitespace-nowrap mt-1 border border-cyan-500/30"
+                              className={`absolute top-full left-1/2 text-[10px] text-white px-2 py-0.5 rounded whitespace-nowrap mt-1 border border-cyan-500/30 ${preferStableMapRendering ? 'bg-slate-950/90' : 'bg-black/60'}`}
                               style={{ transform: `translateX(-50%) scale(${shipNameScale})`, transformOrigin: 'top center' }}
                           >
                               {ship.cadetName} ({Math.round(progress * 100)}%)
@@ -2107,15 +2250,15 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
                           {/* VISITED FLAGS (Map View) */}
                           {/* Show small markers for visitors */}
-                          {ships.some(s => s.visitedPlanets?.includes(planet.id)) && (
+                          {((visitedShipsByPlanet.get(planet.id) || []).length > 0) && (
                               <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-end justify-center gap-0.5 h-4 opacity-70 group-hover:opacity-100 transition-opacity">
-                                  {ships.filter(s => s.visitedPlanets?.includes(planet.id)).slice(0, 3).map((v, i) => (
+                                  {(visitedShipsByPlanet.get(planet.id) || []).slice(0, 3).map((v) => (
                                       <div 
                                         key={v.id} 
                                         className={`w-0.5 h-2 ${v.avatarColor?.replace('text', 'bg').replace('400', '500') || 'bg-white'} rounded-t-full shadow-[0_0_5px_rgba(255,255,255,0.8)]`} 
                                       />
                                   ))}
-                                  {ships.filter(s => s.visitedPlanets?.includes(planet.id)).length > 3 && (
+                                  {(visitedShipsByPlanet.get(planet.id) || []).length > 3 && (
                                       <div className="w-0.5 h-1 bg-white rounded-full" />
                                   )}
                               </div>
@@ -2127,7 +2270,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                               {/* Label Wrapper - No inverse rotation needed now as the planet div itself is counter-rotated */}
                               <div>
                                  <span 
-                                    className="text-white/60 text-xs uppercase tracking-widest font-bold group-hover:text-white transition-all shadow-black drop-shadow-md bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/10"
+                                                className={`text-white/60 text-xs uppercase tracking-widest font-bold group-hover:text-white shadow-black px-2 py-0.5 rounded-full border border-white/10 ${preferStableMapRendering ? 'bg-slate-950/90' : 'transition-all drop-shadow-md bg-black/50 backdrop-blur-sm'}`}
                                     style={{
                                         // Dynamic scaling based on zoom level to ensure readability
                                         // If zoom is small (e.g. 0.1), we want label to be larger to be seen.
@@ -2145,8 +2288,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                        {/* Docked Ships Indicators */}
                        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
                           {/* Parking Orbit Ring */}
-                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length > 0 && (() => {
-                              const dockedCount = ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').length;
+                          {(dockedShipsByPlanet.get(planet.id) || []).length > 0 && (() => {
+                              const dockedCount = (dockedShipsByPlanet.get(planet.id) || []).length;
                               const basePadding = planet.pixelSize >= 90 ? 56 : planet.pixelSize >= 70 ? 48 : 38;
                               const crowdPadding = dockedCount > 10 ? 20 : dockedCount > 6 ? 12 : 0;
                               const radius = (planet.pixelSize / 2) + basePadding + crowdPadding;
@@ -2163,7 +2306,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                               );
                           })()}
 
-                          {ships.filter(s => s.locationId === planet.id && s.status !== 'traveling').map((ship, idx, arr) => {
+                          {(dockedShipsByPlanet.get(planet.id) || []).map((ship, idx, arr) => {
                               // Distribute ships evenly around the planet + Animation
                               const orbitSpeed = 15; // Degrees per second
                               const timeOffset = (now / 1000) * orbitSpeed;
@@ -2186,7 +2329,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                                 >
                                     {arr.length <= 8 && (
                                         <span
-                                            className="text-[10px] font-bold text-white bg-black/70 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap mb-1 shadow-lg backdrop-blur-sm"
+                                            className={`text-[10px] font-bold text-white px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap mb-1 ${preferStableMapRendering ? 'bg-slate-950/90' : 'bg-black/70 shadow-lg backdrop-blur-sm'}`}
                                             style={{ transform: `scale(${shipNameScale})`, transformOrigin: 'bottom center' }}
                                         >
                                             {ship.cadetName}
@@ -2259,19 +2402,6 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                     <span className="font-bold tracking-widest uppercase text-sm">Cockpit</span>
                 </Link>
            </>
-       )}
-
-       {isTeacherClassroomDisplay && (
-           <div className="absolute right-6 top-52 z-[60] w-[220px] rounded-xl border border-cyan-500/30 bg-black/75 px-4 py-3 text-white shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-md">
-               <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300">Classroom Tour</div>
-               <div className="mt-1 text-sm font-semibold text-white">{activeSpotlightTarget?.label || 'Ready to spotlight'}</div>
-               <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/60">
-                   {activeSpotlightTarget ? (activeSpotlightTarget.type === 'planet' ? 'Planet Overview' : activeSpotlightTarget.type === 'traveling' ? 'Transit Spotlight' : 'Ship Spotlight') : 'Standby'}
-               </div>
-               <div className="mt-2 text-xs text-cyan-200/90">
-                   {!isSpotlightMode ? 'Paused' : isSpotlightBlocked ? 'Holding current frame' : `${Math.max(1, Math.ceil(spotlightRemainingMs / 1000))}s remaining`}
-               </div>
-           </div>
        )}
 
        {/* View Controls */}
@@ -2373,7 +2503,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                {isCommandMode && controlledShipId && (
                    <div className="bg-orange-500/20 border border-orange-500/50 p-2 rounded mb-4 text-center">
                        <p className="text-orange-400 text-xs font-bold uppercase tracking-widest">RELAYING COMMAND TO</p>
-                       <p className="text-white font-bold">{ships.find(s => s.id === controlledShipId)?.cadetName || "Unknown Unit"}</p>
+                       <p className="text-white font-bold">{(controlledShipId ? shipsById.get(controlledShipId)?.cadetName : undefined) || "Unknown Unit"}</p>
                    </div>
                )}
 
@@ -2601,7 +2731,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                                 <div>
                                     <div className="font-bold text-sm">{ship.cadetName}</div>
                                     <div className="text-[10px] uppercase tracking-wider opacity-70">
-                                        AT: {PLANETS.find(p => p.id === ship.locationId)?.name || 'Deep Space'}
+                                        AT: {planetById.get(ship.locationId)?.name || 'Deep Space'}
                                     </div>
                                 </div>
                                 {controlledShipId === ship.id && (
@@ -2648,270 +2778,12 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
        {/* AWARD CEREMONY OVERLAY */}
        <AnimatePresence>
          {!isStudentPersonalView && ((awardQueue.length > 0 && !activeUnlockReveal) || Boolean(activeUnlockReveal)) && (
-            <div 
-                key="award-overlay"
-                className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-auto cursor-pointer"
-                onClick={dismissCurrentOverlay}
-            >
-                {/* Visual Backdrop (Dim the map slightly) */}
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" 
-                />
-
-                <button
-                    type="button"
-                    aria-label="Close reward overlay"
-                    className="absolute right-4 top-4 z-[390] rounded-full border border-white/40 bg-black/60 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-white hover:bg-black/80"
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        dismissCurrentOverlay();
-                    }}
-                >
-                    Close
-                </button>
-
-                {/* Multiple Awards Container */}
-                {!activeUnlockReveal && (() => {
-                    const awardCount = awardQueue.length;
-                    const overlayScale = awardCount > 20 ? 0.42 : awardCount > 16 ? 0.5 : awardCount > 12 ? 0.6 : awardCount > 8 ? 0.72 : awardCount > 6 ? 0.82 : 1;
-                    const isSuperDense = awardCount > 16;
-
-                    return (
-                <div
-                    className={`flex flex-wrap items-center justify-center ${awardQueue.length > 16 ? 'gap-1 p-1' : awardQueue.length > 10 ? 'gap-1.5 p-1.5' : awardQueue.length > 6 ? 'gap-2 p-2' : 'gap-6 p-8'} h-[100dvh] overflow-hidden cursor-default origin-center`}
-                    style={{ transform: `scale(${overlayScale})` }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {awardQueue.map((award) => {
-                        const isSingleAward = awardQueue.length === 1;
-                        const isDualAward = awardQueue.length === 2;
-                        const isCompactAward = awardQueue.length > 2;
-                        const isDenseAward = awardQueue.length > 6;
-                        const isUltraDenseAward = awardQueue.length > 10;
-                        const useLightAnimation = awardQueue.length > 6;
-                        const selectedPet = getPetById(award.ship.selectedPetId);
-                        return (
-                        <motion.div
-                            key={award.id}
-                            initial={{ scale: 0, rotate: -10, y: 50 }}
-                            animate={{ scale: 1, rotate: 0, y: 0 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            transition={{ 
-                                type: useLightAnimation ? "tween" : "spring",
-                                stiffness: useLightAnimation ? undefined : 200,
-                                damping: useLightAnimation ? undefined : 20,
-                                duration: useLightAnimation ? 0.16 : undefined,
-                                delay: 0
-                            }}
-                            className={`relative z-50 bg-black/90 border border-cyan-500 rounded-3xl p-6 flex flex-col items-center shadow-[0_0_60px_rgba(6,182,212,0.6)] text-center pointer-events-auto overflow-hidden
-                                ${isSuperDense ? 'w-[136px] p-2 rounded-xl' : isUltraDenseAward ? 'w-[156px] p-2.5 rounded-xl' : isDenseAward ? 'w-[185px] p-3 rounded-2xl' : isCompactAward ? 'w-[250px] aspect-auto p-4' : isSingleAward ? 'w-[95vw] max-w-[980px] min-h-[78vh] max-h-[94vh] overflow-y-auto p-6 sm:w-[90vw] sm:p-8 lg:p-12' : isDualAward ? 'w-[400px] aspect-auto p-8' : 'w-[420px] aspect-square p-8'}
-                            `}
-                            onClick={(e) => {
-                                // Optional: Allow clicking individual card to dismiss just that one? 
-                                // User asked for whole screen click dismiss. 
-                                // Let's just let the parent click handler handle it.
-                                // e.stopPropagation(); 
-                            }}
-                        >
-                            {/* Background Shine */}
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-900/40 via-transparent to-transparent" />
-
-                            <h2 className={`${isSuperDense ? 'text-[9px]' : isUltraDenseAward ? 'text-[10px]' : isCompactAward ? 'text-sm' : isSingleAward ? 'text-xl sm:text-2xl lg:text-[2rem]' : 'text-xl'} text-cyan-300 font-mono tracking-widest ${isSuperDense ? 'mb-1.5' : isSingleAward ? 'mb-6' : 'mb-4'} uppercase relative z-10`}>Training Milestone</h2>
-
-                            {/* Avatar + Ship + Pet */}
-                            <motion.div
-                                animate={isDenseAward ? undefined : {
-                                    y: [0, -10, 0],
-                                    rotate: [0, -5, 5, 0]
-                                }}
-                                transition={isDenseAward ? undefined : {
-                                    repeat: Infinity,
-                                    duration: 4,
-                                    ease: "easeInOut"
-                                }}
-                                className={`relative z-10 ${isSuperDense ? 'mb-0.5' : isUltraDenseAward ? 'mb-1' : isCompactAward ? 'mb-2' : isSingleAward ? 'mb-8' : 'mb-6'}`}
-                            >
-                                <div className={`relative flex items-center justify-center ${isSuperDense ? 'w-32 h-12' : isUltraDenseAward ? 'w-40 h-16' : isDenseAward ? 'w-48 h-20' : isCompactAward ? 'w-56 h-24' : isSingleAward ? 'w-[18rem] h-[10rem] sm:w-[24rem] sm:h-[14rem] lg:w-[30rem] lg:h-[17rem]' : 'w-80 h-36'}`}>
-                                    {award.ship.flag && (
-                                        <div className={`absolute z-40 ${isCompactAward ? '-top-2 right-[35%] scale-75' : isSingleAward ? '-top-3 right-[41%] scale-95 sm:scale-110' : '-top-3 right-[38%] scale-95'}`}>
-                                            <TinyFlag config={award.ship.flag} />
-                                        </div>
-                                    )}
-
-                                    <div className={`absolute left-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[58px] h-[58px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[90px] h-[90px] top-[62%] -translate-y-1/2 sm:w-[112px] sm:h-[112px] lg:w-[126px] lg:h-[126px]' : 'w-[84px] h-[84px] top-[58%] -translate-y-1/2'}`}>
-                                        <UserAvatar userData={award.ship as any} transparentBg className="w-full h-full" />
-                                    </div>
-
-                                    <div className={`relative z-20 ${isCompactAward ? 'w-24 h-24' : isSingleAward ? 'w-44 h-44 sm:w-56 sm:h-56 lg:w-60 lg:h-60' : 'w-40 h-40'}`}>
-                                        <img 
-                                            src={getAssetPath(resolveShipAssetPath(award.ship.shipId || 'finalship'))} 
-                                            onError={(event) => {
-                                                event.currentTarget.onerror = null;
-                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
-                                            }}
-                                            alt="Award Ship"
-                                            className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
-                                        />
-                                    </div>
-
-                                    <div className={`absolute right-1 z-30 flex items-center justify-center ${isCompactAward ? 'w-[52px] h-[52px] top-[60%] -translate-y-1/2' : isSingleAward ? 'w-[82px] h-[82px] top-[62%] -translate-y-1/2 sm:w-[98px] sm:h-[98px] lg:w-[114px] lg:h-[114px]' : 'w-[76px] h-[76px] top-[58%] -translate-y-1/2'}`}>
-                                        {selectedPet.imageSrc ? (
-                                            <img
-                                                src={getAssetPath(selectedPet.imageSrc)}
-                                                alt={selectedPet.name}
-                                                className="w-full h-full object-contain"
-                                            />
-                                        ) : (
-                                            <span className={`${isCompactAward ? 'text-xl' : isSingleAward ? 'text-3xl sm:text-4xl' : 'text-2xl'} leading-none`}>{selectedPet.emoji}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            <div className={`${isSuperDense ? 'text-base mb-1' : isUltraDenseAward ? 'text-lg' : isCompactAward ? 'text-2xl' : isSingleAward ? 'text-[2.55rem] sm:text-5xl lg:text-6xl mb-4' : isDualAward ? 'text-3xl mb-2' : 'text-4xl'} font-bold text-white font-sans relative z-10 ${isSingleAward || isDualAward ? 'w-full px-3 whitespace-normal break-words leading-tight' : 'truncate w-full'}`}>
-                                {award.ship.cadetName}
-                            </div>
-                            
-                            {award.reason && (
-                                <div className={`text-cyan-400/80 ${isSuperDense ? 'text-[8px]' : isUltraDenseAward ? 'text-[9px]' : isCompactAward ? 'text-xs' : isSingleAward ? 'text-base sm:text-lg' : 'text-sm'} font-bold uppercase tracking-widest ${isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : isSingleAward ? 'mb-8' : 'mb-6'} relative z-10`}>
-                                    {award.reason}
-                                </div>
-                            )}
-
-                            {!award.reason && <div className={isSuperDense ? 'mb-1' : isUltraDenseAward ? 'mb-2' : isSingleAward ? 'mb-8' : 'mb-6'} />}
-
-                            <div className={`flex items-center justify-center ${isSuperDense ? 'gap-2' : 'gap-4'} w-full relative z-10`}>
-                                <div className={`flex-1 bg-green-500/10 ${isSuperDense ? 'p-1.5 rounded-lg' : isSingleAward ? 'p-4 sm:p-5 rounded-2xl' : 'p-3 rounded-xl'} border border-green-500/30`}>
-                                    <span className={`block text-green-400 ${isSuperDense ? 'text-[8px]' : 'text-[10px]'} font-bold uppercase tracking-wider mb-1`}>XP Gained</span>
-                                    <span className={`${isUltraDenseAward ? 'text-lg' : isSingleAward ? 'text-4xl sm:text-5xl' : 'text-2xl'} block font-black text-green-300`}>+{award.xpGained}</span>
-                                </div>
-
-                                {award.newRank && (
-                                <motion.div 
-                                        animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
-                                        transition={{ repeat: Infinity, duration: 1.5 }}
-                                        className={`flex-1 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 ${isSingleAward ? 'p-4 sm:p-5 rounded-2xl' : 'p-3 rounded-xl'} border border-yellow-500/50 flex flex-col items-center gap-1 shadow-[0_0_30px_rgba(234,179,8,0.4)] relative overflow-hidden`}
-                                >
-                                    <div className="absolute inset-0 bg-yellow-400/10 animate-pulse" />
-                                    <span className={`block text-yellow-300 ${isSingleAward ? 'text-xs sm:text-sm' : 'text-[10px]'} font-black uppercase tracking-widest relative z-10`}>PROMOTION!</span>
-                                    {(() => {
-                                        const r = ranks.find(rk => rk.name === award.newRank);
-                                        return r?.image && (
-                                            <motion.img 
-                                                    initial={{ scale: 0, rotate: 180 }}
-                                                    animate={{ scale: 1, rotate: 0 }}
-                                                    transition={{ type: "spring", bounce: 0.6 }}
-                                                    src={getAssetPath(r.image)} 
-                                                    alt="Rank Badge" 
-                                                    className={`${isSingleAward ? 'w-20 h-20 sm:w-24 sm:h-24' : 'w-16 h-16'} object-contain my-1 drop-shadow-[0_0_20px_rgba(234,179,8,0.8)] relative z-10`} 
-                                            />
-                                        );
-                                    })()}
-                                    <span className={`${isSingleAward ? 'text-base sm:text-lg' : 'text-sm'} block font-black text-yellow-100 truncate w-full text-center relative z-10`}>{award.newRank}</span>
-                                </motion.div>
-                                )}
-                            </div>
-                        </motion.div>
-                        );
-                    })}
-                </div>
-                    );
-                })()}
-
-                <AnimatePresence>
-                    {activeUnlockReveal && (
-                        <motion.div
-                            key={`unlock-reveal-${activeUnlockReveal.id}`}
-                            initial={{ opacity: 0, scale: 0.8, y: 30 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                            transition={{ type: "spring", stiffness: 220, damping: 18 }}
-                            className="absolute inset-0 z-[380] flex items-center justify-center pointer-events-auto"
-                        >
-                            <div className="relative w-[760px] max-w-[92vw] bg-black/95 border-2 border-fuchsia-400 rounded-3xl shadow-[0_0_80px_rgba(217,70,239,0.7)] p-8 overflow-hidden" onClick={(event) => event.stopPropagation()}>
-                                <button
-                                    type="button"
-                                    aria-label="Close unlock reveal"
-                                    className="absolute right-3 top-3 z-20 rounded-full border border-fuchsia-200/70 bg-black/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-fuchsia-100 hover:bg-black/80"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        dismissCurrentOverlay();
-                                    }}
-                                >
-                                    Close
-                                </button>
-                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-fuchsia-700/40 via-purple-800/10 to-transparent" />
-                                <motion.div
-                                    initial={{ scale: 0.95, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    className="relative z-10"
-                                >
-                                    <div className="text-center mb-6">
-                                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/20 border border-fuchsia-300/40 text-fuchsia-100 text-xs font-black uppercase tracking-[0.25em]">
-                                            <Award size={14} />
-                                            New Discovery
-                                        </div>
-                                        <div className="mt-3 text-2xl md:text-3xl font-black text-white uppercase tracking-wider">
-                                            {activeUnlockReveal.ship.cadetName}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start justify-items-center">
-                                        {(activeUnlockReveal.unlocks?.ships || []).map((id) => (
-                                            <div key={`reveal-ship-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                <img
-                                                    src={getAssetPath(resolveShipAssetPath(id))}
-                                                    onError={(event) => {
-                                                        event.currentTarget.onerror = null;
-                                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
-                                                    }}
-                                                    alt={id}
-                                                    className="w-16 h-16 object-contain drop-shadow-md"
-                                                />
-                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Ship</div>
-                                            </div>
-                                        ))}
-                                        {(activeUnlockReveal.unlocks?.avatars || []).map((id) => (
-                                            <div key={`reveal-avatar-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                <div className="w-16 h-16 rounded-full border border-fuchsia-300/40 overflow-hidden">
-                                                    <UserAvatar avatarId={id} hat="none" className="w-full h-full" />
-                                                </div>
-                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Avatar</div>
-                                            </div>
-                                        ))}
-                                        {(activeUnlockReveal.unlocks?.pets || []).map((id) => {
-                                            const pet = getPetById(id);
-                                            return (
-                                                <div key={`reveal-pet-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                    <div className="w-16 h-16 rounded-full border border-fuchsia-300/40 overflow-hidden bg-black/40 flex items-center justify-center text-3xl">
-                                                        {pet.imageSrc ? (
-                                                            <img src={getAssetPath(pet.imageSrc)} alt={pet.name} className="w-full h-full object-contain" />
-                                                        ) : (
-                                                            <>{pet.emoji}</>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Pet</div>
-                                                </div>
-                                            );
-                                        })}
-                                        {(activeUnlockReveal.unlocks?.objects || []).map((id) => (
-                                            <div key={`reveal-object-${id}`} className="w-full bg-fuchsia-500/10 border border-fuchsia-300/30 rounded-2xl p-3 flex flex-col items-center gap-2">
-                                                <div className="w-16 h-16 rounded-xl border border-fuchsia-300/40 bg-black/40 flex items-center justify-center text-xs text-fuchsia-100 font-bold px-2 text-center leading-tight">
-                                                    {id}
-                                                </div>
-                                                <div className="text-[10px] text-fuchsia-100 uppercase font-black tracking-widest">New Object</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+            <AwardOverlay
+                awards={awardQueue}
+                activeUnlockReveal={activeUnlockReveal}
+                ranks={ranks}
+                onDismiss={dismissCurrentOverlay}
+            />
          )}
        </AnimatePresence>
 

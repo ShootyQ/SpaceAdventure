@@ -8,6 +8,12 @@ const normalizeValue = (value: string) => String(value || "").trim().toLowerCase
 
 const normalizePathValue = (value: string) => normalizeValue(value).replace(/\\/g, "/").split(/[?#]/)[0];
 
+const inferCategoryFromImagePath = (imagePath?: string) => {
+    const normalizedPath = normalizePathValue(imagePath || "");
+    const match = normalizedPath.match(/\/images\/collectibles\/(avatars|objects|pets|ships|flags)\//);
+    return match?.[1] || "";
+};
+
 const getPathStem = (value: string) => {
     const normalized = normalizePathValue(value);
     const lastSegment = normalized.split("/").pop() || normalized;
@@ -110,11 +116,18 @@ export const canonicalizeShopItemId = (itemId: string, imagePath?: string) => {
     const normalizedCategory = normalizeValue(rawCategory);
     const rawId = rest.join("/");
 
-    if (!KNOWN_SHOP_CATEGORIES.has(normalizedCategory) || !rawId) return normalizedItemId;
+    const inferredCategory = inferCategoryFromImagePath(imagePath);
+    const effectiveCategory = KNOWN_SHOP_CATEGORIES.has(normalizedCategory)
+        ? normalizedCategory
+        : inferredCategory;
 
-    return getCanonicalShopItemId({
-        category: normalizedCategory,
-        rawId,
-        imagePath,
-    });
+    if (effectiveCategory && rawId) {
+        return getCanonicalShopItemId({
+            category: effectiveCategory,
+            rawId,
+            imagePath,
+        });
+    }
+
+    return normalizedItemId;
 };

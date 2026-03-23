@@ -14,6 +14,13 @@ export const SHIP_OPTIONS: ShipOption[] = [
     { id: "coconutship", name: "Tropical Drifter", type: "cruiser", assetPath: "/images/collectibles/ships/starter/coconutship.png" },
     { id: "dragoneggship", name: "Dragon Scale Pod", type: "scout", assetPath: "/images/collectibles/ships/starter/dragoneggship.png" },
 
+    { id: "astromart", name: "Astromart", type: "cargo", assetPath: "/images/collectibles/ships/shop/ships/astromart.png" },
+    { id: "cacti-x", name: "Cacti-X", type: "scout", assetPath: "/images/collectibles/ships/shop/ship.shop.Cacti-X.png" },
+    { id: "clockworkheron", name: "Clockwork Heron", type: "scout", assetPath: "/images/collectibles/ships/shop/ship.shop.ClockworkHeron.png" },
+    { id: "crayonship", name: "Crayon Ship", type: "fighter", assetPath: "/images/collectibles/ships/shop/ship.shop.Crayonship.png" },
+    { id: "nebulacarousel", name: "Nebula Carousel", type: "cruiser", assetPath: "/images/collectibles/ships/shop/ship.shop.NebulaCarousel.png" },
+    { id: "vroomvroom", name: "Vroom Vroom", type: "fighter", assetPath: "/images/collectibles/ships/shop/ship.shop.VroomVroom.png" },
+
     { id: "earth-xp-earn", name: "Terra Vanguard", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/earth-xp-earn.png" },
     { id: "jupiter-xp-earn", name: "Stormbelly Freighter", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/jupiter-xp-earn.png" },
     { id: "mars-xp-earn", name: "Crimson Striker", type: "cargo", assetPath: "/images/collectibles/ships/xp-unlocks/mars-xp-earn.png" },

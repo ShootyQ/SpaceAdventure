@@ -233,22 +233,27 @@ const buildShopRows = (
   shopPrices: Record<string, number>,
   shopNameOverrides: Record<string, string>
 ): EditableRow[] => {
-  return shopItems.map((item) => {
+  const dedupe = new Set<string>();
+
+  return shopItems.flatMap((item) => {
     const normalizedItemId = canonicalizeShopItemId(item.id, item.imagePath);
-    return {
-    key: `shop:${item.id}`,
-    domain: "shop",
-    id: item.id,
-    name: String(shopNameOverrides[normalizedItemId] || item.name || item.id),
-    sourceName: String(item.name || item.id),
-    category: String(item.category || "misc").toLowerCase(),
-    method: "shop",
-    scope: "any",
-    planetId: firstPlanetId,
-    assetPath: item.imagePath,
-    price: toIntMin(shopPrices[normalizedItemId] ?? item.price, 0),
-    lockedMethod: true,
-  };
+    if (!normalizedItemId || dedupe.has(normalizedItemId)) return [];
+    dedupe.add(normalizedItemId);
+
+    return [{
+      key: `shop:${normalizedItemId}`,
+      domain: "shop",
+      id: normalizedItemId,
+      name: String(shopNameOverrides[normalizedItemId] || item.name || normalizedItemId),
+      sourceName: String(item.name || normalizedItemId),
+      category: String((normalizedItemId.split("/")[0] || item.category || "misc")).toLowerCase(),
+      method: "shop",
+      scope: "any",
+      planetId: firstPlanetId,
+      assetPath: item.imagePath,
+      price: toIntMin(shopPrices[normalizedItemId] ?? item.price, 0),
+      lockedMethod: true,
+    }];
   });
 };
 
