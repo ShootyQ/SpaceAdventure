@@ -61,6 +61,8 @@ const CLASSROOM_SPOTLIGHT_TRAVEL_DWELL_MS = 12000;
 const CLASSROOM_SPOTLIGHT_MANUAL_HOLD_MS = 15000;
 const CLASSROOM_SPOTLIGHT_PAN_SMOOTHING = 0.18;
 const CLASSROOM_SPOTLIGHT_ZOOM_SMOOTHING = 0.14;
+const CLASSROOM_SPOTLIGHT_STABLE_MAX_ZOOM = 3.2;
+const CLASSROOM_SPOTLIGHT_STABLE_SHIP_MAX_ZOOM = 3.2;
 
 type StarfieldPoint = {
     id: number;
@@ -1419,15 +1421,17 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   const lerpNumber = (start: number, end: number, alpha: number) => start + ((end - start) * alpha);
 
   const getPlanetSpotlightZoom = (shipCount: number) => {
-      if (shipCount >= 10) return 0.85;
-      if (shipCount >= 5) return 1.15;
-      return 1.45;
+      const zoomLevel = shipCount >= 10 ? 0.85 : shipCount >= 5 ? 1.15 : 1.45;
+      return preferStableMapRendering
+          ? Math.min(zoomLevel, CLASSROOM_SPOTLIGHT_STABLE_MAX_ZOOM)
+          : zoomLevel;
   };
 
   const getShipSpotlightZoom = (shipCount: number) => {
-      if (shipCount >= 10) return 3.2;
-      if (shipCount >= 5) return 4.8;
-      return 6.4;
+      const zoomLevel = shipCount >= 10 ? 3.2 : shipCount >= 5 ? 4.8 : 6.4;
+      return preferStableMapRendering
+          ? Math.min(zoomLevel, CLASSROOM_SPOTLIGHT_STABLE_SHIP_MAX_ZOOM)
+          : zoomLevel;
   };
 
   const getDockedShipPosition = (shipId: string, timestamp: number) => {
@@ -1558,7 +1562,10 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
       const position = getSpotlightPosition(target, timestamp);
       if (!position) return null;
 
-      const targetZoom = Math.min(Math.max(target.zoom, MIN_MAP_ZOOM), MAX_MAP_ZOOM);
+      const maxSpotlightZoom = preferStableMapRendering
+          ? Math.min(MAX_MAP_ZOOM, CLASSROOM_SPOTLIGHT_STABLE_MAX_ZOOM)
+          : MAX_MAP_ZOOM;
+      const targetZoom = Math.min(Math.max(target.zoom, MIN_MAP_ZOOM), maxSpotlightZoom);
       return {
           pan: {
               x: -position.x * targetZoom,
@@ -2117,12 +2124,14 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
        
        {/* Solar System Container with Pan & Zoom */}
        <div 
-                    className="relative flex items-center justify-center transform-gpu"
+                    className="relative flex items-center justify-center"
                         style={{
-                                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                                transform: preferStableMapRendering
+                                    ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+                                    : `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
                                 transformOrigin: 'center center',
-                                willChange: 'transform',
-                                backfaceVisibility: 'hidden'
+                                willChange: preferStableMapRendering ? 'auto' : 'transform',
+                                backfaceVisibility: preferStableMapRendering ? 'visible' : 'hidden'
                         }}
         >
           
@@ -2297,7 +2306,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
                               return (
                                   <div
-                                      className="absolute rounded-full border border-cyan-500/30 border-dashed animate-[spin_60s_linear_infinite]"
+                                      className={`absolute rounded-full border border-cyan-500/30 border-dashed ${preferStableMapRendering ? '' : 'animate-[spin_60s_linear_infinite]'}`}
                                       style={{
                                           width: diameter,
                                           height: diameter,
