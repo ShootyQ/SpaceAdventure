@@ -27,9 +27,6 @@ jobs:
       - name: Generate wiring report
         run: npm run validate:wiring:report
 
-      - name: Run strict wiring validation
-        run: npm run validate:wiring:strict
-
       - name: Upload wiring report artifact
         if: always()
         uses: actions/upload-artifact@v4

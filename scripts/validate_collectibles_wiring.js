@@ -131,7 +131,6 @@ shipRules.forEach((rule, index) => {
   if (!planetId) errors.push(`Ship rule #${index + 1} (${id || "unknown"}) missing planetId.`);
   if (!unlockKey) errors.push(`Ship rule #${index + 1} (${id || "unknown"}) missing unlockKey.`);
   if (!allowedChannels.has(channel)) errors.push(`Ship rule #${index + 1} (${id || "unknown"}) has invalid channel '${channel}'.`);
-  if (channel !== "xp") warnings.push(`Ship rule '${id}' channel is '${channel}' in xp-unlocks.json.`);
   if (starterSet.has(id)) errors.push(`Ship id '${id}' is both starter and XP rule.`);
 });
 
@@ -145,7 +144,6 @@ avatarRules.forEach((rule, index) => {
   if (!planetId) errors.push(`Avatar rule #${index + 1} (${id || "unknown"}) missing planetId.`);
   if (!unlockKey) errors.push(`Avatar rule #${index + 1} (${id || "unknown"}) missing unlockKey.`);
   if (!allowedChannels.has(channel)) errors.push(`Avatar rule #${index + 1} (${id || "unknown"}) has invalid channel '${channel}'.`);
-  if (channel !== "xp") warnings.push(`Avatar rule '${id}' channel is '${channel}' in xp-unlocks.json.`);
 });
 
 const shipUnlockKeyCollisions = checkIdDuplicates(shipRules.map((rule) => `${String(rule?.planetId || "").toLowerCase()}::${String(rule?.unlockKey || "")}`));

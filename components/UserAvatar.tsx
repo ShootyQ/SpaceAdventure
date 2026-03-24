@@ -23,7 +23,7 @@ export const AVATAR_OPTIONS = [
     { id: 'jovi', name: 'Jovi', src: '/images/collectibles/avatars/xp-unlocks/jovi.png' },
     { id: 'rusty', name: 'Rusty', src: '/images/collectibles/avatars/uncommon/rusty.png' },
     { id: 'vylaet', name: 'Vylaet', src: '/images/collectibles/avatars/rare/spacevylaet.png' },
-    { id: 'candor', name: 'Candor', src: '/images/collectibles/avatars/extremely-rare/Candor.Avatar.Mercury.Extremely-rare.png' },
+    { id: 'candor', name: 'Candor', src: '/images/collectibles/avatars/extremely-rare/candor.avatar.mercury.extremely-rare.png' },
     { id: 'earth-xp-avatar', name: 'Terra Trailblazer', src: '/images/collectibles/avatars/xp-unlocks/avatar.earth.xpunlock.png' },
     { id: 'mercury-xp-avatar', name: 'Solar Sprint', src: '/images/collectibles/avatars/xp-unlocks/avatar.mercury.xp-earn.png' },
     { id: 'saturn-xp-avatar', name: 'Ringline Renegade', src: '/images/collectibles/avatars/xp-unlocks/avatar.saturn.xpunlock.png' },
