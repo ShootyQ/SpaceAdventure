@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, where, onSnapshot, doc, increment, runTransaction, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +22,7 @@ export default function RewardsPage() {
     const [students, setStudents] = useState<UserData[]>([]);
     const [behaviors, setBehaviors] = useState<Behavior[]>([]);
     const [ranks, setRanks] = useState<Rank[]>([]);
+    const [studentSort, setStudentSort] = useState<"alpha-asc" | "alpha-desc">("alpha-asc");
     
     // UI State
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -33,6 +34,21 @@ export default function RewardsPage() {
     const { user } = useAuth();
     const { activeTeacherId } = useTeacherScope();
     const teacherScopeId = activeTeacherId || user?.uid || null;
+
+    const getStudentName = (student: UserData) => {
+        const displayName = String(student.displayName || "").trim();
+        const username = String((student as any).username || "").trim();
+        return displayName || username || "Cadet";
+    };
+
+    const sortedStudents = useMemo(() => {
+        const direction = studentSort === "alpha-desc" ? -1 : 1;
+        return [...students].sort((left, right) => {
+            const leftName = getStudentName(left);
+            const rightName = getStudentName(right);
+            return leftName.localeCompare(rightName, undefined, { sensitivity: "base", numeric: true }) * direction;
+        });
+    }, [students, studentSort]);
 
     // Helper for Multi-Select
     const toggleSelection = (uid: string) => {
@@ -371,6 +387,19 @@ export default function RewardsPage() {
                                 <span className="md:hidden">Fleet</span>
                             </h2>
                             <div className="flex items-center gap-2">
+                                <label htmlFor="student-sort" className="text-[10px] uppercase tracking-wider text-cyan-600 font-bold">
+                                    Sort
+                                </label>
+                                <select
+                                    id="student-sort"
+                                    value={studentSort}
+                                    onChange={(e) => setStudentSort(e.target.value as "alpha-asc" | "alpha-desc")}
+                                    className="text-xs font-bold text-cyan-200 bg-cyan-950/70 border border-cyan-800 px-2 py-1.5 rounded uppercase tracking-wider outline-none focus:border-cyan-400"
+                                    title="Sort cadets alphabetically"
+                                >
+                                    <option value="alpha-asc">A-Z</option>
+                                    <option value="alpha-desc">Z-A</option>
+                                </select>
                                 <button 
                                     onClick={selectAll}
                                     className="text-xs font-bold text-cyan-400 bg-cyan-950/50 hover:bg-cyan-900 border border-cyan-800 px-3 py-1.5 rounded uppercase tracking-wider transition-colors"
@@ -392,7 +421,7 @@ export default function RewardsPage() {
                              <div className="flex-1 overflow-y-auto pr-1 md:pr-2 custom-scrollbar pb-24">
                                 {/* Density adjustments for mobile: grid-cols-4, smaller gap */}
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4 auto-rows-fr">
-                                    {students.map(student => {
+                                    {sortedStudents.map(student => {
                                         const rank = ranks.slice().sort((a,b) => b.minXP - a.minXP).find(r => (student.xp || 0) >= r.minXP);
                                         const isSelected = selectedIds.has(student.uid);
                                         return (
@@ -432,7 +461,7 @@ export default function RewardsPage() {
                                             <div className="flex-1 flex flex-col items-center md:items-start justify-center w-full z-10 gap-1 md:gap-2">
                                                 <div className="text-center md:text-left w-full flex flex-col justify-center">
                                                     <h3 className="text-white font-bold text-[11px] sm:text-xs md:text-base leading-tight w-full px-0.5 break-words md:truncate">
-                                                        {student.displayName || 'Cadet'}
+                                                        {getStudentName(student)}
                                                     </h3>
                                                     <p className="text-cyan-600 text-[10px] md:text-xs uppercase tracking-wider font-bold truncate">
                                                         {rank?.name || 'Space Cadet'} • {student.xp || 0} XP
