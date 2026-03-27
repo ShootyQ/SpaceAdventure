@@ -552,6 +552,19 @@ export function getCurrentCargoUsed(resources?: ResourceInventory): number {
     return Object.values(resources || {}).reduce((sum, value) => sum + Math.max(0, Number(value || 0)), 0);
 }
 
+export function getStoredCargoUnits(
+    resources?: ResourceInventory,
+    ownedMachines?: OwnedMachineInventory,
+    placedMachines?: Record<string, PlacedMachine>
+): number {
+    const resourceUnits = getCurrentCargoUsed(resources);
+    const machineUnits = MACHINE_CATALOG.reduce((sum, machine) => {
+        return sum + getAvailableMachineCount(machine.id, ownedMachines, placedMachines);
+    }, 0);
+
+    return resourceUnits + machineUnits;
+}
+
 export function getAvailableMachineCount(
     machineId: string,
     ownedMachines?: OwnedMachineInventory,

@@ -42,6 +42,7 @@ import {
     getMachineUnitDurationMs,
     getPlanetResources,
     getResourceDefinition,
+    getStoredCargoUnits,
     getTravelComputationBetweenPlanets,
     normalizeClassPlanetDiscoveryState,
 } from "@/lib/resource-economy";
@@ -2093,8 +2094,8 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         [currentUserGameplay?.upgrades?.hull]
     );
     const currentUserCargoUsed = useMemo(
-        () => getCurrentCargoUsed(currentUserGameplay?.resources || {}),
-        [currentUserGameplay?.resources]
+        () => getStoredCargoUnits(currentUserGameplay?.resources || {}, currentUserGameplay?.ownedMachines, currentUserGameplay?.placedMachines),
+        [currentUserGameplay?.ownedMachines, currentUserGameplay?.placedMachines, currentUserGameplay?.resources]
     );
     const ownPlacedMachines = useMemo(
         () => Object.values(currentUserGameplay?.placedMachines || {}),
@@ -2239,7 +2240,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                 if (!accrual || accrual.unitsReady <= 0) throw new Error("No collected output is ready yet.");
 
                 const hullStats = getHullTierStats(latestUserData.upgrades?.hull);
-                const remainingCapacity = Math.max(0, hullStats.cargoCapacity - getCurrentCargoUsed(nextResources));
+                const remainingCapacity = Math.max(0, hullStats.cargoCapacity - getStoredCargoUnits(nextResources, latestUserData.ownedMachines, nextPlacedMachines));
                 if (remainingCapacity <= 0) throw new Error("Cargo hold is full.");
 
                 collectedUnits = Math.min(accrual.unitsReady, remainingCapacity);

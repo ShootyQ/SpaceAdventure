@@ -7,9 +7,9 @@ import { db } from "@/lib/firebase";
 import { ClassPlanetDiscoveryState, PLANETS, UserData } from "@/types";
 import {
     RESOURCE_DISCOVERY_DOC_ID,
-    getCurrentCargoUsed,
     getPlanetResources,
     getResourceDefinition,
+    getStoredCargoUnits,
     normalizeClassPlanetDiscoveryState,
 } from "@/lib/resource-economy";
 
@@ -83,7 +83,7 @@ export function ClassResourceDashboard({
         });
 
         const activeMachines = students.reduce((sum, student) => sum + Object.keys(student.placedMachines || {}).length, 0);
-        const storedCargo = students.reduce((sum, student) => sum + getCurrentCargoUsed(student.resources || {}), 0);
+        const storedCargo = students.reduce((sum, student) => sum + getStoredCargoUnits(student.resources || {}, student.ownedMachines, student.placedMachines), 0);
 
         return {
             discoveredSlots,

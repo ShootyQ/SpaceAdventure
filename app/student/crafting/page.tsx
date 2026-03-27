@@ -12,13 +12,13 @@ import {
     canCraftShipUpgrade,
     formatMachineCostLabel,
     getBoosterStats,
-    getCurrentCargoUsed,
     getCurrentShipUpgrade,
     getHullTierStats,
     getLanderStats,
     getMachineDefinition,
     getNextShipUpgrade,
     getResourceDefinition,
+    getStoredCargoUnits,
     MACHINE_CATALOG,
     STARTER_MINER_ID,
 } from "@/lib/resource-economy";
@@ -50,7 +50,7 @@ export default function StudentCraftingPage() {
     const ownedMachines = effectiveUserData?.ownedMachines || {};
     const placedMachines = effectiveUserData?.placedMachines || {};
     const starterMiner = getMachineDefinition(STARTER_MINER_ID);
-    const cargoUsed = getCurrentCargoUsed(resources);
+    const cargoUsed = getStoredCargoUnits(resources, ownedMachines, placedMachines);
     const hullStats = getHullTierStats(effectiveUserData?.upgrades?.hull);
     const upgradeLevels = {
         boosters: Number(effectiveUserData?.upgrades?.boosters || 0),

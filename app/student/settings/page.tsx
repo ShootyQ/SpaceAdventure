@@ -35,6 +35,7 @@ import {
     getNextShipUpgrade,
     getPlanetResources,
     getResourceDefinition,
+    getStoredCargoUnits,
     getTravelComputationBetweenPlanets,
 } from "@/lib/resource-economy";
 
@@ -250,6 +251,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
 
     const shipColor = userData?.spaceship?.color || "text-cyan-400";
     const selectedShipId = userData?.spaceship?.modelId || userData?.spaceship?.id || "finalship";
+    const selectedShipAssetPath = resolveShipOption(selectedShipId)?.assetPath || resolveShipAssetPath(selectedShipId);
     // Extract tailwind color class prefix for glowing effects (e.g. text-blue-400 -> blue)
     const glowColor = shipColor.includes('-') ? shipColor.split('-')[1] : 'cyan';
 
@@ -336,7 +338,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
                       <div className="absolute right-0 w-24 h-24 rounded-full border-2 border-cyan-500/50 overflow-hidden bg-black flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.3)] z-20">
                            <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 6, repeat: Infinity }}>
                                 <img
-                                    src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                                    src={getAssetPath(selectedShipAssetPath)}
                                     alt="Selected ship"
                                     className="w-14 h-14 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                                     onError={(event) => {
@@ -503,8 +505,10 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     const boosterStats = getBoosterStats(boosterLevel);
     const landerStats = getLanderStats(landerLevel);
     const hullStats = getHullTierStats(hullLevel);
-    const cargoUsed = getCurrentCargoUsed(effectiveUserData?.resources || {});
+    const cargoUsed = getStoredCargoUnits(effectiveUserData?.resources || {}, effectiveUserData?.ownedMachines, effectiveUserData?.placedMachines);
     const routePreview = getTravelComputationBetweenPlanets(currentPlanetId, longRangeDestinationId, boosterLevel);
+    const selectedShipOption = resolveShipOption(selectedShipId);
+    const selectedShipAssetPath = selectedShipOption?.assetPath || resolveShipAssetPath(selectedShipId);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
@@ -517,7 +521,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 >
                     <img 
-                        src={getAssetPath(resolveShipAssetPath(selectedShipId))}
+                        src={getAssetPath(selectedShipAssetPath)}
                         onError={(event) => {
                             event.currentTarget.onerror = null;
                             event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
@@ -573,7 +577,15 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                                 onClick={() => setSelectedShipId(opt.id)}
                                 className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
                             >
-                                <img src={getAssetPath(resolveShipAssetPath(opt.id))} alt={opt.name} className="w-20 h-20 object-contain shrink-0" />
+                                <img
+                                    src={getAssetPath(opt.assetPath || resolveShipAssetPath(opt.id))}
+                                    alt={opt.name}
+                                    className="w-20 h-20 object-contain shrink-0"
+                                    onError={(event) => {
+                                        event.currentTarget.onerror = null;
+                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                    }}
+                                />
                                 <div className="min-w-0 flex-1">
                                     <span className={`block text-xs uppercase font-bold ${selectedShipId === opt.id ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
                                 </div>
@@ -906,8 +918,6 @@ function ShipUpgradeBlueprints({ userData }: { userData?: UserData | null }) {
 }
 
 function InventoryView({ userData, user }: { userData?: UserData | null; user?: any | null }) {
-    const [pendingAction, setPendingAction] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string>("");
     const [liveUserData, setLiveUserData] = useState<UserData | null>(userData || null);
 
     useEffect(() => {
@@ -926,51 +936,17 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
     }, [user?.uid]);
 
     const effectiveUserData = liveUserData || userData || null;
-    const currentPlanetId = normalizePlanetId(effectiveUserData?.location || "earth") || "earth";
-    const currentPlanetResources = useMemo(() => getPlanetResources(currentPlanetId), [currentPlanetId]);
     const hullStats = useMemo(() => getHullTierStats(effectiveUserData?.upgrades?.hull), [effectiveUserData?.upgrades?.hull]);
     const resources = effectiveUserData?.resources || {};
-    const cargoUsed = useMemo(() => getCurrentCargoUsed(resources), [resources]);
-    const cargoRemaining = Math.max(0, hullStats.cargoCapacity - cargoUsed);
     const placedMachines = useMemo(() => Object.values(effectiveUserData?.placedMachines || {}), [effectiveUserData?.placedMachines]);
-    const activeMachineCount = placedMachines.length;
     const ownedMachines = effectiveUserData?.ownedMachines || {};
-    const starterMiner = getMachineDefinition(STARTER_MINER_ID);
-    const basicMachineRows = useMemo(() => (
-        MACHINE_CATALOG
-            .filter((machine) => machine.tier === 1)
-            .map((machine) => {
-                const totalOwned = Number(ownedMachines[machine.id] || 0);
-                const deployedCount = placedMachines.filter((placedMachine) => placedMachine.machineId === machine.id).length;
-                const availableCount = getAvailableMachineCount(machine.id, ownedMachines, effectiveUserData?.placedMachines);
-                const targetResource = currentPlanetResources.find((resource) => resource.machineFamily === machine.family);
+    const cargoUsed = useMemo(
+        () => getStoredCargoUnits(resources, ownedMachines, effectiveUserData?.placedMachines),
+        [effectiveUserData?.placedMachines, ownedMachines, resources]
+    );
 
-                return {
-                    machine,
-                    totalOwned,
-                    deployedCount,
-                    availableCount,
-                    targetResource,
-                };
-            })
-    ), [currentPlanetResources, effectiveUserData?.placedMachines, ownedMachines, placedMachines]);
-    const craftableMachineRows = useMemo(() => (
-        MACHINE_CATALOG
-            .filter((machine) => machine.id !== STARTER_MINER_ID)
-            .map((machine) => ({
-                machine,
-                totalOwned: Number(ownedMachines[machine.id] || 0),
-                availability: canCraftMachine(machine.id, resources, ownedMachines, effectiveUserData?.placedMachines),
-                previousMachine: machine.previousMachineId ? getMachineDefinition(machine.previousMachineId) : null,
-            }))
-    ), [effectiveUserData?.placedMachines, ownedMachines, resources]);
     const displayedResources = useMemo(() => {
-        const interestingResourceIds = Array.from(new Set([
-            ...Object.keys(resources),
-            ...currentPlanetResources.map((resource) => resource.resourceId),
-        ]));
-
-        return interestingResourceIds
+        return Object.keys(resources)
             .map((resourceId) => {
                 const definition = getResourceDefinition(resourceId);
                 return {
@@ -979,294 +955,28 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                     quantity: Number(resources[resourceId] || 0),
                 };
             })
-            .filter((entry) => Boolean(entry.definition))
+            .filter((entry) => Boolean(entry.definition) && entry.quantity > 0)
             .sort((left, right) => right.quantity - left.quantity);
-    }, [currentPlanetResources, resources]);
-    const placedMachineSnapshots = useMemo(() => {
-        return placedMachines
-            .map((placedMachine) => ({
-                placedMachine,
-                accrual: getMachineAccrualSnapshot(placedMachine),
-                targetResource: getResourceDefinition(placedMachine.resourceId),
-            }))
-            .sort((left, right) => right.placedMachine.placedAt - left.placedMachine.placedAt);
-    }, [placedMachines]);
+    }, [resources]);
+
     const ownedMachineSlots = useMemo(() => {
         return MACHINE_CATALOG
             .map((machine) => {
                 const totalOwned = Number(ownedMachines[machine.id] || 0);
                 const deployedCount = placedMachines.filter((placedMachine) => placedMachine.machineId === machine.id).length;
                 const availableCount = Math.max(0, totalOwned - deployedCount);
+
                 return {
                     machine,
-                    totalOwned,
-                    deployedCount,
                     availableCount,
                 };
             })
-            .filter((entry) => entry.totalOwned > 0)
-            .sort((left, right) => right.totalOwned - left.totalOwned);
+            .filter((entry) => entry.availableCount > 0)
+            .sort((left, right) => right.availableCount - left.availableCount);
     }, [ownedMachines, placedMachines]);
-    const quickDeployRows = useMemo(() => {
-        return basicMachineRows.filter((row) => row.totalOwned > 0 || row.availableCount > 0);
-    }, [basicMachineRows]);
 
-    const runWithFeedback = async (actionKey: string, action: () => Promise<string>) => {
-        setPendingAction(actionKey);
-        setNotice("");
-        try {
-            const nextNotice = await action();
-            setNotice(nextNotice);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Action failed.";
-            setNotice(message);
-        } finally {
-            setPendingAction(null);
-        }
-    };
-
-    const handleStarterMinerPurchase = async () => {
-        if (!user?.uid || !starterMiner?.starterPriceCredits) {
-            throw new Error("Starter miner store is offline.");
-        }
-
-        const starterMinerPrice = starterMiner.starterPriceCredits;
-
-        await runWithFeedback("buy-starter-miner", async () => {
-            const userRef = doc(db, "users", user.uid);
-
-            await runTransaction(db, async (transaction) => {
-                const snapshot = await transaction.get(userRef);
-                if (!snapshot.exists()) {
-                    throw new Error("Student profile not found.");
-                }
-
-                const latestUserData = snapshot.data() as UserData;
-                const currentCredits = Number(latestUserData.galacticCredits || 0);
-                if (currentCredits < starterMinerPrice) {
-                    throw new Error(`You need ${starterMinerPrice} credits for the first miner.`);
-                }
-
-                const nextOwnedMachines = {
-                    ...(latestUserData.ownedMachines || {}),
-                    [STARTER_MINER_ID]: Number(latestUserData.ownedMachines?.[STARTER_MINER_ID] || 0) + 1,
-                };
-
-                transaction.update(userRef, {
-                    galacticCredits: increment(-starterMinerPrice),
-                    ownedMachines: nextOwnedMachines,
-                });
-            });
-
-            return "Starter miner acquired. Deploy it to the current planet when ready.";
-        });
-    };
-
-    const handleCraftMachine = async (machineId: string) => {
-        if (!user?.uid) {
-            throw new Error("You must be signed in to craft a machine.");
-        }
-
-        await runWithFeedback(`craft-${machineId}`, async () => {
-            const machine = getMachineDefinition(machineId);
-            if (!machine) {
-                throw new Error("Machine blueprint not found.");
-            }
-
-            const userRef = doc(db, "users", user.uid);
-
-            await runTransaction(db, async (transaction) => {
-                const snapshot = await transaction.get(userRef);
-                if (!snapshot.exists()) {
-                    throw new Error("Student profile not found.");
-                }
-
-                const latestUserData = snapshot.data() as UserData;
-                const nextResources = { ...(latestUserData.resources || {}) };
-                const nextOwnedMachines = { ...(latestUserData.ownedMachines || {}) };
-                const availability = canCraftMachine(machineId, nextResources, nextOwnedMachines, latestUserData.placedMachines);
-
-                if (!availability.ok) {
-                    throw new Error(availability.reason || "Missing fabrication requirements.");
-                }
-
-                machine.costs.forEach((cost) => {
-                    nextResources[cost.resourceId] = Math.max(0, Number(nextResources[cost.resourceId] || 0) - cost.quantity);
-                    if (nextResources[cost.resourceId] <= 0) {
-                        delete nextResources[cost.resourceId];
-                    }
-                });
-
-                if (machine.previousMachineId) {
-                    nextOwnedMachines[machine.previousMachineId] = Math.max(0, Number(nextOwnedMachines[machine.previousMachineId] || 0) - 1);
-                    if (nextOwnedMachines[machine.previousMachineId] <= 0) {
-                        delete nextOwnedMachines[machine.previousMachineId];
-                    }
-                }
-
-                nextOwnedMachines[machine.id] = Number(nextOwnedMachines[machine.id] || 0) + 1;
-
-                transaction.update(userRef, {
-                    resources: nextResources,
-                    ownedMachines: nextOwnedMachines,
-                });
-            });
-
-            return `${machine.name} fabricated and added to cargo.`;
-        });
-    };
-
-    const handleDeployMachine = async (machineId: string) => {
-        if (!user?.uid) {
-            throw new Error("You must be signed in to deploy a machine.");
-        }
-
-        await runWithFeedback(`deploy-${machineId}`, async () => {
-            const definition = getMachineDefinition(machineId);
-            if (!definition) {
-                throw new Error("Machine blueprint not found.");
-            }
-
-            const userRef = doc(db, "users", user.uid);
-            let deployedResourceName = "";
-            let deployedPlanetName = currentPlanetId;
-
-            await runTransaction(db, async (transaction) => {
-                const snapshot = await transaction.get(userRef);
-                if (!snapshot.exists()) {
-                    throw new Error("Student profile not found.");
-                }
-
-                const latestUserData = snapshot.data() as UserData;
-                const latestPlanetId = normalizePlanetId(latestUserData.location || "earth") || "earth";
-                const nextHullStats = getHullTierStats(latestUserData.upgrades?.hull);
-                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
-                const nextOwnedMachines = latestUserData.ownedMachines || {};
-                const deployedCount = Object.values(nextPlacedMachines).filter((placedMachine) => placedMachine.machineId === machineId).length;
-                const ownedCount = Number(nextOwnedMachines[machineId] || 0);
-
-                if (Object.keys(nextPlacedMachines).length >= nextHullStats.activeMachineLimit) {
-                    throw new Error(`Hull limit reached. Upgrade hull plating for more than ${nextHullStats.activeMachineLimit} active machines.`);
-                }
-
-                if (ownedCount - deployedCount <= 0) {
-                    throw new Error("No spare machine of that type is available to deploy.");
-                }
-
-                const targetResource = getPlanetResources(latestPlanetId).find((resource) => resource.machineFamily === definition.family);
-                if (!targetResource) {
-                    throw new Error("This planet does not support that machine family.");
-                }
-
-                const placedAt = Date.now();
-                const placedMachineId = buildPlacedMachineId(machineId, latestPlanetId, targetResource.resourceId);
-                nextPlacedMachines[placedMachineId] = {
-                    id: placedMachineId,
-                    machineId,
-                    family: definition.family,
-                    tier: definition.tier,
-                    planetId: latestPlanetId,
-                    resourceId: targetResource.resourceId,
-                    category: targetResource.category,
-                    placedAt,
-                    lastCollectedAt: placedAt,
-                } satisfies PlacedMachine;
-
-                deployedResourceName = targetResource.resourceName;
-                deployedPlanetName = latestPlanetId;
-                transaction.update(userRef, { placedMachines: nextPlacedMachines });
-            });
-
-            return `${definition.name} deployed to ${deployedPlanetName} for ${deployedResourceName}.`;
-        });
-    };
-
-    const handlePackMachine = async (placedMachineId: string) => {
-        if (!user?.uid) {
-            throw new Error("You must be signed in to pack up a machine.");
-        }
-
-        await runWithFeedback(`pack-${placedMachineId}`, async () => {
-            const userRef = doc(db, "users", user.uid);
-            let machineName = "Machine";
-
-            await runTransaction(db, async (transaction) => {
-                const snapshot = await transaction.get(userRef);
-                if (!snapshot.exists()) {
-                    throw new Error("Student profile not found.");
-                }
-
-                const latestUserData = snapshot.data() as UserData;
-                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
-                const targetMachine = nextPlacedMachines[placedMachineId];
-                if (!targetMachine) {
-                    throw new Error("Machine is no longer deployed.");
-                }
-
-                machineName = getMachineDefinition(targetMachine.machineId)?.name || machineName;
-                delete nextPlacedMachines[placedMachineId];
-                transaction.update(userRef, { placedMachines: nextPlacedMachines });
-            });
-
-            return `${machineName} packed back into cargo.`;
-        });
-    };
-
-    const handleCollectMachine = async (placedMachineId: string) => {
-        if (!user?.uid) {
-            throw new Error("You must be signed in to collect resources.");
-        }
-
-        await runWithFeedback(`collect-${placedMachineId}`, async () => {
-            const userRef = doc(db, "users", user.uid);
-            let collectedUnits = 0;
-            let resourceLabel = "resource";
-
-            await runTransaction(db, async (transaction) => {
-                const snapshot = await transaction.get(userRef);
-                if (!snapshot.exists()) {
-                    throw new Error("Student profile not found.");
-                }
-
-                const latestUserData = snapshot.data() as UserData;
-                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
-                const nextResources = { ...(latestUserData.resources || {}) };
-                const targetMachine = nextPlacedMachines[placedMachineId];
-                if (!targetMachine) {
-                    throw new Error("Machine is no longer deployed.");
-                }
-
-                const accrual = getMachineAccrualSnapshot(targetMachine);
-                if (!accrual || accrual.unitsReady <= 0) {
-                    throw new Error("No collected output is ready yet.");
-                }
-
-                const nextHullStats = getHullTierStats(latestUserData.upgrades?.hull);
-                const usedCapacity = getCurrentCargoUsed(nextResources);
-                const remainingCapacity = Math.max(0, nextHullStats.cargoCapacity - usedCapacity);
-                if (remainingCapacity <= 0) {
-                    throw new Error("Cargo hold is full. Upgrade hull plating before collecting more output.");
-                }
-
-                collectedUnits = Math.min(accrual.unitsReady, remainingCapacity);
-                resourceLabel = getResourceDefinition(targetMachine.resourceId)?.name || targetMachine.resourceId;
-                nextResources[targetMachine.resourceId] = Number(nextResources[targetMachine.resourceId] || 0) + collectedUnits;
-
-                const lastCollectedAt = Math.max(targetMachine.lastCollectedAt || targetMachine.placedAt, targetMachine.placedAt);
-                nextPlacedMachines[placedMachineId] = {
-                    ...targetMachine,
-                    lastCollectedAt: lastCollectedAt + Math.floor(getMachineUnitDurationMs(targetMachine.machineId) * collectedUnits),
-                };
-
-                transaction.update(userRef, {
-                    resources: nextResources,
-                    placedMachines: nextPlacedMachines,
-                });
-            });
-
-            return `Collected ${collectedUnits} ${resourceLabel}.`;
-        });
-    };
+    const visibleStacks = displayedResources.length + ownedMachineSlots.length;
+    const storedMachineUnits = ownedMachineSlots.reduce((sum, entry) => sum + entry.availableCount, 0);
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -1276,231 +986,87 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                         <Database className="text-amber-400" size={32} />
                         <div>
                             <h2 className="text-2xl font-bold text-amber-400 uppercase tracking-widest">Cargo Hold</h2>
-                            <p className="text-xs text-amber-200/70 uppercase tracking-[0.3em] mt-1">Inventory grid, field gear, and collected resources</p>
+                            <p className="text-xs text-amber-200/70 uppercase tracking-[0.3em] mt-1">Stacked inventory only</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-wrap justify-end">
-                        <div className="text-right">
-                            <div className="text-xs uppercase tracking-[0.3em] text-amber-700">Current Planet</div>
-                            <div className="text-lg font-bold text-white uppercase">{currentPlanetId}</div>
-                        </div>
-                        <Link href="/student/crafting" className="rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 transition-colors">
-                            Open Crafting Table
-                        </Link>
-                    </div>
+                    <Link href="/student/crafting" className="rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 transition-colors">
+                        Open Crafting Table
+                    </Link>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-3">
                     <div className="rounded-2xl border border-amber-900/60 bg-amber-950/15 p-4">
-                        <div className="text-xs uppercase tracking-[0.3em] text-amber-600">Cargo Capacity</div>
+                        <div className="text-xs uppercase tracking-[0.3em] text-amber-600">Inventory Capacity</div>
                         <div className="mt-2 text-3xl font-bold text-white">{cargoUsed} / {hullStats.cargoCapacity}</div>
                         <progress
                             value={Math.min(100, (cargoUsed / Math.max(hullStats.cargoCapacity, 1)) * 100)}
                             max={100}
                             className="mt-3 h-3 w-full rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-black/50 [&::-webkit-progress-value]:bg-amber-400"
                         />
-                        <div className="mt-3 text-xs text-amber-200/70">Remaining capacity: {cargoRemaining} units</div>
+                        <div className="mt-3 text-xs text-amber-200/70">Stacks share one tile, but every stored unit counts toward capacity.</div>
                     </div>
 
                     <div className="rounded-2xl border border-cyan-900/60 bg-cyan-950/15 p-4">
-                        <div className="text-xs uppercase tracking-[0.3em] text-cyan-600">Hull Machine Limit</div>
-                        <div className="mt-2 text-3xl font-bold text-white">{activeMachineCount} / {hullStats.activeMachineLimit}</div>
-                        <div className="mt-3 text-xs text-cyan-200/70">{hullStats.label} supports {hullStats.upgradeSlots} ship upgrade slot(s).</div>
+                        <div className="text-xs uppercase tracking-[0.3em] text-cyan-600">Stored Machine Units</div>
+                        <div className="mt-2 text-3xl font-bold text-white">{storedMachineUnits}</div>
+                        <div className="mt-3 text-xs text-cyan-200/70">Crafted miners, extractors, and harvesters stay here until deployed on a planet.</div>
                     </div>
 
                     <div className="rounded-2xl border border-emerald-900/60 bg-emerald-950/15 p-4">
-                        <div className="text-xs uppercase tracking-[0.3em] text-emerald-600">Credits Available</div>
-                        <div className="mt-2 text-3xl font-bold text-white">{Number(effectiveUserData?.galacticCredits || 0)}</div>
-                        <div className="mt-3 text-xs text-emerald-200/70">Use the crafting table for new machines and upgrade fabrication.</div>
+                        <div className="text-xs uppercase tracking-[0.3em] text-emerald-600">Visible Stacks</div>
+                        <div className="mt-2 text-3xl font-bold text-white">{visibleStacks}</div>
+                        <div className="mt-3 text-xs text-emerald-200/70">Resources and undeployed machines each appear once with a quantity badge.</div>
                     </div>
                 </div>
-
-                {notice ? (
-                    <div className="mt-4 rounded-2xl border border-amber-700/40 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
-                        {notice}
-                    </div>
-                ) : null}
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
-                <div className="space-y-6">
-                    <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
-                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                            <div>
-                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Cargo Grid</h3>
-                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Placeholder inventory tiles until final art arrives</p>
-                            </div>
-                            <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">{displayedResources.length + ownedMachineSlots.length} occupied slots</span>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                            {displayedResources.map(({ resourceId, definition, quantity }) => (
-                                <div key={`resource-${resourceId}`} className="aspect-square rounded-2xl border border-emerald-900/40 bg-emerald-950/10 p-4 flex flex-col justify-between">
-                                    <div className="w-12 h-12 rounded-2xl border border-emerald-500/20 bg-black/30 flex items-center justify-center text-sm font-bold text-emerald-100">
-                                        {definition?.symbol || "--"}
-                                    </div>
-                                    <div>
-                                        <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{definition?.name || resourceId}</div>
-                                        <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-600 mt-1">{definition?.category || "unknown"}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-2xl font-bold text-white">{quantity}</div>
-                                        <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-500">stored</div>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {ownedMachineSlots.map(({ machine, totalOwned, deployedCount, availableCount }) => (
-                                <div key={`machine-${machine.id}`} className="aspect-square rounded-2xl border border-amber-900/40 bg-amber-950/10 p-4 flex flex-col justify-between">
-                                    <div className="w-12 h-12 rounded-2xl border border-amber-500/20 bg-black/30 flex items-center justify-center text-sm font-bold text-amber-100">
-                                        {machine.symbol}
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-white">{machine.name}</div>
-                                        <div className="text-[10px] uppercase tracking-[0.25em] text-amber-600 mt-1">tier {machine.tier} {machine.family}</div>
-                                    </div>
-                                    <div className="text-right text-[11px] text-amber-100/80">
-                                        <div>Total: {totalOwned}</div>
-                                        <div>Ready: {availableCount}</div>
-                                        <div>Field: {deployedCount}</div>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {displayedResources.length === 0 && ownedMachineSlots.length === 0 ? (
-                                <div className="col-span-full rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-6 text-sm text-cyan-500">
-                                    No cargo stored yet. Use the crafting table to build gear, then deploy machines and bring resources back here.
-                                </div>
-                            ) : null}
-                        </div>
+            <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
+                <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                    <div>
+                        <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Inventory Grid</h3>
+                        <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Placeholder item tiles until final art arrives</p>
                     </div>
-
-                    <div className="border border-amber-900/40 bg-black/40 rounded-3xl p-6">
-                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                            <div>
-                                <h3 className="text-lg font-bold text-amber-200 uppercase tracking-widest">Field Actions</h3>
-                                <p className="text-xs text-amber-700 uppercase tracking-[0.25em] mt-1">Deploy compatible gear on the planet you are currently orbiting</p>
-                            </div>
-                            <span className="text-[10px] uppercase tracking-[0.25em] text-amber-700">Crafting moved to workshop</span>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-3">
-                            {quickDeployRows.length === 0 ? (
-                                <div className="md:col-span-2 rounded-2xl border border-amber-900/50 bg-amber-950/10 p-4 text-sm text-amber-500">
-                                    No machines in cargo yet. Build one from the crafting table first.
-                                </div>
-                            ) : quickDeployRows.map(({ machine, totalOwned, deployedCount, availableCount, targetResource }) => {
-                                const deployDisabled = availableCount <= 0 || !targetResource || activeMachineCount >= hullStats.activeMachineLimit || Boolean(pendingAction);
-                                return (
-                                    <div key={machine.id} className="rounded-2xl border border-amber-900/50 bg-amber-950/10 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="rounded-lg border border-amber-800/60 px-2 py-1 text-xs font-bold text-amber-100 bg-black/30">{machine.symbol}</span>
-                                                    <h4 className="text-base font-bold text-white">{machine.name}</h4>
-                                                </div>
-                                                <div className="text-xs text-amber-200/80 mt-2">Owned {totalOwned} • Deployed {deployedCount} • Ready {availableCount}</div>
-                                                <div className="text-xs text-amber-300/70 mt-1">{targetResource ? `Targets ${targetResource.resourceName}` : "No matching resource on this planet."}</div>
-                                            </div>
-                                            <button
-                                                onClick={() => handleDeployMachine(machine.id)}
-                                                disabled={deployDisabled}
-                                                className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
-                                            >
-                                                {pendingAction === `deploy-${machine.id}` ? "Deploying..." : "Deploy"}
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">{visibleStacks} visible stacks</span>
                 </div>
 
-                <div className="space-y-6">
-                    <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
-                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                    {displayedResources.map(({ resourceId, definition, quantity }) => (
+                        <div key={`resource-${resourceId}`} className="aspect-square rounded-2xl border border-emerald-900/40 bg-emerald-950/10 p-4 flex flex-col justify-between">
+                            <div className="w-14 h-14 rounded-2xl border border-emerald-500/20 bg-black/30 flex items-center justify-center text-sm font-bold text-emerald-100">
+                                {definition?.symbol || "--"}
+                            </div>
                             <div>
-                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Planet Readout</h3>
-                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">The three resources available at your current stop</p>
+                                <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{definition?.name || resourceId}</div>
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-600 mt-1">{definition?.category || "unknown"}</div>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-500">stack</div>
+                                <div className="rounded-full min-w-10 px-3 py-1 text-center text-sm font-bold text-white bg-emerald-500/20 border border-emerald-400/20">{quantity}</div>
                             </div>
                         </div>
+                    ))}
 
-                        <div className="space-y-3">
-                            {currentPlanetResources.map((resource) => {
-                                const definition = getResourceDefinition(resource.resourceId);
-                                return (
-                                    <div key={resource.resourceId} className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4 flex items-center justify-between gap-3">
-                                        <div>
-                                            <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{resource.resourceName}</div>
-                                            <div className="text-xs text-cyan-500 mt-1">{MACHINE_FAMILY_LABELS[resource.machineFamily]}</div>
-                                        </div>
-                                        <div className="rounded-xl border border-cyan-800/60 px-3 py-2 text-xs font-bold text-cyan-100 bg-black/30">
-                                            {definition?.symbol || "--"}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
-                        <div className="flex items-center justify-between gap-3 mb-4">
+                    {ownedMachineSlots.map(({ machine, availableCount }) => (
+                        <div key={`machine-${machine.id}`} className="aspect-square rounded-2xl border border-amber-900/40 bg-amber-950/10 p-4 flex flex-col justify-between">
+                            <div className="w-14 h-14 rounded-2xl border border-amber-500/20 bg-black/30 flex items-center justify-center text-sm font-bold text-amber-100">
+                                {machine.symbol}
+                            </div>
                             <div>
-                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Active Placements</h3>
-                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Collect output or pack machines back into cargo</p>
+                                <div className="font-bold text-white">{machine.name}</div>
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-600 mt-1">tier {machine.tier} {machine.family}</div>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-500">stored</div>
+                                <div className="rounded-full min-w-10 px-3 py-1 text-center text-sm font-bold text-white bg-amber-500/20 border border-amber-400/20">{availableCount}</div>
                             </div>
                         </div>
+                    ))}
 
-                        <div className="space-y-3">
-                            {placedMachineSnapshots.length === 0 ? (
-                                <div className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4 text-sm text-cyan-500">
-                                    No machines deployed yet. Build or buy gear from the crafting table, then deploy it here.
-                                </div>
-                            ) : placedMachineSnapshots.map(({ placedMachine, accrual, targetResource }) => {
-                                const definition = getMachineDefinition(placedMachine.machineId);
-                                const progressPercent = accrual?.nextUnitProgressPercent || 0;
-                                const collectDisabled = !accrual || accrual.unitsReady <= 0 || Boolean(pendingAction);
-                                return (
-                                    <div key={placedMachine.id} className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <div className="text-sm font-bold text-white uppercase tracking-wide">{definition?.name || placedMachine.machineId}</div>
-                                                <div className="text-xs text-cyan-500 mt-1">{placedMachine.planetId} | {targetResource?.name || placedMachine.resourceId}</div>
-                                                <div className="text-xs text-cyan-300/80 mt-2">Ready output: {accrual?.unitsReady || 0} unit(s)</div>
-                                            </div>
-                                            <div className="rounded-xl border border-cyan-800/50 px-3 py-2 text-xs text-cyan-100 bg-black/30">
-                                                {definition?.symbol || "--"}
-                                            </div>
-                                        </div>
-
-                                        <progress
-                                            value={progressPercent}
-                                            max={100}
-                                            className="mt-3 h-2 w-full rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-black/40 [&::-webkit-progress-value]:bg-cyan-400"
-                                        />
-
-                                        <div className="mt-3 flex gap-2">
-                                            <button
-                                                onClick={() => handleCollectMachine(placedMachine.id)}
-                                                disabled={collectDisabled}
-                                                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
-                                            >
-                                                {pendingAction === `collect-${placedMachine.id}` ? "Collecting..." : "Collect"}
-                                            </button>
-                                            <button
-                                                onClick={() => handlePackMachine(placedMachine.id)}
-                                                disabled={Boolean(pendingAction)}
-                                                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide border border-cyan-700/50 text-cyan-200 hover:bg-cyan-900/30 disabled:bg-gray-900 disabled:text-gray-500 transition-colors"
-                                            >
-                                                {pendingAction === `pack-${placedMachine.id}` ? "Packing..." : "Pack Up"}
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                    {visibleStacks === 0 ? (
+                        <div className="col-span-full rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-6 text-sm text-cyan-500">
+                            No inventory stored yet. Crafted machines will appear here until you deploy them on a planet.
                         </div>
-                    </div>
+                    ) : null}
                 </div>
             </div>
         </div>
@@ -1539,7 +1105,7 @@ const FLAG_COLORS = [
 function FlagDesigner() {
     const { userData, user } = useAuth();
     const [loading, setLoading] = useState(false);
-    
+
     const [pole, setPole] = useState("silver");
     const [pattern, setPattern] = useState("solid");
     const [primaryColor, setPrimaryColor] = useState("blue");
@@ -1618,35 +1184,29 @@ function FlagDesigner() {
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {/* Visualizer */}
             <div className="bg-black/50 border border-red-900/50 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[400px] relative">
                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900/20 to-transparent pointer-events-none" />
-                 
+
                  <div className="relative z-10 scale-150">
                     <svg width="220" height="300" viewBox="0 0 220 300">
-                        {/* Pole */}
                         <rect x="10" y="20" width="10" height="280" rx="5" fill={FLAG_POLES.find(p => p.id === pole)?.color} />
-                        
-                        {/* Flag Clip Path Container */}
+
                         <g transform="translate(20, 30)">
-                             {/* Shadows/Waves overlay */}
                              <defs>
                                 <clipPath id="flagShape">
                                     {shape === 'rectangle' && <rect x="0" y="0" width="200" height="120" />}
                                     {shape === 'pennant' && <polygon points="0,0 200,60 0,120" />}
-                                    {shape === 'triangle' && <polygon points="0,0 200,0 100,120 0,0" />} 
-                                    {shape === 'swallowtail' && <polygon points="0,0 200,0 200,120 100,60 0,120" />} 
+                                    {shape === 'triangle' && <polygon points="0,0 200,0 100,120 0,0" />}
+                                    {shape === 'swallowtail' && <polygon points="0,0 200,0 200,120 100,60 0,120" />}
                                 </clipPath>
                              </defs>
-                             
+
                              <g clipPath="url(#flagShape)">
                                  {renderFlagContent()}
-                                 {/* Fabric Ripple Effect */}
                                  <rect x="0" y="0" width="200" height="120" fill="url(#ripple)" opacity="0.3" style={{ mixBlendMode: 'multiply' }} />
                              </g>
                         </g>
 
-                        {/* Top Knob */}
                         <circle cx="15" cy="20" r="8" fill={FLAG_POLES.find(p => p.id === pole)?.color} stroke="#000" strokeWidth="2" />
                     </svg>
                  </div>
@@ -1656,14 +1216,12 @@ function FlagDesigner() {
                  </div>
             </div>
 
-            {/* Controls */}
             <div className="space-y-6">
                 <div className="bg-red-950/20 p-6 rounded-xl border border-red-500/20 max-h-[600px] overflow-y-auto custom-scrollbar">
                      <h3 className="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
                         <Flag size={20} className="text-red-500" /> Fabricator
                      </h3>
 
-                     {/* Pole Selector */}
                      <div className="mb-6">
                         <label className="block text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Pole Material</label>
                         <div className="flex gap-2">
@@ -1679,7 +1237,6 @@ function FlagDesigner() {
                         </div>
                      </div>
 
-                     {/* Main Color */}
                      <div className="mb-6">
                         <label className="block text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Primary Color</label>
                         <div className="grid grid-cols-4 gap-2">
@@ -1694,7 +1251,6 @@ function FlagDesigner() {
                         </div>
                      </div>
 
-                     {/* Secondary Color */}
                      <div className="mb-6">
                         <label className="block text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Secondary Color</label>
                         <div className="grid grid-cols-4 gap-2">
@@ -1709,7 +1265,6 @@ function FlagDesigner() {
                         </div>
                      </div>
 
-                     {/* Pattern */}
                      <div className="mb-6">
                         <label className="block text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Pattern</label>
                         <div className="grid grid-cols-2 gap-2">
@@ -1725,7 +1280,6 @@ function FlagDesigner() {
                         </div>
                      </div>
 
-                     {/* Shape */}
                      <div className="mb-6">
                         <label className="block text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Banner Shape</label>
                         <div className="flex gap-2">
