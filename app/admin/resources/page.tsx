@@ -31,7 +31,7 @@ export default function AdminResourcesPage() {
     useEffect(() => {
         const teachersQuery = query(collection(db, "users"), where("role", "==", "teacher"));
         const unsubscribe = onSnapshot(teachersQuery, (snapshot) => {
-            const nextTeachers = snapshot.docs.map((teacherDoc) => ({ uid: teacherDoc.id, ...(teacherDoc.data() as UserData) }));
+            const nextTeachers = snapshot.docs.map((teacherDoc) => ({ ...(teacherDoc.data() as UserData), uid: teacherDoc.id }));
             nextTeachers.sort((left, right) => {
                 const leftLabel = (left.schoolName || left.displayName || left.email || "").toLowerCase();
                 const rightLabel = (right.schoolName || right.displayName || right.email || "").toLowerCase();

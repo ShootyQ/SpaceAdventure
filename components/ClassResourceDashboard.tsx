@@ -35,7 +35,7 @@ export function ClassResourceDashboard({
 
         const studentsQuery = query(collection(db, "users"), where("teacherId", "==", teacherId));
         const unsubscribe = onSnapshot(studentsQuery, (snapshot) => {
-            setStudents(snapshot.docs.map((studentDoc) => ({ uid: studentDoc.id, ...(studentDoc.data() as UserData) })));
+            setStudents(snapshot.docs.map((studentDoc) => ({ ...(studentDoc.data() as UserData), uid: studentDoc.id })));
         });
 
         return () => unsubscribe();
