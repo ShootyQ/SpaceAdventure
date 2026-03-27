@@ -834,11 +834,11 @@ function ShipUpgradeBlueprints({ userData }: { userData?: UserData | null }) {
                                         <>
                                             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-100">
                                                 <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Before vs After</div>
-                                                <div>Earth to Neptune: {currentTravel ? formatTravelDuration(currentTravel.adjustedMinutes) : "N/A"} -> {nextTravel ? formatTravelDuration(nextTravel.adjustedMinutes) : "N/A"}</div>
+                                                <div>Earth to Neptune: {currentTravel ? formatTravelDuration(currentTravel.adjustedMinutes) : "N/A"}{" -> "}{nextTravel ? formatTravelDuration(nextTravel.adjustedMinutes) : "N/A"}</div>
                                             </div>
                                             <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-3 text-xs text-emerald-100">
                                                 <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Speed Gain</div>
-                                                <div>{currentBooster.speedMultiplier.toFixed(2)}x -> {nextBooster.speedMultiplier.toFixed(2)}x</div>
+                                                <div>{currentBooster.speedMultiplier.toFixed(2)}x{" -> "}{nextBooster.speedMultiplier.toFixed(2)}x</div>
                                             </div>
                                         </>
                                     );
@@ -850,11 +850,11 @@ function ShipUpgradeBlueprints({ userData }: { userData?: UserData | null }) {
                                         <>
                                             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-100">
                                                 <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Cargo Capacity</div>
-                                                <div>{currentHullStats.cargoCapacity} -> {nextHullStats.cargoCapacity}</div>
+                                                <div>{currentHullStats.cargoCapacity}{" -> "}{nextHullStats.cargoCapacity}</div>
                                             </div>
                                             <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-3 text-xs text-emerald-100">
                                                 <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Machine Limit</div>
-                                                <div>{currentHullStats.activeMachineLimit} -> {nextHullStats.activeMachineLimit}</div>
+                                                <div>{currentHullStats.activeMachineLimit}{" -> "}{nextHullStats.activeMachineLimit}</div>
                                             </div>
                                         </>
                                     );
@@ -866,11 +866,11 @@ function ShipUpgradeBlueprints({ userData }: { userData?: UserData | null }) {
                                         <>
                                             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-100">
                                                 <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Landing Speed</div>
-                                                <div>-{currentLanderStats.landingTimeReductionPercent}% -> -{nextLanderStats.landingTimeReductionPercent}%</div>
+                                                <div>-{currentLanderStats.landingTimeReductionPercent}%{" -> "}-{nextLanderStats.landingTimeReductionPercent}%</div>
                                             </div>
                                             <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-3 text-xs text-emerald-100">
                                                 <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Manual Gather</div>
-                                                <div>+{currentLanderStats.manualGatherBonus} -> +{nextLanderStats.manualGatherBonus}</div>
+                                                <div>+{currentLanderStats.manualGatherBonus}{" -> "}+{nextLanderStats.manualGatherBonus}</div>
                                             </div>
                                         </>
                                     );
