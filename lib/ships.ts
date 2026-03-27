@@ -7,6 +7,31 @@ export interface ShipOption {
     assetPath: string;
 }
 
+const normalizeShipId = (shipId?: string) => {
+    let value = String(shipId || "finalship").trim().toLowerCase();
+    if (!value) return "finalship";
+
+    if (value.includes("/")) {
+        value = value.split("/").pop() || value;
+    }
+
+    value = value.replace(/\.png$/i, "");
+    value = value.replace(/^ship\.shop\./, "");
+    value = value.replace(/^ships?_/, "");
+    value = value.replace(/^ship[_-]/, "");
+
+    return value || "finalship";
+};
+const buildShipKey = (value?: string) => normalizeShipId(value).replace(/[^a-z0-9]/g, "");
+
+const titleizeShipId = (shipId?: string) => {
+    return String(shipId || "ship")
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase()) || "Ship";
+};
+
 export const SHIP_OPTIONS: ShipOption[] = [
     { id: "finalship", name: "Standard Interceptor", type: "fighter", assetPath: "/images/collectibles/ships/starter/finalship.png" },
     { id: "alienship", name: "Alien Scout", type: "scout", assetPath: "/images/collectibles/ships/starter/alienship.png" },
@@ -61,9 +86,34 @@ const SHIP_ASSET_PATHS = new Map<string, string>(
     SHIP_OPTIONS.map((ship) => [ship.id, ship.assetPath])
 );
 
+const SHIP_OPTIONS_BY_ID = new Map<string, ShipOption>(
+    SHIP_OPTIONS.map((ship) => [normalizeShipId(ship.id), ship])
+);
+
+const SHIP_OPTIONS_BY_KEY = new Map<string, ShipOption>(
+    SHIP_OPTIONS.flatMap((ship) => {
+        const assetFileName = ship.assetPath.split("/").pop()?.replace(/\.png$/i, "") || ship.id;
+        return [
+            [buildShipKey(ship.id), ship] as const,
+            [buildShipKey(assetFileName), ship] as const,
+        ];
+    })
+);
+
+export function resolveShipOption(shipId?: string): ShipOption | undefined {
+    const normalized = normalizeShipId(shipId);
+    const exact = SHIP_OPTIONS_BY_ID.get(normalized);
+    if (exact) return exact;
+    return SHIP_OPTIONS_BY_KEY.get(buildShipKey(normalized));
+}
+
+export function resolveShipDisplayName(shipId?: string): string {
+    return resolveShipOption(shipId)?.name || titleizeShipId(shipId);
+}
+
 export function resolveShipAssetPath(shipId?: string): string {
     const normalized = String(shipId || "finalship").trim();
     if (!normalized) return "/images/collectibles/ships/starter/finalship.png";
 
-    return SHIP_ASSET_PATHS.get(normalized) || `/images/collectibles/ships/shop/ships/${normalized}.png`;
+    return resolveShipOption(normalized)?.assetPath || SHIP_ASSET_PATHS.get(normalized) || `/images/collectibles/ships/shop/ships/${normalized}.png`;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { resolveShipAssetPath } from "@/lib/ships";
+import { resolveShipDisplayName } from "@/lib/ships";
 import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -2151,6 +2152,57 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
             ...travel,
         };
     }, [currentUserGameplay, selectedPlanet]);
+    const selectedPlanetActionButton = (() => {
+        if (!selectedPlanet) return null;
+
+        const isAtLocation = getSubjectLocationId(landingSubject) === selectedPlanet.id;
+
+        if (isCommandMode && controlledShipId) {
+            if (isAtLocation) {
+                return (
+                    <button
+                        onClick={() => setIsLanded(true)}
+                        className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
+                    >
+                        <Flag size={18} />
+                        LAND ON SURFACE (REMOTE)
+                    </button>
+                );
+            }
+
+            return (
+                <button
+                    onClick={() => handleTravel(controlledShipId)}
+                    className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] animate-pulse"
+                >
+                    <Radio size={18} />
+                    EXECUTE REMOTE JUMP
+                </button>
+            );
+        }
+
+        if (userData?.location === selectedPlanet.id) {
+            return (
+                <button
+                    onClick={() => setIsLanded(true)}
+                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
+                >
+                    <Flag size={18} />
+                    LAND ON SURFACE
+                </button>
+            );
+        }
+
+        return (
+            <button
+                onClick={() => handleTravel()}
+                className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+            >
+                <Navigation size={18} />
+                ENGAGE HYPERDRIVE
+            </button>
+        );
+    })();
 
     const runLandingMachineAction = useCallback(async (actionKey: string, action: () => Promise<string>) => {
         setLandingMachineAction(actionKey);
@@ -2292,7 +2344,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         });
     }, [runLandingMachineAction, userData?.uid]);
 
-  const getSubjectLocationId = (subject: unknown): string | undefined => {
+    function getSubjectLocationId(subject: unknown): string | undefined {
       if (!subject || typeof subject !== 'object') return undefined;
 
       if ('locationId' in subject) {
@@ -2306,7 +2358,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
       }
 
       return undefined;
-  };
+    }
 
   const getSubjectUserId = (subject: unknown): string | undefined => {
       if (!subject || typeof subject !== 'object') return undefined;
@@ -2824,6 +2876,10 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                
                <p className="text-gray-300 mb-6">{selectedPlanet.description}</p>
 
+               <div className="mb-6 rounded-2xl border border-cyan-500/20 bg-black/30 p-3 sticky top-4 z-10 backdrop-blur-sm">
+                   {selectedPlanetActionButton}
+               </div>
+
                {isStudentPersonalView && selectedPlanetTravelPreview ? (
                    <div className="mb-6 p-4 bg-cyan-950/20 rounded-lg border border-cyan-900/40">
                        <div className="text-[10px] text-cyan-400 uppercase tracking-widest font-bold mb-2">
@@ -2916,7 +2972,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
                    const renderKnownUnlock = (id: string, label: string) => (
                         <div key={`${label}-${id}`} className="text-[10px] text-emerald-200/90 uppercase tracking-widest bg-emerald-500/10 border border-emerald-400/20 rounded px-2 py-1">
-                            {label}: {id}
+                            {label}: {label === 'Ship' ? resolveShipDisplayName(id) : id}
                         </div>
                    );
                    
@@ -3020,59 +3076,6 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                   </div>
                </div>
                
-               {/* Action Buttons */}
-               {(() => {
-                   const isAtLocation = getSubjectLocationId(landingSubject) === selectedPlanet.id;
-
-                   if (isCommandMode && controlledShipId) {
-                        if (isAtLocation) {
-                             return (
-                               <button 
-                                  onClick={() => setIsLanded(true)}
-                                  className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
-                               >
-                                  <Flag size={18} />
-                                  LAND ON SURFACE (REMOTE)
-                               </button>
-                             );
-                        } else {
-                             return (
-                               <button 
-                                  onClick={() => handleTravel(controlledShipId)}
-                                  className="mt-4 w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] animate-pulse"
-                               >
-                                  <Radio size={18} />
-                                  EXECUTE REMOTE JUMP
-                               </button>
-                             );
-                        }
-                   } 
-                   
-                   // Regular User Checks
-                   if (userData?.location === selectedPlanet.id) {
-                       return (
-                           <button 
-                              onClick={() => {
-                                  setIsLanded(true);
-                              }}
-                              className="mt-4 w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors border border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)] animate-pulse"
-                           >
-                              <Flag size={18} />
-                              LAND ON SURFACE
-                           </button>
-                       );
-                   }
-
-                   return (
-                       <button 
-                          onClick={() => handleTravel()}
-                          className="mt-4 w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold flex items-center justify-center gap-2 transition-colors"
-                       >
-                          <Navigation size={18} />
-                          ENGAGE HYPERDRIVE
-                       </button>
-                   );
-               })()}
             </motion.div>
          )}
        </AnimatePresence>

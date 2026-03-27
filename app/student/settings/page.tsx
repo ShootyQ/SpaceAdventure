@@ -12,7 +12,7 @@ import {
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { UserAvatar } from "@/components/UserAvatar";
-import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
+import { SHIP_OPTIONS, resolveShipAssetPath, resolveShipDisplayName, resolveShipOption } from "@/lib/ships";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, type UnlockRule } from "@/lib/unlocks";
 import { isXpUnlockEarned, normalizeXpUnlockProgressMap, syncXpUnlockProgressForRules, type XpUnlockProgressMap } from "@/lib/xp-unlock-progress";
 import {
@@ -220,6 +220,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
     const MENU_ITEMS = [
         { id: 'ship', title: 'Hangar Bay', icon: Rocket, color: 'text-cyan-400', border: 'border-cyan-500', bg: 'bg-cyan-950/30' },
         { id: 'inventory', title: 'Cargo Hold', icon: Box, color: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/30' },
+        { id: 'crafting', title: 'Crafting Table', icon: Wrench, color: 'text-lime-300', border: 'border-lime-500', bg: 'bg-lime-950/20', href: '/student/crafting' },
         { id: 'avatar', title: 'Pilot Profile', icon: User, color: 'text-purple-400', border: 'border-purple-500', bg: 'bg-purple-950/30', href: '/student/avatar' },
         { id: 'flag', title: 'Flag Designer', icon: Flag, color: 'text-red-400', border: 'border-red-500', bg: 'bg-red-950/30' },
         { id: 'missions', title: 'Mission Log', icon: Activity, color: 'text-green-400', border: 'border-green-500', bg: 'bg-green-950/20', href: '/student/missions' },
@@ -424,7 +425,8 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     useEffect(() => {
         if (effectiveUserData?.spaceship) {
             setShipName(sanitizeName(effectiveUserData.spaceship.name));
-            setSelectedShipId(effectiveUserData.spaceship.id || effectiveUserData.spaceship.modelId || "finalship");
+            const storedShipId = effectiveUserData.spaceship.id || effectiveUserData.spaceship.modelId || "finalship";
+            setSelectedShipId(resolveShipOption(storedShipId)?.id || storedShipId);
             const col = SHIP_COLORS.find(c => c.class === effectiveUserData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
             // setSelectedType(userData.spaceship.type);
@@ -436,16 +438,9 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
         const builtInIds = new Set<string>(builtInUnlocked.map((option) => option.id));
         const dynamicShopIds = Array.from(unlockedShipIds).filter((id) => !builtInIds.has(id));
 
-        const toLabel = (shipId: string) =>
-            String(shipId || "")
-                .replace(/[-_]+/g, " ")
-                .replace(/\s+/g, " ")
-                .trim()
-                .replace(/\b\w/g, (char) => char.toUpperCase()) || "Ship";
-
         const dynamicOptions = dynamicShopIds.map((id) => ({
-            id,
-            name: toLabel(id),
+            id: resolveShipOption(id)?.id || id,
+            name: resolveShipDisplayName(id),
             type: "scout" as const,
             assetPath: resolveShipAssetPath(id),
         }));
@@ -654,7 +649,18 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                     </div>
                 </div>
 
-                <ShipUpgradeBlueprints userData={effectiveUserData} />
+                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <div className="text-sm uppercase tracking-wider text-cyan-500">Fabrication Moved</div>
+                            <div className="mt-2 text-lg font-bold text-white uppercase tracking-wide">Crafting now lives at the workshop</div>
+                            <div className="mt-2 text-sm text-cyan-300/80">Use the dedicated crafting table to build machines and forge system upgrades. This hangar now stays focused on your ship loadout.</div>
+                        </div>
+                        <Link href="/student/crafting" className="rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 transition-colors">
+                            Open Crafting Table
+                        </Link>
+                    </div>
+                </div>
 
                 <button
                     onClick={handleSave}
@@ -985,6 +991,25 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
             }))
             .sort((left, right) => right.placedMachine.placedAt - left.placedMachine.placedAt);
     }, [placedMachines]);
+    const ownedMachineSlots = useMemo(() => {
+        return MACHINE_CATALOG
+            .map((machine) => {
+                const totalOwned = Number(ownedMachines[machine.id] || 0);
+                const deployedCount = placedMachines.filter((placedMachine) => placedMachine.machineId === machine.id).length;
+                const availableCount = Math.max(0, totalOwned - deployedCount);
+                return {
+                    machine,
+                    totalOwned,
+                    deployedCount,
+                    availableCount,
+                };
+            })
+            .filter((entry) => entry.totalOwned > 0)
+            .sort((left, right) => right.totalOwned - left.totalOwned);
+    }, [ownedMachines, placedMachines]);
+    const quickDeployRows = useMemo(() => {
+        return basicMachineRows.filter((row) => row.totalOwned > 0 || row.availableCount > 0);
+    }, [basicMachineRows]);
 
     const runWithFeedback = async (actionKey: string, action: () => Promise<string>) => {
         setPendingAction(actionKey);
@@ -1251,12 +1276,17 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                         <Database className="text-amber-400" size={32} />
                         <div>
                             <h2 className="text-2xl font-bold text-amber-400 uppercase tracking-widest">Cargo Hold</h2>
-                            <p className="text-xs text-amber-200/70 uppercase tracking-[0.3em] mt-1">Automation, storage, and shipyard prep</p>
+                            <p className="text-xs text-amber-200/70 uppercase tracking-[0.3em] mt-1">Inventory grid, field gear, and collected resources</p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <div className="text-xs uppercase tracking-[0.3em] text-amber-700">Current Planet</div>
-                        <div className="text-lg font-bold text-white uppercase">{currentPlanetId}</div>
+                    <div className="flex items-center gap-3 flex-wrap justify-end">
+                        <div className="text-right">
+                            <div className="text-xs uppercase tracking-[0.3em] text-amber-700">Current Planet</div>
+                            <div className="text-lg font-bold text-white uppercase">{currentPlanetId}</div>
+                        </div>
+                        <Link href="/student/crafting" className="rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 transition-colors">
+                            Open Crafting Table
+                        </Link>
                     </div>
                 </div>
 
@@ -1281,7 +1311,7 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                     <div className="rounded-2xl border border-emerald-900/60 bg-emerald-950/15 p-4">
                         <div className="text-xs uppercase tracking-[0.3em] text-emerald-600">Credits Available</div>
                         <div className="mt-2 text-3xl font-bold text-white">{Number(effectiveUserData?.galacticCredits || 0)}</div>
-                        <div className="mt-3 text-xs text-emerald-200/70">Starter miner store price: {starterMiner?.starterPriceCredits || 0} credits</div>
+                        <div className="mt-3 text-xs text-emerald-200/70">Use the crafting table for new machines and upgrade fabrication.</div>
                     </div>
                 </div>
 
@@ -1297,88 +1327,116 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                     <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
                         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
                             <div>
-                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Planet Resource Scan</h3>
-                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Current location target list</p>
+                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Cargo Grid</h3>
+                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Placeholder inventory tiles until final art arrives</p>
                             </div>
-                            <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">Future class discovery hook</span>
+                            <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">{displayedResources.length + ownedMachineSlots.length} occupied slots</span>
                         </div>
 
-                        <div className="grid md:grid-cols-3 gap-3">
-                            {currentPlanetResources.map((resource) => {
-                                const definition = getResourceDefinition(resource.resourceId);
-                                return (
-                                    <div key={resource.resourceId} className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4">
-                                        <div className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">{resource.category}</div>
-                                        <div className="mt-2 flex items-center justify-between gap-3">
-                                            <div>
-                                                <div className={`text-lg font-bold ${definition?.accentClass || "text-white"}`}>{resource.resourceName}</div>
-                                                <div className="text-xs text-cyan-500 mt-1">{MACHINE_FAMILY_LABELS[resource.machineFamily]}</div>
-                                            </div>
-                                            <div className="rounded-xl border border-cyan-800/60 px-3 py-2 text-xs font-bold text-cyan-100 bg-black/30">
-                                                {definition?.symbol || "--"}
-                                            </div>
-                                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                            {displayedResources.map(({ resourceId, definition, quantity }) => (
+                                <div key={`resource-${resourceId}`} className="aspect-square rounded-2xl border border-emerald-900/40 bg-emerald-950/10 p-4 flex flex-col justify-between">
+                                    <div className="w-12 h-12 rounded-2xl border border-emerald-500/20 bg-black/30 flex items-center justify-center text-sm font-bold text-emerald-100">
+                                        {definition?.symbol || "--"}
                                     </div>
-                                );
-                            })}
+                                    <div>
+                                        <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{definition?.name || resourceId}</div>
+                                        <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-600 mt-1">{definition?.category || "unknown"}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-2xl font-bold text-white">{quantity}</div>
+                                        <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-500">stored</div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {ownedMachineSlots.map(({ machine, totalOwned, deployedCount, availableCount }) => (
+                                <div key={`machine-${machine.id}`} className="aspect-square rounded-2xl border border-amber-900/40 bg-amber-950/10 p-4 flex flex-col justify-between">
+                                    <div className="w-12 h-12 rounded-2xl border border-amber-500/20 bg-black/30 flex items-center justify-center text-sm font-bold text-amber-100">
+                                        {machine.symbol}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-white">{machine.name}</div>
+                                        <div className="text-[10px] uppercase tracking-[0.25em] text-amber-600 mt-1">tier {machine.tier} {machine.family}</div>
+                                    </div>
+                                    <div className="text-right text-[11px] text-amber-100/80">
+                                        <div>Total: {totalOwned}</div>
+                                        <div>Ready: {availableCount}</div>
+                                        <div>Field: {deployedCount}</div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {displayedResources.length === 0 && ownedMachineSlots.length === 0 ? (
+                                <div className="col-span-full rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-6 text-sm text-cyan-500">
+                                    No cargo stored yet. Use the crafting table to build gear, then deploy machines and bring resources back here.
+                                </div>
+                            ) : null}
                         </div>
                     </div>
 
                     <div className="border border-amber-900/40 bg-black/40 rounded-3xl p-6">
                         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
                             <div>
-                                <h3 className="text-lg font-bold text-amber-200 uppercase tracking-widest">Machine Bay</h3>
-                                <p className="text-xs text-amber-700 uppercase tracking-[0.25em] mt-1">Buy the first miner, then deploy what you own</p>
+                                <h3 className="text-lg font-bold text-amber-200 uppercase tracking-widest">Field Actions</h3>
+                                <p className="text-xs text-amber-700 uppercase tracking-[0.25em] mt-1">Deploy compatible gear on the planet you are currently orbiting</p>
+                            </div>
+                            <span className="text-[10px] uppercase tracking-[0.25em] text-amber-700">Crafting moved to workshop</span>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-3">
+                            {quickDeployRows.length === 0 ? (
+                                <div className="md:col-span-2 rounded-2xl border border-amber-900/50 bg-amber-950/10 p-4 text-sm text-amber-500">
+                                    No machines in cargo yet. Build one from the crafting table first.
+                                </div>
+                            ) : quickDeployRows.map(({ machine, totalOwned, deployedCount, availableCount, targetResource }) => {
+                                const deployDisabled = availableCount <= 0 || !targetResource || activeMachineCount >= hullStats.activeMachineLimit || Boolean(pendingAction);
+                                return (
+                                    <div key={machine.id} className="rounded-2xl border border-amber-900/50 bg-amber-950/10 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="rounded-lg border border-amber-800/60 px-2 py-1 text-xs font-bold text-amber-100 bg-black/30">{machine.symbol}</span>
+                                                    <h4 className="text-base font-bold text-white">{machine.name}</h4>
+                                                </div>
+                                                <div className="text-xs text-amber-200/80 mt-2">Owned {totalOwned} • Deployed {deployedCount} • Ready {availableCount}</div>
+                                                <div className="text-xs text-amber-300/70 mt-1">{targetResource ? `Targets ${targetResource.resourceName}` : "No matching resource on this planet."}</div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeployMachine(machine.id)}
+                                                disabled={deployDisabled}
+                                                className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                            >
+                                                {pendingAction === `deploy-${machine.id}` ? "Deploying..." : "Deploy"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                            <div>
+                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Planet Readout</h3>
+                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">The three resources available at your current stop</p>
                             </div>
                         </div>
 
                         <div className="space-y-3">
-                            {basicMachineRows.map(({ machine, totalOwned, deployedCount, availableCount, targetResource }) => {
-                                const isStarterMiner = machine.id === STARTER_MINER_ID;
-                                const deployDisabled = availableCount <= 0 || !targetResource || activeMachineCount >= hullStats.activeMachineLimit || Boolean(pendingAction);
+                            {currentPlanetResources.map((resource) => {
+                                const definition = getResourceDefinition(resource.resourceId);
                                 return (
-                                    <div key={machine.id} className="rounded-2xl border border-amber-900/50 bg-amber-950/10 p-4">
-                                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="rounded-lg border border-amber-800/60 px-2 py-1 text-xs font-bold text-amber-100 bg-black/30">{machine.symbol}</span>
-                                                    <h4 className="text-base font-bold text-white uppercase tracking-wide">{machine.name}</h4>
-                                                </div>
-                                                <div className="text-xs text-amber-500 mt-2">{machine.description}</div>
-                                                <div className="text-xs text-amber-200/80 mt-2">Output: {machine.dailyOutput} unit(s) per day</div>
-                                                <div className="text-xs text-amber-200/80 mt-1">Owned: {totalOwned} | Deployed: {deployedCount} | Ready to deploy: {availableCount}</div>
-                                                <div className="text-xs text-amber-300/70 mt-1">Craft costs: {formatMachineCostLabel(machine.costs)}</div>
-                                            </div>
-
-                                            <div className="flex flex-col gap-2 min-w-[180px]">
-                                                {isStarterMiner && totalOwned === 0 ? (
-                                                    <button
-                                                        onClick={handleStarterMinerPurchase}
-                                                        disabled={Boolean(pendingAction)}
-                                                        className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-emerald-500 text-black hover:bg-emerald-400 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
-                                                    >
-                                                        {pendingAction === "buy-starter-miner" ? "Acquiring..." : `Buy First Miner (${machine.starterPriceCredits} cr)`}
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleDeployMachine(machine.id)}
-                                                        disabled={deployDisabled}
-                                                        className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
-                                                    >
-                                                        {pendingAction === `deploy-${machine.id}` ? "Deploying..." : "Deploy To Current Planet"}
-                                                    </button>
-                                                )}
-
-                                                <div className="rounded-xl border border-amber-900/50 bg-black/30 px-3 py-2 text-xs text-amber-200/80">
-                                                    {targetResource
-                                                        ? `Target: ${targetResource.resourceName}`
-                                                        : "This planet has no matching resource for this machine."}
-                                                </div>
-
-                                                {!isStarterMiner ? (
-                                                    <div className="text-[10px] uppercase tracking-[0.25em] text-amber-700">Crafting unlock comes next</div>
-                                                ) : null}
-                                            </div>
+                                    <div key={resource.resourceId} className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4 flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{resource.resourceName}</div>
+                                            <div className="text-xs text-cyan-500 mt-1">{MACHINE_FAMILY_LABELS[resource.machineFamily]}</div>
+                                        </div>
+                                        <div className="rounded-xl border border-cyan-800/60 px-3 py-2 text-xs font-bold text-cyan-100 bg-black/30">
+                                            {definition?.symbol || "--"}
                                         </div>
                                     </div>
                                 );
@@ -1386,64 +1444,18 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                         </div>
                     </div>
 
-                    <div className="border border-purple-900/40 bg-black/40 rounded-3xl p-6">
-                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                            <div>
-                                <h3 className="text-lg font-bold text-purple-200 uppercase tracking-widest">Machine Fabricator</h3>
-                                <p className="text-xs text-purple-700 uppercase tracking-[0.25em] mt-1">Craft extractor, harvester, and advanced machine tiers</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            {craftableMachineRows.map(({ machine, totalOwned, availability, previousMachine }) => (
-                                <div key={`craft-${machine.id}`} className="rounded-2xl border border-purple-900/50 bg-purple-950/10 p-4">
-                                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="rounded-lg border border-purple-800/60 px-2 py-1 text-xs font-bold text-purple-100 bg-black/30">{machine.symbol}</span>
-                                                <h4 className="text-base font-bold text-white uppercase tracking-wide">{machine.name}</h4>
-                                            </div>
-                                            <div className="text-xs text-purple-500 mt-2">{machine.description}</div>
-                                            <div className="text-xs text-purple-200/80 mt-2">Output: {machine.dailyOutput} unit(s) per day</div>
-                                            <div className="text-xs text-purple-200/80 mt-1">Owned in cargo: {totalOwned}</div>
-                                            <div className="text-xs text-purple-300/80 mt-1">Resource costs: {formatMachineCostLabel(machine.costs)}</div>
-                                            {previousMachine ? (
-                                                <div className="text-xs text-purple-300/80 mt-1">Consumes one spare {previousMachine.name}</div>
-                                            ) : null}
-                                        </div>
-
-                                        <div className="flex flex-col gap-2 min-w-[220px]">
-                                            <button
-                                                onClick={() => handleCraftMachine(machine.id)}
-                                                disabled={!availability.ok || Boolean(pendingAction)}
-                                                className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-purple-400 text-black hover:bg-purple-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
-                                            >
-                                                {pendingAction === `craft-${machine.id}` ? "Fabricating..." : "Craft Machine"}
-                                            </button>
-                                            <div className="rounded-xl border border-purple-900/50 bg-black/30 px-3 py-2 text-xs text-purple-200/80">
-                                                {availability.ok ? "Ready to fabricate." : availability.reason}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-6">
                     <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Active Placements</h3>
-                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Collect output or pack machines up</p>
+                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Collect output or pack machines back into cargo</p>
                             </div>
                         </div>
 
                         <div className="space-y-3">
                             {placedMachineSnapshots.length === 0 ? (
                                 <div className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4 text-sm text-cyan-500">
-                                    No machines deployed yet. Buy the starter miner and send it to work.
+                                    No machines deployed yet. Build or buy gear from the crafting table, then deploy it here.
                                 </div>
                             ) : placedMachineSnapshots.map(({ placedMachine, accrual, targetResource }) => {
                                 const definition = getMachineDefinition(placedMachine.machineId);
@@ -1487,34 +1499,6 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                                     </div>
                                 );
                             })}
-                        </div>
-                    </div>
-
-                    <div className="border border-emerald-900/40 bg-black/40 rounded-3xl p-6">
-                        <div className="flex items-center justify-between gap-3 mb-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-emerald-200 uppercase tracking-widest">Resource Ledger</h3>
-                                <p className="text-xs text-emerald-700 uppercase tracking-[0.25em] mt-1">Stored cargo and current planet targets</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            {displayedResources.length === 0 ? (
-                                <div className="rounded-2xl border border-emerald-900/50 bg-emerald-950/10 p-4 text-sm text-emerald-500">
-                                    No stored resources yet. Deploy a machine and come back to collect.
-                                </div>
-                            ) : displayedResources.map(({ resourceId, definition, quantity }) => (
-                                <div key={resourceId} className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-900/40 bg-emerald-950/10 px-4 py-3">
-                                    <div>
-                                        <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{definition?.name || resourceId}</div>
-                                        <div className="text-xs text-emerald-600 uppercase tracking-[0.25em] mt-1">{definition?.category || "unknown"}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-xl font-bold text-white">{quantity}</div>
-                                        <div className="text-xs text-emerald-600 uppercase tracking-[0.25em]">{definition?.symbol || "--"}</div>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>
