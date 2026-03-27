@@ -1005,6 +1005,8 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
             throw new Error("Starter miner store is offline.");
         }
 
+        const starterMinerPrice = starterMiner.starterPriceCredits;
+
         await runWithFeedback("buy-starter-miner", async () => {
             const userRef = doc(db, "users", user.uid);
 
@@ -1016,8 +1018,8 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
 
                 const latestUserData = snapshot.data() as UserData;
                 const currentCredits = Number(latestUserData.galacticCredits || 0);
-                if (currentCredits < starterMiner.starterPriceCredits) {
-                    throw new Error(`You need ${starterMiner.starterPriceCredits} credits for the first miner.`);
+                if (currentCredits < starterMinerPrice) {
+                    throw new Error(`You need ${starterMinerPrice} credits for the first miner.`);
                 }
 
                 const nextOwnedMachines = {
@@ -1026,7 +1028,7 @@ function InventoryView({ userData, user }: { userData?: UserData | null; user?: 
                 };
 
                 transaction.update(userRef, {
-                    galacticCredits: increment(-starterMiner.starterPriceCredits),
+                    galacticCredits: increment(-starterMinerPrice),
                     ownedMachines: nextOwnedMachines,
                 });
             });
