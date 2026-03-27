@@ -1,0 +1,26 @@
+﻿Planet Resource List,,,
+Planet,Resource,Category,Gathering Tool
+Mercury,Iron,Ore,Miner
+Mercury,Helium,Gas,Gas Extractor
+Mercury,Sun Moss,Organic,Harvester
+Venus,Sulfur,Ore,Miner
+Venus,Carbon Dioxide,Gas,Gas Extractor
+Venus,Cloud Bloom,Organic,Harvester
+Earth,Quartz,Ore,Miner
+Earth,Oxygen,Gas,Gas Extractor
+Earth,Algae,Organic,Harvester
+Mars,Iron Oxide,Ore,Miner
+Mars,Argon,Gas,Gas Extractor
+Mars,Red Moss,Organic,Harvester
+Jupiter,Ammonia Ice,Ore,Miner
+Jupiter,Hydrogen,Gas,Gas Extractor
+Jupiter,Sky Coral,Organic,Harvester
+Saturn,Ice,Ore,Miner
+Saturn,Methane,Gas,Gas Extractor
+Saturn,Glow Kelp,Organic,Harvester
+Uranus,Ammonia,Ore,Miner
+Uranus,Hydrogen,Gas,Gas Extractor
+Uranus,Blue Lichen,Organic,Harvester
+Neptune,Ice,Ore,Miner
+Neptune,Neon,Gas,Gas Extractor
+Neptune,Sea Bloom,Organic,Harvester

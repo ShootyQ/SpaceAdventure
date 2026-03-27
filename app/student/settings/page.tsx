@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Rank, FlagConfig } from "@/types";
-import { doc, updateDoc, onSnapshot, increment, collection } from "firebase/firestore";
+import { Rank, FlagConfig, PlacedMachine, UserData } from "@/types";
+import { doc, updateDoc, onSnapshot, increment, collection, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
@@ -15,6 +15,28 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { SHIP_OPTIONS, resolveShipAssetPath } from "@/lib/ships";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, type UnlockRule } from "@/lib/unlocks";
 import { isXpUnlockEarned, normalizeXpUnlockProgressMap, syncXpUnlockProgressForRules, type XpUnlockProgressMap } from "@/lib/xp-unlock-progress";
+import {
+    getBoosterStats,
+    canCraftMachine,
+    canCraftShipUpgrade,
+    getLanderStats,
+    MACHINE_CATALOG,
+    SHIP_UPGRADE_CATALOG,
+    STARTER_MINER_ID,
+    buildPlacedMachineId,
+    formatMachineCostLabel,
+    getAvailableMachineCount,
+    getCurrentShipUpgrade,
+    getCurrentCargoUsed,
+    getHullTierStats,
+    getMachineAccrualSnapshot,
+    getMachineDefinition,
+    getMachineUnitDurationMs,
+    getNextShipUpgrade,
+    getPlanetResources,
+    getResourceDefinition,
+    getTravelComputationBetweenPlanets,
+} from "@/lib/resource-economy";
 
 // Custom Icon for Ship
 const Rocket = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
@@ -46,6 +68,22 @@ const getPurchasedShopShipIds = (purchasedShopItemIds?: string[]) => {
 };
 
 const normalizePlanetId = (planetId?: string) => String(planetId || "").trim().toLowerCase();
+
+const MACHINE_FAMILY_LABELS = {
+    miner: "Ore Mining",
+    extractor: "Gas Extraction",
+    harvester: "Organic Harvest",
+} as const;
+
+const formatTravelDuration = (minutes: number) => {
+    if (minutes < 60) return `${Math.round(minutes)} mins`;
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours < 24) return `${hours}h ${mins}m`;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return `${days}d ${remainingHours}h`;
+};
 
 const readPlanetXpValue = (planetXP: Record<string, number> | undefined, planetId: string) => {
     const normalizedPlanetId = normalizePlanetId(planetId);
@@ -360,20 +398,38 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
 
 function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user: any, unlockedShipIds: Set<string> }) {
     const [loading, setLoading] = useState(false);
+    const [liveUserData, setLiveUserData] = useState<UserData | null>(userData || null);
     const [shipName, setShipName] = useState("");
     const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
     const [selectedShipId, setSelectedShipId] = useState("finalship");
     // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
 
     useEffect(() => {
-        if (userData?.spaceship) {
-            setShipName(sanitizeName(userData.spaceship.name));
-            setSelectedShipId(userData.spaceship.id || userData.spaceship.modelId || "finalship");
-            const col = SHIP_COLORS.find(c => c.class === userData.spaceship?.color) || SHIP_COLORS[0];
+        setLiveUserData(userData || null);
+    }, [userData]);
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const unsubscribe = onSnapshot(doc(db, "users", user.uid), (snapshot) => {
+            if (!snapshot.exists()) return;
+            setLiveUserData(snapshot.data() as UserData);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    const effectiveUserData = liveUserData || userData || null;
+
+    useEffect(() => {
+        if (effectiveUserData?.spaceship) {
+            setShipName(sanitizeName(effectiveUserData.spaceship.name));
+            setSelectedShipId(effectiveUserData.spaceship.id || effectiveUserData.spaceship.modelId || "finalship");
+            const col = SHIP_COLORS.find(c => c.class === effectiveUserData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
             // setSelectedType(userData.spaceship.type);
         }
-    }, [userData]);
+    }, [effectiveUserData?.spaceship?.color, effectiveUserData?.spaceship?.id, effectiveUserData?.spaceship?.modelId, effectiveUserData?.spaceship?.name]);
 
     const visibleShipOptions = useMemo(() => {
         const builtInUnlocked = SHIP_OPTIONS.filter((option) => unlockedShipIds.has(option.id));
@@ -398,7 +454,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     }, [unlockedShipIds]);
 
     useEffect(() => {
-        const currentShipId = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
+        const currentShipId = effectiveUserData?.spaceship?.id || effectiveUserData?.spaceship?.modelId || "finalship";
         if (!unlockedShipIds.has(selectedShipId)) {
             if (unlockedShipIds.has(currentShipId)) {
                 setSelectedShipId(currentShipId);
@@ -409,7 +465,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                 setSelectedShipId("finalship");
             }
         }
-    }, [selectedShipId, unlockedShipIds, userData?.spaceship?.id, userData?.spaceship?.modelId, visibleShipOptions]);
+    }, [effectiveUserData?.spaceship?.id, effectiveUserData?.spaceship?.modelId, selectedShipId, unlockedShipIds, visibleShipOptions]);
 
     const handleSave = async () => {
         if (!user) return;
@@ -417,7 +473,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
         try {
             const userRef = doc(db, "users", user.uid);
             const safeShipName = sanitizeName(shipName);
-            const currentShipId = userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship";
+            const currentShipId = effectiveUserData?.spaceship?.id || effectiveUserData?.spaceship?.modelId || "finalship";
             const fallbackShipId = unlockedShipIds.has(currentShipId)
                 ? currentShipId
                 : (visibleShipOptions[0]?.id || "finalship");
@@ -440,10 +496,20 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
 
     // Fuel Mechanics
     // Base 500. Each level of "Fuel" upgrade adds 250 capacity.
-    const fuelUpgradeLevel = userData?.upgrades?.fuel || 0;
+    const fuelUpgradeLevel = effectiveUserData?.upgrades?.fuel || 0;
     const maxFuel = 500 + (fuelUpgradeLevel * 250);
-    const currentFuel = userData?.fuel !== undefined ? userData.fuel : 500; // Default to Max/500 if not set (Migration)
+    const currentFuel = effectiveUserData?.fuel !== undefined ? effectiveUserData.fuel : 500; // Default to Max/500 if not set (Migration)
     const fuelPercentage = Math.min((currentFuel / maxFuel) * 100, 100);
+    const currentPlanetId = normalizePlanetId(effectiveUserData?.location || "earth") || "earth";
+    const longRangeDestinationId = currentPlanetId === "neptune" ? "earth" : "neptune";
+    const boosterLevel = Number(effectiveUserData?.upgrades?.boosters || 0);
+    const hullLevel = Number(effectiveUserData?.upgrades?.hull || 0);
+    const landerLevel = Number(effectiveUserData?.upgrades?.landers || 0);
+    const boosterStats = getBoosterStats(boosterLevel);
+    const landerStats = getLanderStats(landerLevel);
+    const hullStats = getHullTierStats(hullLevel);
+    const cargoUsed = getCurrentCargoUsed(effectiveUserData?.resources || {});
+    const routePreview = getTravelComputationBetweenPlanets(currentPlanetId, longRangeDestinationId, boosterLevel);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
@@ -557,12 +623,38 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
                         <Wrench size={16} /> System Upgrades
                     </label>
                     <div className="grid grid-cols-2 gap-4">
-                        <UpgradeSlot icon={Zap} label="Boosters" level={userData?.upgrades?.boosters || 0} active={(userData?.upgrades?.boosters || 0) > 0} />
-                        <UpgradeSlot icon={Database} label="Fuel Tank" level={userData?.upgrades?.fuel || 0} active={(userData?.upgrades?.fuel || 0) > 0} />
-                        <UpgradeSlot icon={Map} label="Landers" level={userData?.upgrades?.landers || 0} active={(userData?.upgrades?.landers || 0) > 0} />
-                        <UpgradeSlot icon={Shield} label="Hull Plating" level={userData?.upgrades?.hull || 0} active={(userData?.upgrades?.hull || 0) > 0} />
+                        <UpgradeSlot icon={Zap} label="Boosters" level={boosterLevel} active={boosterLevel > 0} />
+                        <UpgradeSlot icon={Database} label="Fuel Tank" level={fuelUpgradeLevel} active={fuelUpgradeLevel > 0} />
+                        <UpgradeSlot icon={Map} label="Landers" level={landerLevel} active={landerLevel > 0} />
+                        <UpgradeSlot icon={Shield} label="Hull Plating" level={hullLevel} active={hullLevel > 0} />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Travel Profile</div>
+                            <div className="mt-2 text-sm font-bold text-white">{boosterStats.label}</div>
+                            <div className="mt-1 text-xs text-cyan-300">{boosterStats.travelReductionPercent}% faster than baseline</div>
+                            {routePreview ? (
+                                <div className="mt-2 text-[11px] text-cyan-200/80">
+                                    {currentPlanetId.toUpperCase()} to {longRangeDestinationId.toUpperCase()}: {formatTravelDuration(routePreview.adjustedMinutes)}
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Cargo Capacity</div>
+                            <div className="mt-2 text-sm font-bold text-white">{cargoUsed} / {hullStats.cargoCapacity}</div>
+                            <div className="mt-1 text-xs text-cyan-300">{hullStats.activeMachineLimit} active machines allowed</div>
+                        </div>
+                        <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Surface Operations</div>
+                            <div className="mt-2 text-sm font-bold text-white">{landerStats.label}</div>
+                            <div className="mt-1 text-xs text-cyan-300">Landing {landerStats.landingTimeReductionPercent}% faster</div>
+                            <div className="mt-1 text-[11px] text-cyan-200/80">Manual gather bonus +{landerStats.manualGatherBonus}</div>
+                        </div>
                     </div>
                 </div>
+
+                <ShipUpgradeBlueprints userData={effectiveUserData} />
 
                 <button
                     onClick={handleSave}
@@ -577,23 +669,853 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     );
 }
 
-function InventoryView() {
+function ShipUpgradeBlueprints({ userData }: { userData?: UserData | null }) {
+    const { user } = useAuth();
+    const [liveUserData, setLiveUserData] = useState<UserData | null>(userData || null);
+    const [pendingAction, setPendingAction] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string>("");
+
+    useEffect(() => {
+        setLiveUserData(userData || null);
+    }, [userData]);
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const unsubscribe = onSnapshot(doc(db, "users", user.uid), (snapshot) => {
+            if (!snapshot.exists()) return;
+            setLiveUserData(snapshot.data() as UserData);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    const effectiveUserData = liveUserData || userData || null;
+    const resources = effectiveUserData?.resources || {};
+    const cargoUsed = getCurrentCargoUsed(resources);
+    const upgradeLevels = {
+        boosters: Number(effectiveUserData?.upgrades?.boosters || 0),
+        hull: Number(effectiveUserData?.upgrades?.hull || 0),
+        landers: Number(effectiveUserData?.upgrades?.landers || 0),
+    } as const;
+    const currentHullStats = getHullTierStats(upgradeLevels.hull);
+    const currentBoosterRoute = getTravelComputationBetweenPlanets("earth", "neptune", upgradeLevels.boosters);
+    const currentLanderStats = getLanderStats(upgradeLevels.landers);
+
+    const nextUpgradeRows = ["boosters", "hull", "landers"].map((family) => ({
+        family,
+        currentUpgrade: getCurrentShipUpgrade(family as "boosters" | "hull" | "landers", upgradeLevels[family as keyof typeof upgradeLevels]),
+        nextUpgrade: getNextShipUpgrade(family as "boosters" | "hull" | "landers", upgradeLevels[family as keyof typeof upgradeLevels]),
+        availability: canCraftShipUpgrade(family as "boosters" | "hull" | "landers", upgradeLevels[family as keyof typeof upgradeLevels], resources),
+    }));
+
+    const handleCraftUpgrade = async (family: "boosters" | "hull" | "landers") => {
+        if (!user?.uid) {
+            setNotice("You must be signed in to craft ship upgrades.");
+            return;
+        }
+
+        setPendingAction(family);
+        setNotice("");
+
+        try {
+            const userRef = doc(db, "users", user.uid);
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) {
+                    throw new Error("Student profile not found.");
+                }
+
+                const latestUserData = snapshot.data() as UserData;
+                const currentLevel = Number(latestUserData.upgrades?.[family] || 0);
+                const nextUpgrade = getNextShipUpgrade(family, currentLevel);
+                const availability = canCraftShipUpgrade(family, currentLevel, latestUserData.resources || {});
+
+                if (!nextUpgrade) {
+                    throw new Error("Upgrade family already maxed.");
+                }
+
+                if (!availability.ok) {
+                    throw new Error(availability.reason || "Missing required materials.");
+                }
+
+                const nextResources = { ...(latestUserData.resources || {}) };
+                nextUpgrade.costs.forEach((cost) => {
+                    nextResources[cost.resourceId] = Math.max(0, Number(nextResources[cost.resourceId] || 0) - cost.quantity);
+                    if (nextResources[cost.resourceId] <= 0) {
+                        delete nextResources[cost.resourceId];
+                    }
+                });
+
+                transaction.update(userRef, {
+                    resources: nextResources,
+                    [`upgrades.${family}`]: currentLevel + 1,
+                });
+            });
+
+            const craftedUpgrade = getNextShipUpgrade(family, upgradeLevels[family]);
+            setNotice(`${craftedUpgrade?.name || "Upgrade"} installed.`);
+        } catch (error) {
+            setNotice(error instanceof Error ? error.message : "Upgrade craft failed.");
+        } finally {
+            setPendingAction(null);
+        }
+    };
+
     return (
-        <div className="max-w-4xl mx-auto border border-amber-500/30 bg-black/40 rounded-3xl p-8 min-h-[500px]">
-            <div className="flex items-center gap-3 mb-8 pb-4 border-b border-amber-500/30">
-                <Database className="text-amber-400" size={32} />
-                <h2 className="text-2xl font-bold text-amber-400 uppercase tracking-widest">Cargo Hold</h2>
+        <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
+            <div className="flex items-center justify-between gap-3 mb-4">
+                <label className="block text-sm uppercase tracking-wider text-cyan-500 flex items-center gap-2">
+                    <Wrench size={16} /> Upgrade Blueprints
+                </label>
+                <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">Fabricator Online</span>
             </div>
 
-            <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
-                {[...Array(24)].map((_, i) => (
-                    <div key={i} className="aspect-square bg-amber-950/20 border border-amber-900/50 rounded-lg flex items-center justify-center hover:bg-amber-900/30 hover:border-amber-500/50 transition-colors cursor-pointer group">
-                        <div className="text-amber-900/40 text-xs font-mono group-hover:text-amber-500/60">EMPTY</div>
+            {notice ? (
+                <div className="mb-4 rounded-xl border border-cyan-700/40 bg-cyan-950/30 px-3 py-2 text-xs text-cyan-100">
+                    {notice}
+                </div>
+            ) : null}
+
+            <div className="mb-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-cyan-900/40 bg-black/25 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Current Travel</div>
+                    <div className="mt-2 text-sm font-bold text-white">{currentBoosterRoute ? formatTravelDuration(currentBoosterRoute.adjustedMinutes) : "Unavailable"}</div>
+                    <div className="mt-1 text-xs text-cyan-300">Earth to Neptune benchmark</div>
+                </div>
+                <div className="rounded-2xl border border-cyan-900/40 bg-black/25 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Current Cargo</div>
+                    <div className="mt-2 text-sm font-bold text-white">{cargoUsed} / {currentHullStats.cargoCapacity}</div>
+                    <div className="mt-1 text-xs text-cyan-300">{currentHullStats.activeMachineLimit} machines active</div>
+                </div>
+                <div className="rounded-2xl border border-cyan-900/40 bg-black/25 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Current Lander</div>
+                    <div className="mt-2 text-sm font-bold text-white">-{currentLanderStats.landingTimeReductionPercent}% landing time</div>
+                    <div className="mt-1 text-xs text-cyan-300">Manual gather +{currentLanderStats.manualGatherBonus}</div>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                {nextUpgradeRows.map(({ family, currentUpgrade, nextUpgrade, availability }) => (
+                    <div key={family} className="rounded-2xl border border-cyan-900/60 bg-black/30 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <div className="text-xs uppercase tracking-[0.25em] text-cyan-600">{family}</div>
+                                <div className="text-white font-bold uppercase tracking-wide mt-1">{currentUpgrade?.name || "Offline"}</div>
+                                <div className="text-xs text-cyan-700 mt-1">{currentUpgrade?.effect || "No blueprint loaded."}</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-700">Next Tier</div>
+                                <div className="text-sm font-bold text-cyan-200 mt-1">{nextUpgrade?.name || "Maxed"}</div>
+                            </div>
+                        </div>
+
+                        {nextUpgrade ? (
+                            <div className="mt-3 grid gap-2 md:grid-cols-[1.1fr,1fr]">
+                                <div className="rounded-xl border border-cyan-900/40 bg-cyan-950/10 p-3 text-xs text-cyan-200">
+                                    <div className="uppercase tracking-[0.25em] text-cyan-600 mb-1">Effect</div>
+                                    {nextUpgrade.effect}
+                                </div>
+                                <div className="rounded-xl border border-cyan-900/40 bg-black/40 p-3 text-xs text-cyan-300">
+                                    <div className="uppercase tracking-[0.25em] text-cyan-600 mb-1">Required Materials</div>
+                                    {formatMachineCostLabel(nextUpgrade.costs)}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {nextUpgrade ? (
+                            <div className="mt-3 grid gap-2 md:grid-cols-2">
+                                {family === "boosters" ? (() => {
+                                    const currentTravel = getTravelComputationBetweenPlanets("earth", "neptune", upgradeLevels.boosters);
+                                    const nextTravel = getTravelComputationBetweenPlanets("earth", "neptune", upgradeLevels.boosters + 1);
+                                    const currentBooster = getBoosterStats(upgradeLevels.boosters);
+                                    const nextBooster = getBoosterStats(upgradeLevels.boosters + 1);
+                                    return (
+                                        <>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                                                <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Before vs After</div>
+                                                <div>Earth to Neptune: {currentTravel ? formatTravelDuration(currentTravel.adjustedMinutes) : "N/A"} -> {nextTravel ? formatTravelDuration(nextTravel.adjustedMinutes) : "N/A"}</div>
+                                            </div>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-3 text-xs text-emerald-100">
+                                                <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Speed Gain</div>
+                                                <div>{currentBooster.speedMultiplier.toFixed(2)}x -> {nextBooster.speedMultiplier.toFixed(2)}x</div>
+                                            </div>
+                                        </>
+                                    );
+                                })() : null}
+
+                                {family === "hull" ? (() => {
+                                    const nextHullStats = getHullTierStats(upgradeLevels.hull + 1);
+                                    return (
+                                        <>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                                                <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Cargo Capacity</div>
+                                                <div>{currentHullStats.cargoCapacity} -> {nextHullStats.cargoCapacity}</div>
+                                            </div>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-3 text-xs text-emerald-100">
+                                                <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Machine Limit</div>
+                                                <div>{currentHullStats.activeMachineLimit} -> {nextHullStats.activeMachineLimit}</div>
+                                            </div>
+                                        </>
+                                    );
+                                })() : null}
+
+                                {family === "landers" ? (() => {
+                                    const nextLanderStats = getLanderStats(upgradeLevels.landers + 1);
+                                    return (
+                                        <>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                                                <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Landing Speed</div>
+                                                <div>-{currentLanderStats.landingTimeReductionPercent}% -> -{nextLanderStats.landingTimeReductionPercent}%</div>
+                                            </div>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-3 text-xs text-emerald-100">
+                                                <div className="uppercase tracking-[0.25em] text-emerald-300/80 mb-1">Manual Gather</div>
+                                                <div>+{currentLanderStats.manualGatherBonus} -> +{nextLanderStats.manualGatherBonus}</div>
+                                            </div>
+                                        </>
+                                    );
+                                })() : null}
+                            </div>
+                        ) : null}
+
+                        {nextUpgrade ? (
+                            <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                                <div className="text-xs text-cyan-300/80">
+                                    {availability.ok ? "Materials ready for install." : availability.reason}
+                                </div>
+                                <button
+                                    onClick={() => handleCraftUpgrade(family as "boosters" | "hull" | "landers")}
+                                    disabled={!availability.ok || Boolean(pendingAction)}
+                                    className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                >
+                                    {pendingAction === family ? "Installing..." : "Craft Upgrade"}
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
                 ))}
             </div>
-            <div className="mt-8 text-center text-amber-500/50 font-mono text-sm">
-                0 / 24 SLOTS OCCUPIED
+        </div>
+    );
+}
+
+function InventoryView({ userData, user }: { userData?: UserData | null; user?: any | null }) {
+    const [pendingAction, setPendingAction] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string>("");
+    const [liveUserData, setLiveUserData] = useState<UserData | null>(userData || null);
+
+    useEffect(() => {
+        setLiveUserData(userData || null);
+    }, [userData]);
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const unsubscribe = onSnapshot(doc(db, "users", user.uid), (snapshot) => {
+            if (!snapshot.exists()) return;
+            setLiveUserData(snapshot.data() as UserData);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    const effectiveUserData = liveUserData || userData || null;
+    const currentPlanetId = normalizePlanetId(effectiveUserData?.location || "earth") || "earth";
+    const currentPlanetResources = useMemo(() => getPlanetResources(currentPlanetId), [currentPlanetId]);
+    const hullStats = useMemo(() => getHullTierStats(effectiveUserData?.upgrades?.hull), [effectiveUserData?.upgrades?.hull]);
+    const resources = effectiveUserData?.resources || {};
+    const cargoUsed = useMemo(() => getCurrentCargoUsed(resources), [resources]);
+    const cargoRemaining = Math.max(0, hullStats.cargoCapacity - cargoUsed);
+    const placedMachines = useMemo(() => Object.values(effectiveUserData?.placedMachines || {}), [effectiveUserData?.placedMachines]);
+    const activeMachineCount = placedMachines.length;
+    const ownedMachines = effectiveUserData?.ownedMachines || {};
+    const starterMiner = getMachineDefinition(STARTER_MINER_ID);
+    const basicMachineRows = useMemo(() => (
+        MACHINE_CATALOG
+            .filter((machine) => machine.tier === 1)
+            .map((machine) => {
+                const totalOwned = Number(ownedMachines[machine.id] || 0);
+                const deployedCount = placedMachines.filter((placedMachine) => placedMachine.machineId === machine.id).length;
+                const availableCount = getAvailableMachineCount(machine.id, ownedMachines, effectiveUserData?.placedMachines);
+                const targetResource = currentPlanetResources.find((resource) => resource.machineFamily === machine.family);
+
+                return {
+                    machine,
+                    totalOwned,
+                    deployedCount,
+                    availableCount,
+                    targetResource,
+                };
+            })
+    ), [currentPlanetResources, effectiveUserData?.placedMachines, ownedMachines, placedMachines]);
+    const craftableMachineRows = useMemo(() => (
+        MACHINE_CATALOG
+            .filter((machine) => machine.id !== STARTER_MINER_ID)
+            .map((machine) => ({
+                machine,
+                totalOwned: Number(ownedMachines[machine.id] || 0),
+                availability: canCraftMachine(machine.id, resources, ownedMachines, effectiveUserData?.placedMachines),
+                previousMachine: machine.previousMachineId ? getMachineDefinition(machine.previousMachineId) : null,
+            }))
+    ), [effectiveUserData?.placedMachines, ownedMachines, resources]);
+    const displayedResources = useMemo(() => {
+        const interestingResourceIds = Array.from(new Set([
+            ...Object.keys(resources),
+            ...currentPlanetResources.map((resource) => resource.resourceId),
+        ]));
+
+        return interestingResourceIds
+            .map((resourceId) => {
+                const definition = getResourceDefinition(resourceId);
+                return {
+                    resourceId,
+                    definition,
+                    quantity: Number(resources[resourceId] || 0),
+                };
+            })
+            .filter((entry) => Boolean(entry.definition))
+            .sort((left, right) => right.quantity - left.quantity);
+    }, [currentPlanetResources, resources]);
+    const placedMachineSnapshots = useMemo(() => {
+        return placedMachines
+            .map((placedMachine) => ({
+                placedMachine,
+                accrual: getMachineAccrualSnapshot(placedMachine),
+                targetResource: getResourceDefinition(placedMachine.resourceId),
+            }))
+            .sort((left, right) => right.placedMachine.placedAt - left.placedMachine.placedAt);
+    }, [placedMachines]);
+
+    const runWithFeedback = async (actionKey: string, action: () => Promise<string>) => {
+        setPendingAction(actionKey);
+        setNotice("");
+        try {
+            const nextNotice = await action();
+            setNotice(nextNotice);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Action failed.";
+            setNotice(message);
+        } finally {
+            setPendingAction(null);
+        }
+    };
+
+    const handleStarterMinerPurchase = async () => {
+        if (!user?.uid || !starterMiner?.starterPriceCredits) {
+            throw new Error("Starter miner store is offline.");
+        }
+
+        await runWithFeedback("buy-starter-miner", async () => {
+            const userRef = doc(db, "users", user.uid);
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) {
+                    throw new Error("Student profile not found.");
+                }
+
+                const latestUserData = snapshot.data() as UserData;
+                const currentCredits = Number(latestUserData.galacticCredits || 0);
+                if (currentCredits < starterMiner.starterPriceCredits) {
+                    throw new Error(`You need ${starterMiner.starterPriceCredits} credits for the first miner.`);
+                }
+
+                const nextOwnedMachines = {
+                    ...(latestUserData.ownedMachines || {}),
+                    [STARTER_MINER_ID]: Number(latestUserData.ownedMachines?.[STARTER_MINER_ID] || 0) + 1,
+                };
+
+                transaction.update(userRef, {
+                    galacticCredits: increment(-starterMiner.starterPriceCredits),
+                    ownedMachines: nextOwnedMachines,
+                });
+            });
+
+            return "Starter miner acquired. Deploy it to the current planet when ready.";
+        });
+    };
+
+    const handleCraftMachine = async (machineId: string) => {
+        if (!user?.uid) {
+            throw new Error("You must be signed in to craft a machine.");
+        }
+
+        await runWithFeedback(`craft-${machineId}`, async () => {
+            const machine = getMachineDefinition(machineId);
+            if (!machine) {
+                throw new Error("Machine blueprint not found.");
+            }
+
+            const userRef = doc(db, "users", user.uid);
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) {
+                    throw new Error("Student profile not found.");
+                }
+
+                const latestUserData = snapshot.data() as UserData;
+                const nextResources = { ...(latestUserData.resources || {}) };
+                const nextOwnedMachines = { ...(latestUserData.ownedMachines || {}) };
+                const availability = canCraftMachine(machineId, nextResources, nextOwnedMachines, latestUserData.placedMachines);
+
+                if (!availability.ok) {
+                    throw new Error(availability.reason || "Missing fabrication requirements.");
+                }
+
+                machine.costs.forEach((cost) => {
+                    nextResources[cost.resourceId] = Math.max(0, Number(nextResources[cost.resourceId] || 0) - cost.quantity);
+                    if (nextResources[cost.resourceId] <= 0) {
+                        delete nextResources[cost.resourceId];
+                    }
+                });
+
+                if (machine.previousMachineId) {
+                    nextOwnedMachines[machine.previousMachineId] = Math.max(0, Number(nextOwnedMachines[machine.previousMachineId] || 0) - 1);
+                    if (nextOwnedMachines[machine.previousMachineId] <= 0) {
+                        delete nextOwnedMachines[machine.previousMachineId];
+                    }
+                }
+
+                nextOwnedMachines[machine.id] = Number(nextOwnedMachines[machine.id] || 0) + 1;
+
+                transaction.update(userRef, {
+                    resources: nextResources,
+                    ownedMachines: nextOwnedMachines,
+                });
+            });
+
+            return `${machine.name} fabricated and added to cargo.`;
+        });
+    };
+
+    const handleDeployMachine = async (machineId: string) => {
+        if (!user?.uid) {
+            throw new Error("You must be signed in to deploy a machine.");
+        }
+
+        await runWithFeedback(`deploy-${machineId}`, async () => {
+            const definition = getMachineDefinition(machineId);
+            if (!definition) {
+                throw new Error("Machine blueprint not found.");
+            }
+
+            const userRef = doc(db, "users", user.uid);
+            let deployedResourceName = "";
+            let deployedPlanetName = currentPlanetId;
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) {
+                    throw new Error("Student profile not found.");
+                }
+
+                const latestUserData = snapshot.data() as UserData;
+                const latestPlanetId = normalizePlanetId(latestUserData.location || "earth") || "earth";
+                const nextHullStats = getHullTierStats(latestUserData.upgrades?.hull);
+                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
+                const nextOwnedMachines = latestUserData.ownedMachines || {};
+                const deployedCount = Object.values(nextPlacedMachines).filter((placedMachine) => placedMachine.machineId === machineId).length;
+                const ownedCount = Number(nextOwnedMachines[machineId] || 0);
+
+                if (Object.keys(nextPlacedMachines).length >= nextHullStats.activeMachineLimit) {
+                    throw new Error(`Hull limit reached. Upgrade hull plating for more than ${nextHullStats.activeMachineLimit} active machines.`);
+                }
+
+                if (ownedCount - deployedCount <= 0) {
+                    throw new Error("No spare machine of that type is available to deploy.");
+                }
+
+                const targetResource = getPlanetResources(latestPlanetId).find((resource) => resource.machineFamily === definition.family);
+                if (!targetResource) {
+                    throw new Error("This planet does not support that machine family.");
+                }
+
+                const placedAt = Date.now();
+                const placedMachineId = buildPlacedMachineId(machineId, latestPlanetId, targetResource.resourceId);
+                nextPlacedMachines[placedMachineId] = {
+                    id: placedMachineId,
+                    machineId,
+                    family: definition.family,
+                    tier: definition.tier,
+                    planetId: latestPlanetId,
+                    resourceId: targetResource.resourceId,
+                    category: targetResource.category,
+                    placedAt,
+                    lastCollectedAt: placedAt,
+                } satisfies PlacedMachine;
+
+                deployedResourceName = targetResource.resourceName;
+                deployedPlanetName = latestPlanetId;
+                transaction.update(userRef, { placedMachines: nextPlacedMachines });
+            });
+
+            return `${definition.name} deployed to ${deployedPlanetName} for ${deployedResourceName}.`;
+        });
+    };
+
+    const handlePackMachine = async (placedMachineId: string) => {
+        if (!user?.uid) {
+            throw new Error("You must be signed in to pack up a machine.");
+        }
+
+        await runWithFeedback(`pack-${placedMachineId}`, async () => {
+            const userRef = doc(db, "users", user.uid);
+            let machineName = "Machine";
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) {
+                    throw new Error("Student profile not found.");
+                }
+
+                const latestUserData = snapshot.data() as UserData;
+                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
+                const targetMachine = nextPlacedMachines[placedMachineId];
+                if (!targetMachine) {
+                    throw new Error("Machine is no longer deployed.");
+                }
+
+                machineName = getMachineDefinition(targetMachine.machineId)?.name || machineName;
+                delete nextPlacedMachines[placedMachineId];
+                transaction.update(userRef, { placedMachines: nextPlacedMachines });
+            });
+
+            return `${machineName} packed back into cargo.`;
+        });
+    };
+
+    const handleCollectMachine = async (placedMachineId: string) => {
+        if (!user?.uid) {
+            throw new Error("You must be signed in to collect resources.");
+        }
+
+        await runWithFeedback(`collect-${placedMachineId}`, async () => {
+            const userRef = doc(db, "users", user.uid);
+            let collectedUnits = 0;
+            let resourceLabel = "resource";
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) {
+                    throw new Error("Student profile not found.");
+                }
+
+                const latestUserData = snapshot.data() as UserData;
+                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
+                const nextResources = { ...(latestUserData.resources || {}) };
+                const targetMachine = nextPlacedMachines[placedMachineId];
+                if (!targetMachine) {
+                    throw new Error("Machine is no longer deployed.");
+                }
+
+                const accrual = getMachineAccrualSnapshot(targetMachine);
+                if (!accrual || accrual.unitsReady <= 0) {
+                    throw new Error("No collected output is ready yet.");
+                }
+
+                const nextHullStats = getHullTierStats(latestUserData.upgrades?.hull);
+                const usedCapacity = getCurrentCargoUsed(nextResources);
+                const remainingCapacity = Math.max(0, nextHullStats.cargoCapacity - usedCapacity);
+                if (remainingCapacity <= 0) {
+                    throw new Error("Cargo hold is full. Upgrade hull plating before collecting more output.");
+                }
+
+                collectedUnits = Math.min(accrual.unitsReady, remainingCapacity);
+                resourceLabel = getResourceDefinition(targetMachine.resourceId)?.name || targetMachine.resourceId;
+                nextResources[targetMachine.resourceId] = Number(nextResources[targetMachine.resourceId] || 0) + collectedUnits;
+
+                const lastCollectedAt = Math.max(targetMachine.lastCollectedAt || targetMachine.placedAt, targetMachine.placedAt);
+                nextPlacedMachines[placedMachineId] = {
+                    ...targetMachine,
+                    lastCollectedAt: lastCollectedAt + Math.floor(getMachineUnitDurationMs(targetMachine.machineId) * collectedUnits),
+                };
+
+                transaction.update(userRef, {
+                    resources: nextResources,
+                    placedMachines: nextPlacedMachines,
+                });
+            });
+
+            return `Collected ${collectedUnits} ${resourceLabel}.`;
+        });
+    };
+
+    return (
+        <div className="max-w-6xl mx-auto space-y-6">
+            <div className="border border-amber-500/30 bg-black/40 rounded-3xl p-8">
+                <div className="flex items-center justify-between gap-4 mb-8 pb-4 border-b border-amber-500/30 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <Database className="text-amber-400" size={32} />
+                        <div>
+                            <h2 className="text-2xl font-bold text-amber-400 uppercase tracking-widest">Cargo Hold</h2>
+                            <p className="text-xs text-amber-200/70 uppercase tracking-[0.3em] mt-1">Automation, storage, and shipyard prep</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-xs uppercase tracking-[0.3em] text-amber-700">Current Planet</div>
+                        <div className="text-lg font-bold text-white uppercase">{currentPlanetId}</div>
+                    </div>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="rounded-2xl border border-amber-900/60 bg-amber-950/15 p-4">
+                        <div className="text-xs uppercase tracking-[0.3em] text-amber-600">Cargo Capacity</div>
+                        <div className="mt-2 text-3xl font-bold text-white">{cargoUsed} / {hullStats.cargoCapacity}</div>
+                        <progress
+                            value={Math.min(100, (cargoUsed / Math.max(hullStats.cargoCapacity, 1)) * 100)}
+                            max={100}
+                            className="mt-3 h-3 w-full rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-black/50 [&::-webkit-progress-value]:bg-amber-400"
+                        />
+                        <div className="mt-3 text-xs text-amber-200/70">Remaining capacity: {cargoRemaining} units</div>
+                    </div>
+
+                    <div className="rounded-2xl border border-cyan-900/60 bg-cyan-950/15 p-4">
+                        <div className="text-xs uppercase tracking-[0.3em] text-cyan-600">Hull Machine Limit</div>
+                        <div className="mt-2 text-3xl font-bold text-white">{activeMachineCount} / {hullStats.activeMachineLimit}</div>
+                        <div className="mt-3 text-xs text-cyan-200/70">{hullStats.label} supports {hullStats.upgradeSlots} ship upgrade slot(s).</div>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-900/60 bg-emerald-950/15 p-4">
+                        <div className="text-xs uppercase tracking-[0.3em] text-emerald-600">Credits Available</div>
+                        <div className="mt-2 text-3xl font-bold text-white">{Number(effectiveUserData?.galacticCredits || 0)}</div>
+                        <div className="mt-3 text-xs text-emerald-200/70">Starter miner store price: {starterMiner?.starterPriceCredits || 0} credits</div>
+                    </div>
+                </div>
+
+                {notice ? (
+                    <div className="mt-4 rounded-2xl border border-amber-700/40 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+                        {notice}
+                    </div>
+                ) : null}
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
+                <div className="space-y-6">
+                    <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                            <div>
+                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Planet Resource Scan</h3>
+                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Current location target list</p>
+                            </div>
+                            <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">Future class discovery hook</span>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-3">
+                            {currentPlanetResources.map((resource) => {
+                                const definition = getResourceDefinition(resource.resourceId);
+                                return (
+                                    <div key={resource.resourceId} className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4">
+                                        <div className="text-[10px] uppercase tracking-[0.3em] text-cyan-700">{resource.category}</div>
+                                        <div className="mt-2 flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className={`text-lg font-bold ${definition?.accentClass || "text-white"}`}>{resource.resourceName}</div>
+                                                <div className="text-xs text-cyan-500 mt-1">{MACHINE_FAMILY_LABELS[resource.machineFamily]}</div>
+                                            </div>
+                                            <div className="rounded-xl border border-cyan-800/60 px-3 py-2 text-xs font-bold text-cyan-100 bg-black/30">
+                                                {definition?.symbol || "--"}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="border border-amber-900/40 bg-black/40 rounded-3xl p-6">
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                            <div>
+                                <h3 className="text-lg font-bold text-amber-200 uppercase tracking-widest">Machine Bay</h3>
+                                <p className="text-xs text-amber-700 uppercase tracking-[0.25em] mt-1">Buy the first miner, then deploy what you own</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {basicMachineRows.map(({ machine, totalOwned, deployedCount, availableCount, targetResource }) => {
+                                const isStarterMiner = machine.id === STARTER_MINER_ID;
+                                const deployDisabled = availableCount <= 0 || !targetResource || activeMachineCount >= hullStats.activeMachineLimit || Boolean(pendingAction);
+                                return (
+                                    <div key={machine.id} className="rounded-2xl border border-amber-900/50 bg-amber-950/10 p-4">
+                                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="rounded-lg border border-amber-800/60 px-2 py-1 text-xs font-bold text-amber-100 bg-black/30">{machine.symbol}</span>
+                                                    <h4 className="text-base font-bold text-white uppercase tracking-wide">{machine.name}</h4>
+                                                </div>
+                                                <div className="text-xs text-amber-500 mt-2">{machine.description}</div>
+                                                <div className="text-xs text-amber-200/80 mt-2">Output: {machine.dailyOutput} unit(s) per day</div>
+                                                <div className="text-xs text-amber-200/80 mt-1">Owned: {totalOwned} | Deployed: {deployedCount} | Ready to deploy: {availableCount}</div>
+                                                <div className="text-xs text-amber-300/70 mt-1">Craft costs: {formatMachineCostLabel(machine.costs)}</div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-2 min-w-[180px]">
+                                                {isStarterMiner && totalOwned === 0 ? (
+                                                    <button
+                                                        onClick={handleStarterMinerPurchase}
+                                                        disabled={Boolean(pendingAction)}
+                                                        className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-emerald-500 text-black hover:bg-emerald-400 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                                    >
+                                                        {pendingAction === "buy-starter-miner" ? "Acquiring..." : `Buy First Miner (${machine.starterPriceCredits} cr)`}
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleDeployMachine(machine.id)}
+                                                        disabled={deployDisabled}
+                                                        className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-amber-400 text-black hover:bg-amber-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                                    >
+                                                        {pendingAction === `deploy-${machine.id}` ? "Deploying..." : "Deploy To Current Planet"}
+                                                    </button>
+                                                )}
+
+                                                <div className="rounded-xl border border-amber-900/50 bg-black/30 px-3 py-2 text-xs text-amber-200/80">
+                                                    {targetResource
+                                                        ? `Target: ${targetResource.resourceName}`
+                                                        : "This planet has no matching resource for this machine."}
+                                                </div>
+
+                                                {!isStarterMiner ? (
+                                                    <div className="text-[10px] uppercase tracking-[0.25em] text-amber-700">Crafting unlock comes next</div>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="border border-purple-900/40 bg-black/40 rounded-3xl p-6">
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                            <div>
+                                <h3 className="text-lg font-bold text-purple-200 uppercase tracking-widest">Machine Fabricator</h3>
+                                <p className="text-xs text-purple-700 uppercase tracking-[0.25em] mt-1">Craft extractor, harvester, and advanced machine tiers</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {craftableMachineRows.map(({ machine, totalOwned, availability, previousMachine }) => (
+                                <div key={`craft-${machine.id}`} className="rounded-2xl border border-purple-900/50 bg-purple-950/10 p-4">
+                                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="rounded-lg border border-purple-800/60 px-2 py-1 text-xs font-bold text-purple-100 bg-black/30">{machine.symbol}</span>
+                                                <h4 className="text-base font-bold text-white uppercase tracking-wide">{machine.name}</h4>
+                                            </div>
+                                            <div className="text-xs text-purple-500 mt-2">{machine.description}</div>
+                                            <div className="text-xs text-purple-200/80 mt-2">Output: {machine.dailyOutput} unit(s) per day</div>
+                                            <div className="text-xs text-purple-200/80 mt-1">Owned in cargo: {totalOwned}</div>
+                                            <div className="text-xs text-purple-300/80 mt-1">Resource costs: {formatMachineCostLabel(machine.costs)}</div>
+                                            {previousMachine ? (
+                                                <div className="text-xs text-purple-300/80 mt-1">Consumes one spare {previousMachine.name}</div>
+                                            ) : null}
+                                        </div>
+
+                                        <div className="flex flex-col gap-2 min-w-[220px]">
+                                            <button
+                                                onClick={() => handleCraftMachine(machine.id)}
+                                                disabled={!availability.ok || Boolean(pendingAction)}
+                                                className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-purple-400 text-black hover:bg-purple-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                            >
+                                                {pendingAction === `craft-${machine.id}` ? "Fabricating..." : "Craft Machine"}
+                                            </button>
+                                            <div className="rounded-xl border border-purple-900/50 bg-black/30 px-3 py-2 text-xs text-purple-200/80">
+                                                {availability.ok ? "Ready to fabricate." : availability.reason}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="border border-cyan-900/40 bg-black/40 rounded-3xl p-6">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-cyan-200 uppercase tracking-widest">Active Placements</h3>
+                                <p className="text-xs text-cyan-700 uppercase tracking-[0.25em] mt-1">Collect output or pack machines up</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {placedMachineSnapshots.length === 0 ? (
+                                <div className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4 text-sm text-cyan-500">
+                                    No machines deployed yet. Buy the starter miner and send it to work.
+                                </div>
+                            ) : placedMachineSnapshots.map(({ placedMachine, accrual, targetResource }) => {
+                                const definition = getMachineDefinition(placedMachine.machineId);
+                                const progressPercent = accrual?.nextUnitProgressPercent || 0;
+                                const collectDisabled = !accrual || accrual.unitsReady <= 0 || Boolean(pendingAction);
+                                return (
+                                    <div key={placedMachine.id} className="rounded-2xl border border-cyan-900/50 bg-cyan-950/10 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div className="text-sm font-bold text-white uppercase tracking-wide">{definition?.name || placedMachine.machineId}</div>
+                                                <div className="text-xs text-cyan-500 mt-1">{placedMachine.planetId} | {targetResource?.name || placedMachine.resourceId}</div>
+                                                <div className="text-xs text-cyan-300/80 mt-2">Ready output: {accrual?.unitsReady || 0} unit(s)</div>
+                                            </div>
+                                            <div className="rounded-xl border border-cyan-800/50 px-3 py-2 text-xs text-cyan-100 bg-black/30">
+                                                {definition?.symbol || "--"}
+                                            </div>
+                                        </div>
+
+                                        <progress
+                                            value={progressPercent}
+                                            max={100}
+                                            className="mt-3 h-2 w-full rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-black/40 [&::-webkit-progress-value]:bg-cyan-400"
+                                        />
+
+                                        <div className="mt-3 flex gap-2">
+                                            <button
+                                                onClick={() => handleCollectMachine(placedMachine.id)}
+                                                disabled={collectDisabled}
+                                                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                            >
+                                                {pendingAction === `collect-${placedMachine.id}` ? "Collecting..." : "Collect"}
+                                            </button>
+                                            <button
+                                                onClick={() => handlePackMachine(placedMachine.id)}
+                                                disabled={Boolean(pendingAction)}
+                                                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-wide border border-cyan-700/50 text-cyan-200 hover:bg-cyan-900/30 disabled:bg-gray-900 disabled:text-gray-500 transition-colors"
+                                            >
+                                                {pendingAction === `pack-${placedMachine.id}` ? "Packing..." : "Pack Up"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="border border-emerald-900/40 bg-black/40 rounded-3xl p-6">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-emerald-200 uppercase tracking-widest">Resource Ledger</h3>
+                                <p className="text-xs text-emerald-700 uppercase tracking-[0.25em] mt-1">Stored cargo and current planet targets</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {displayedResources.length === 0 ? (
+                                <div className="rounded-2xl border border-emerald-900/50 bg-emerald-950/10 p-4 text-sm text-emerald-500">
+                                    No stored resources yet. Deploy a machine and come back to collect.
+                                </div>
+                            ) : displayedResources.map(({ resourceId, definition, quantity }) => (
+                                <div key={resourceId} className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-900/40 bg-emerald-950/10 px-4 py-3">
+                                    <div>
+                                        <div className={`font-bold ${definition?.accentClass || "text-white"}`}>{definition?.name || resourceId}</div>
+                                        <div className="text-xs text-emerald-600 uppercase tracking-[0.25em] mt-1">{definition?.category || "unknown"}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-xl font-bold text-white">{quantity}</div>
+                                        <div className="text-xs text-emerald-600 uppercase tracking-[0.25em]">{definition?.symbol || "--"}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -1058,7 +1980,7 @@ export default function SettingsPage() {
                     >
                         {view === 'cockpit' && <CockpitView onNavigate={(v) => setView(v as any)} ranks={ranks} />}
                         {view === 'ship' && <ShipSettings userData={userData} user={user} unlockedShipIds={unlockedShipIds} />}
-                        {view === 'inventory' && <InventoryView />}
+                        {view === 'inventory' && <InventoryView userData={userData} user={user} />}
                         {view === 'flag' && <FlagDesigner />}
                     </motion.div>
                 </AnimatePresence>

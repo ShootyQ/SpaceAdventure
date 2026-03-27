@@ -1,0 +1,14 @@
+﻿Machine Crafting Chart,,,,,,,,,,,,,,,,,,,,,
+Machine Family,Tier,Machine Name,Daily Output (units/day),Previous Machine Required,Cost Summary,Cost 1,Qty 1,Category 1,Cost 2,Qty 2,Category 2,Cost 3,Qty 3,Category 3,Cost 4,Qty 4,Category 4,Cost 5,Qty 5,Category 5,Total Resource Units Needed
+Miner,Basic,Basic Miner,1,Included at start,No crafting cost,,,,,,,,,,,,,,,,#VALUE!
+Miner,Improved,Improved Miner,2,Basic Miner,#NAME?,Iron,2,Ore,Quartz,2,Ore,Sulfur,1,Ore,,,,,,,#VALUE!
+Miner,Advanced,Advanced Miner,3,Improved Miner,#NAME?,Iron,3,Ore,Iron Oxide,3,Ore,Ice,2,Ore,Sulfur,2,Ore,,,,#VALUE!
+Miner,Elite,Elite Miner,5,Advanced Miner,#NAME?,Iron,5,Ore,Quartz,5,Ore,Ammonia Ice,5,Ore,Ice,5,Ore,,,,#VALUE!
+Extractor,Basic,Basic Extractor,1,None,#NAME?,Iron,2,Ore,Oxygen,2,Gas,,,,,,,,,,#VALUE!
+Extractor,Improved,Improved Extractor,2,Basic Extractor,#NAME?,Iron,2,Ore,Carbon Dioxide,2,Gas,Argon,2,Gas,,,,,,,#VALUE!
+Extractor,Advanced,Advanced Extractor,3,Improved Extractor,#NAME?,Helium,3,Gas,Hydrogen,3,Gas,Methane,3,Gas,Iron,2,Ore,,,,#VALUE!
+Extractor,Elite,Elite Extractor,5,Advanced Extractor,#NAME?,Hydrogen,5,Gas,Neon,5,Gas,Helium,5,Gas,Methane,5,Gas,,,,#VALUE!
+Harvester,Basic,Basic Harvester,1,None,#NAME?,Iron,2,Ore,Algae,2,Organic,,,,,,,,,,#VALUE!
+Harvester,Improved,Improved Harvester,2,Basic Harvester,#NAME?,Algae,2,Organic,Red Moss,2,Organic,Cloud Bloom,2,Organic,,,,,,,#VALUE!
+Harvester,Advanced,Advanced Harvester,3,Improved Harvester,#NAME?,Glow Kelp,3,Organic,Blue Lichen,3,Organic,Sea Bloom,3,Organic,Red Moss,2,Organic,,,,#VALUE!
+Harvester,Elite,Elite Harvester,5,Advanced Harvester,#NAME?,Sky Coral,5,Organic,Sea Bloom,5,Organic,Glow Kelp,5,Organic,Cloud Bloom,5,Organic,,,,#VALUE!

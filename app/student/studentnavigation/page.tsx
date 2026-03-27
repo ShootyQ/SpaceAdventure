@@ -188,6 +188,8 @@ export default function StudentNavigationPage() {
                 <div className="border border-cyan-500/20 bg-black/40 rounded-2xl p-5">
                     <h2 className="text-lg font-bold uppercase tracking-wider text-white mb-3">Navigation Systems</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <NavCard href="/student/settings?view=inventory" title="Cargo Hold" subtitle="Resources, machines, and storage" />
+                        <NavCard href="/student/settings?view=ship" title="Ship Systems" subtitle="Hull stats and upgrade blueprints" />
                         <NavCard href="/student/hangar" title="Hangar Bay" subtitle="Ship selection only" />
                         <NavCard href="/student/avatar" title="Avatar Selection" subtitle="Avatar selection only" />
                         <NavCard href="/student/pets" title="Pet Selection" subtitle="Pet selection only" />

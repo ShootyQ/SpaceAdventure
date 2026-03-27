@@ -391,6 +391,16 @@ export default function TeacherConsole() {
                         borderColor="border-amber-500/30"
                     />
                 </div>
+                <div id="tile-resources">
+                    <QuickAction
+                        title="Resource Intel"
+                        icon={<Globe size={28} />}
+                        desc="Discovery Dashboard"
+                        href="/teacher/resources"
+                        color="text-emerald-300"
+                        borderColor="border-emerald-500/30"
+                    />
+                </div>
                 <div id="tile-asteroids">
                     <QuickAction 
                         title="Asteroid Event" 

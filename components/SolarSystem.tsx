@@ -9,13 +9,13 @@ import Link from 'next/link';
 import MapTutorial from "@/app/teacher/map/MapTutorial";
 import { useAuth } from "@/context/AuthContext";
 import { useTeacherScope } from "@/context/TeacherScopeContext";
-import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, updateDoc, setDoc, getDoc, orderBy, arrayUnion, increment, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
 import ManifestOverlay from "@/components/ManifestOverlay";
 import AwardOverlay from "@/components/AwardOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig } from "@/types";
+import { Ship, Rank, Behavior, AwardEvent, Planet, FlagConfig, PLANETS, AsteroidEvent, ClassBonusConfig, ClassPlanetDiscoveryState, UserData } from "@/types";
 import {
     DEFAULT_PET_UNLOCK_CHANCE_CONFIG,
     getPetById,
@@ -27,6 +27,23 @@ import {
 } from "@/lib/pets";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, type UnlockRule } from "@/lib/unlocks";
 import { isXpUnlockEarned, normalizeXpUnlockProgressMap } from "@/lib/xp-unlock-progress";
+import {
+    MACHINE_CATALOG,
+    RESOURCE_DISCOVERY_DOC_ID,
+    buildPlacedMachineId,
+    getAvailableMachineCount,
+    getBoosterStats,
+    getCurrentCargoUsed,
+    getDiscoveredPlanetResources,
+    getHullTierStats,
+    getMachineAccrualSnapshot,
+    getMachineDefinition,
+    getMachineUnitDurationMs,
+    getPlanetResources,
+    getResourceDefinition,
+    getTravelComputationBetweenPlanets,
+    normalizeClassPlanetDiscoveryState,
+} from "@/lib/resource-economy";
 
 // Note: Removed local interface definitions in favor of @/types
 
@@ -234,6 +251,10 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
   const [showBonusVictory, setShowBonusVictory] = useState(false);
   const [bonusVictoryDismissed, setBonusVictoryDismissed] = useState(false);
   const [className, setClassName] = useState("");
+        const [classResourceDiscovery, setClassResourceDiscovery] = useState<ClassPlanetDiscoveryState>({});
+        const [currentUserGameplay, setCurrentUserGameplay] = useState<UserData | null>(null);
+        const [landingMachineAction, setLandingMachineAction] = useState<string | null>(null);
+        const [landingMachineNotice, setLandingMachineNotice] = useState<string>("");
     const [unlockConfig, setUnlockConfig] = useState(DEFAULT_UNLOCK_CONFIG);
     const shipXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.ships));
     const avatarXpUnlockRulesRef = useRef<UnlockRule[]>(getXpUnlockRules(DEFAULT_UNLOCK_CONFIG.avatars));
@@ -305,6 +326,39 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
 
     return () => unsub();
     }, [userData, resolvedTeacherId]);
+
+    useEffect(() => {
+        if (!userData?.uid) {
+            setCurrentUserGameplay(null);
+            return;
+        }
+
+        const unsubscribe = onSnapshot(doc(db, "users", userData.uid), (snapshot) => {
+            if (!snapshot.exists()) {
+                setCurrentUserGameplay(null);
+                return;
+            }
+
+            setCurrentUserGameplay(snapshot.data() as UserData);
+        });
+
+        return () => unsubscribe();
+    }, [userData?.uid]);
+
+    useEffect(() => {
+        if (!resolvedTeacherId) {
+            setClassResourceDiscovery({});
+            return;
+        }
+
+        const discoveryRef = doc(db, `users/${resolvedTeacherId}/settings`, RESOURCE_DISCOVERY_DOC_ID);
+        const unsubscribe = onSnapshot(discoveryRef, (snapshot) => {
+            const next = normalizeClassPlanetDiscoveryState((snapshot.data() as any)?.planets || {});
+            setClassResourceDiscovery(next);
+        });
+
+        return () => unsubscribe();
+    }, [resolvedTeacherId]);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "game-config", "collectibles"), (snapshot) => {
@@ -1737,21 +1791,16 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
          return;
     }
 
-    // Distance in logic units (Difference in orbit radii)
-    const dist = Math.abs(endPlanet.orbitSize - startPlanet.orbitSize) / 2;
-    
-    // Base Speed: Earth->Neptune (1875 units) takes 1 Week (10080 mins)
-    // Unit Time = 10080 / 1875 = ~5.376 mins per unit
-    const TIME_PER_UNIT = 5.376;
-    const baseMinutes = dist * TIME_PER_UNIT;
+    const boosterLevel = Number(userData.upgrades?.boosters || 0);
+    const travelComputation = getTravelComputationBetweenPlanets(startPlanet.id, endPlanet.id, boosterLevel);
+    if (!travelComputation) {
+        alert("Unable to calculate that route right now.");
+        return;
+    }
 
-    // Apply Boosters
-    // Formula: SpeedMultiplier = 1 + (Level * 1.2) -> Max Lvl 5 = 7x speed (1 wk -> 24h)
-    const boosterLevel = userData.upgrades?.boosters || 0;
-    const speedMultiplier = 1 + (boosterLevel * 1.2);
-    
-    // Final Duration
-    let travelMinutes = Math.max(baseMinutes / speedMultiplier, 1); // Minimum 1 min
+    const dist = travelComputation.distanceUnits;
+    const speedMultiplier = travelComputation.speedMultiplier;
+    const travelMinutes = travelComputation.adjustedMinutes;
     
     const fuelCost = Math.ceil(travelMinutes / 5);
 
@@ -1773,6 +1822,7 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
         const confirmMsg = `Plotting course to ${selectedPlanet.name}...\n\n` +
                            `Distance: ${Math.round(dist)} AU\n` +
                            `Estimated Time: ${formatDuration(travelMinutes)}\n` +
+                           `${travelComputation.boosterLabel}: ${travelComputation.travelReductionPercent}% faster (${speedMultiplier.toFixed(2)}x)\n` +
                            // `Fuel Cost: ${fuelCost} Units ${boosterLevel > 0 ? `(Booster Lv.${boosterLevel})` : ''}\n\n` +
                            `Engage Hyperdrive?`;
         
@@ -1886,13 +1936,28 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     if (isLanded && selectedPlanet && userData) {
         const recordVisit = async () => {
              const userRef = doc(db, "users", userData.uid);
+             const planetResources = getPlanetResources(selectedPlanet.id);
+
              await updateDoc(userRef, {
                  visitedPlanets: arrayUnion(selectedPlanet.id)
              });
+
+             if (resolvedTeacherId && planetResources.length > 0) {
+                 const discoveryRef = doc(db, `users/${resolvedTeacherId}/settings`, RESOURCE_DISCOVERY_DOC_ID);
+                 await setDoc(discoveryRef, {
+                     planets: {
+                         [selectedPlanet.id]: arrayUnion(...planetResources.map((resource) => resource.resourceId)),
+                     },
+                     updatedAt: Date.now(),
+                     updatedBy: userData.uid,
+                 }, { merge: true });
+             }
         };
-        recordVisit();
+        recordVisit().catch((error) => {
+            console.error("Failed to record landing discovery:", error);
+        });
     }
-  }, [isLanded, selectedPlanet, userData]);
+  }, [isLanded, selectedPlanet, userData, resolvedTeacherId]);
 
   // Asteroid Logic Calcs
   const getAsteroidStatus = () => {
@@ -2019,6 +2084,213 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
     const visitorsForSelectedPlanet = selectedPlanet
         ? (isStudentPersonalView ? planetVisitors : (visitedShipsByPlanet.get(selectedPlanet.id) || []))
         : [];
+    const selectedPlanetDiscoveredResources = selectedPlanet
+        ? getDiscoveredPlanetResources(selectedPlanet.id, classResourceDiscovery)
+        : [];
+    const currentUserHullStats = useMemo(
+        () => getHullTierStats(currentUserGameplay?.upgrades?.hull),
+        [currentUserGameplay?.upgrades?.hull]
+    );
+    const currentUserCargoUsed = useMemo(
+        () => getCurrentCargoUsed(currentUserGameplay?.resources || {}),
+        [currentUserGameplay?.resources]
+    );
+    const ownPlacedMachines = useMemo(
+        () => Object.values(currentUserGameplay?.placedMachines || {}),
+        [currentUserGameplay?.placedMachines]
+    );
+    const ownPlacedMachinesByPlanet = useMemo(() => {
+        const next = new Map<string, typeof ownPlacedMachines>();
+        ownPlacedMachines.forEach((placedMachine) => {
+            const planetId = normalizePlanetId(placedMachine.planetId);
+            const existing = next.get(planetId) || [];
+            existing.push(placedMachine);
+            next.set(planetId, existing);
+        });
+        return next;
+    }, [ownPlacedMachines]);
+    const ownPlacedMachinesForSelectedPlanet = selectedPlanet
+        ? (ownPlacedMachinesByPlanet.get(normalizePlanetId(selectedPlanet.id)) || [])
+        : [];
+    const deployableMachinesForSelectedPlanet = useMemo(() => {
+        if (!selectedPlanet) return [] as Array<{
+            machineId: string;
+            machineName: string;
+            family: string;
+            availableCount: number;
+            resourceId: string;
+            resourceName: string;
+        }>;
+
+        return MACHINE_CATALOG.map((machine) => {
+            const targetResource = getPlanetResources(selectedPlanet.id).find((resource) => resource.machineFamily === machine.family);
+            const availableCount = getAvailableMachineCount(machine.id, currentUserGameplay?.ownedMachines, currentUserGameplay?.placedMachines);
+            return {
+                machineId: machine.id,
+                machineName: machine.name,
+                family: machine.family,
+                availableCount,
+                resourceId: targetResource?.resourceId || "",
+                resourceName: targetResource?.resourceName || "",
+            };
+        }).filter((entry) => entry.resourceId && entry.availableCount > 0);
+    }, [currentUserGameplay?.ownedMachines, currentUserGameplay?.placedMachines, selectedPlanet]);
+    const selectedPlanetTravelPreview = useMemo(() => {
+        if (!selectedPlanet || !currentUserGameplay) return null;
+        const startPlanetId = normalizePlanetId(currentUserGameplay.location || "earth") || "earth";
+        const targetPlanetId = normalizePlanetId(selectedPlanet.id);
+        if (!targetPlanetId || startPlanetId === targetPlanetId) return null;
+
+        const boosterLevel = Number(currentUserGameplay.upgrades?.boosters || 0);
+        const travel = getTravelComputationBetweenPlanets(startPlanetId, targetPlanetId, boosterLevel);
+        if (!travel) return null;
+
+        return {
+            startPlanetId,
+            booster: getBoosterStats(boosterLevel),
+            ...travel,
+        };
+    }, [currentUserGameplay, selectedPlanet]);
+
+    const runLandingMachineAction = useCallback(async (actionKey: string, action: () => Promise<string>) => {
+        setLandingMachineAction(actionKey);
+        setLandingMachineNotice("");
+        try {
+            const nextNotice = await action();
+            setLandingMachineNotice(nextNotice);
+        } catch (error) {
+            setLandingMachineNotice(error instanceof Error ? error.message : "Machine action failed.");
+        } finally {
+            setLandingMachineAction(null);
+        }
+    }, []);
+
+    const handleLandingCollectMachine = useCallback(async (placedMachineId: string) => {
+        if (!userData?.uid) return;
+
+        await runLandingMachineAction(`collect-${placedMachineId}`, async () => {
+            const userRef = doc(db, "users", userData.uid);
+            let collectedUnits = 0;
+            let resourceLabel = "resource";
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) throw new Error("Student profile not found.");
+
+                const latestUserData = snapshot.data() as UserData;
+                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
+                const nextResources = { ...(latestUserData.resources || {}) };
+                const targetMachine = nextPlacedMachines[placedMachineId];
+                if (!targetMachine) throw new Error("Machine is no longer deployed.");
+
+                const accrual = getMachineAccrualSnapshot(targetMachine);
+                if (!accrual || accrual.unitsReady <= 0) throw new Error("No collected output is ready yet.");
+
+                const hullStats = getHullTierStats(latestUserData.upgrades?.hull);
+                const remainingCapacity = Math.max(0, hullStats.cargoCapacity - getCurrentCargoUsed(nextResources));
+                if (remainingCapacity <= 0) throw new Error("Cargo hold is full.");
+
+                collectedUnits = Math.min(accrual.unitsReady, remainingCapacity);
+                resourceLabel = getResourceDefinition(targetMachine.resourceId)?.name || targetMachine.resourceId;
+                nextResources[targetMachine.resourceId] = Number(nextResources[targetMachine.resourceId] || 0) + collectedUnits;
+
+                const lastCollectedAt = Math.max(targetMachine.lastCollectedAt || targetMachine.placedAt, targetMachine.placedAt);
+                nextPlacedMachines[placedMachineId] = {
+                    ...targetMachine,
+                    lastCollectedAt: lastCollectedAt + Math.floor(getMachineUnitDurationMs(targetMachine.machineId) * collectedUnits),
+                };
+
+                transaction.update(userRef, {
+                    resources: nextResources,
+                    placedMachines: nextPlacedMachines,
+                });
+            });
+
+            return `Collected ${collectedUnits} ${resourceLabel}.`;
+        });
+    }, [runLandingMachineAction, userData?.uid]);
+
+    const handleLandingDeployMachine = useCallback(async (machineId: string) => {
+        if (!userData?.uid || !selectedPlanet) return;
+
+        const targetPlanetId = normalizePlanetId(selectedPlanet.id);
+        await runLandingMachineAction(`deploy-${machineId}`, async () => {
+            const definition = getMachineDefinition(machineId);
+            if (!definition) throw new Error("Machine blueprint not found.");
+
+            const userRef = doc(db, "users", userData.uid);
+            let deployedResourceName = "";
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) throw new Error("Student profile not found.");
+
+                const latestUserData = snapshot.data() as UserData;
+                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
+                const nextOwnedMachines = latestUserData.ownedMachines || {};
+                const nextHullStats = getHullTierStats(latestUserData.upgrades?.hull);
+                const deployedCount = Object.values(nextPlacedMachines).filter((placedMachine) => placedMachine.machineId === machineId).length;
+                const ownedCount = Number(nextOwnedMachines[machineId] || 0);
+
+                if (Object.keys(nextPlacedMachines).length >= nextHullStats.activeMachineLimit) {
+                    throw new Error(`Hull limit reached. Upgrade hull plating for more than ${nextHullStats.activeMachineLimit} active machines.`);
+                }
+
+                if (ownedCount - deployedCount <= 0) {
+                    throw new Error("No spare machine of that type is available to deploy.");
+                }
+
+                const targetResource = getPlanetResources(targetPlanetId).find((resource) => resource.machineFamily === definition.family);
+                if (!targetResource) {
+                    throw new Error("This planet does not support that machine family.");
+                }
+
+                const placedAt = Date.now();
+                const placedMachineId = buildPlacedMachineId(machineId, targetPlanetId, targetResource.resourceId);
+                nextPlacedMachines[placedMachineId] = {
+                    id: placedMachineId,
+                    machineId,
+                    family: definition.family,
+                    tier: definition.tier,
+                    planetId: targetPlanetId,
+                    resourceId: targetResource.resourceId,
+                    category: targetResource.category,
+                    placedAt,
+                    lastCollectedAt: placedAt,
+                };
+
+                deployedResourceName = targetResource.resourceName;
+                transaction.update(userRef, { placedMachines: nextPlacedMachines });
+            });
+
+            return `${definition.name} deployed for ${deployedResourceName}.`;
+        });
+    }, [runLandingMachineAction, selectedPlanet, userData?.uid]);
+
+    const handleLandingPackMachine = useCallback(async (placedMachineId: string) => {
+        if (!userData?.uid) return;
+
+        await runLandingMachineAction(`pack-${placedMachineId}`, async () => {
+            const userRef = doc(db, "users", userData.uid);
+            let machineName = "Machine";
+
+            await runTransaction(db, async (transaction) => {
+                const snapshot = await transaction.get(userRef);
+                if (!snapshot.exists()) throw new Error("Student profile not found.");
+
+                const latestUserData = snapshot.data() as UserData;
+                const nextPlacedMachines = { ...(latestUserData.placedMachines || {}) };
+                const targetMachine = nextPlacedMachines[placedMachineId];
+                if (!targetMachine) throw new Error("Machine is no longer deployed.");
+
+                machineName = getMachineDefinition(targetMachine.machineId)?.name || machineName;
+                delete nextPlacedMachines[placedMachineId];
+                transaction.update(userRef, { placedMachines: nextPlacedMachines });
+            });
+
+            return `${machineName} packed back into cargo.`;
+        });
+    }, [runLandingMachineAction, userData?.uid]);
 
   const getSubjectLocationId = (subject: unknown): string | undefined => {
       if (!subject || typeof subject !== 'object') return undefined;
@@ -2255,6 +2527,18 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                                 alt={planet.name}
                                 className="w-[140%] h-[140%] max-w-none object-contain drop-shadow-2xl" 
                               />
+                          ) : null}
+
+                          {planet.id !== 'sun' ? (
+                              <div className={`absolute -right-3 -top-2 min-w-[2.5rem] h-6 px-1 rounded-full border text-[10px] font-black flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.25)] ${classResourceDiscovery[planet.id]?.length ? 'bg-emerald-500/90 border-emerald-200/70 text-black' : 'bg-slate-800/90 border-slate-500/70 text-slate-100'}`}>
+                                  {`${classResourceDiscovery[planet.id]?.length || 0}/${getPlanetResources(planet.id).length}`}
+                              </div>
+                          ) : null}
+
+                          {ownPlacedMachinesByPlanet.get(planet.id)?.length ? (
+                              <div className="absolute -right-2 -bottom-2 min-w-[1.4rem] h-6 px-1 rounded-full bg-amber-400/90 border border-amber-100/80 text-[10px] font-black text-black flex items-center justify-center shadow-[0_0_12px_rgba(251,191,36,0.5)]">
+                                  M{ownPlacedMachinesByPlanet.get(planet.id)?.length}
+                              </div>
                           ) : null}
 
                           {/* VISITED FLAGS (Map View) */}
@@ -2520,6 +2804,11 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                  <div>
                     <h2 className="text-3xl font-bold text-white">{selectedPlanet.name}</h2>
                     <p className="text-blue-300 text-sm">Sector {selectedPlanet.id.toUpperCase()}</p>
+                    {selectedPlanet.id !== 'sun' ? (
+                        <p className="text-emerald-300/80 text-xs mt-1 uppercase tracking-[0.25em]">
+                            Discovery Progress {selectedPlanetDiscoveredResources.length}/{getPlanetResources(selectedPlanet.id).length}
+                        </p>
+                    ) : null}
                  </div>
                  <button onClick={() => setSelectedPlanet(null)} className="text-gray-400 hover:text-white">✕</button>
                </div>
@@ -2534,6 +2823,83 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                </div>
                
                <p className="text-gray-300 mb-6">{selectedPlanet.description}</p>
+
+               {isStudentPersonalView && selectedPlanetTravelPreview ? (
+                   <div className="mb-6 p-4 bg-cyan-950/20 rounded-lg border border-cyan-900/40">
+                       <div className="text-[10px] text-cyan-400 uppercase tracking-widest font-bold mb-2">
+                           Travel Window
+                       </div>
+                       <div className="flex items-start justify-between gap-3">
+                           <div>
+                               <div className="text-sm font-bold text-white">{selectedPlanetTravelPreview.startPlanetId.toUpperCase()} to {selectedPlanet.id.toUpperCase()}</div>
+                               <div className="text-xs text-cyan-300 mt-1">{selectedPlanetTravelPreview.booster.label} running at {selectedPlanetTravelPreview.booster.speedMultiplier.toFixed(2)}x</div>
+                           </div>
+                           <div className="text-right">
+                               <div className="text-lg font-bold text-cyan-100">{formatDuration(selectedPlanetTravelPreview.adjustedMinutes)}</div>
+                               <div className="text-[10px] uppercase tracking-widest text-cyan-300/70">-{selectedPlanetTravelPreview.travelReductionPercent}% vs base</div>
+                           </div>
+                       </div>
+                   </div>
+               ) : null}
+
+               <div className="mb-6 p-4 bg-emerald-950/20 rounded-lg border border-emerald-900/40">
+                   <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold mb-2">
+                       Class Resource Intel
+                   </div>
+                   {selectedPlanetDiscoveredResources.length > 0 ? (
+                       <div className="space-y-2">
+                           {selectedPlanetDiscoveredResources.map((resource) => {
+                               const definition = getResourceDefinition(resource.resourceId);
+                               return (
+                                   <div key={resource.resourceId} className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/10 bg-black/20 px-3 py-2">
+                                       <div>
+                                           <div className={`text-sm font-bold ${definition?.accentClass || 'text-white'}`}>{resource.resourceName}</div>
+                                           <div className="text-[10px] uppercase tracking-widest text-emerald-300/70">{resource.category} via {resource.machineFamily}</div>
+                                       </div>
+                                       <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-100 font-bold">
+                                           {definition?.symbol || '--'}
+                                       </div>
+                                   </div>
+                               );
+                           })}
+                       </div>
+                   ) : (
+                       <div className="text-[11px] text-gray-400 italic">This class has not discovered this planet's resource list yet.</div>
+                   )}
+               </div>
+
+               {isStudentPersonalView && (
+                   <div className="mb-6 p-4 bg-amber-950/20 rounded-lg border border-amber-900/40">
+                       <div className="text-[10px] text-amber-400 uppercase tracking-widest font-bold mb-2">
+                           Your Field Machines
+                       </div>
+                       {ownPlacedMachinesForSelectedPlanet.length > 0 ? (
+                           <div className="space-y-2">
+                               {ownPlacedMachinesForSelectedPlanet.map((placedMachine) => {
+                                   const machine = getMachineDefinition(placedMachine.machineId);
+                                   const accrual = getMachineAccrualSnapshot(placedMachine, now);
+                                   const resource = getResourceDefinition(placedMachine.resourceId);
+                                   return (
+                                       <div key={placedMachine.id} className="rounded-lg border border-amber-500/10 bg-black/20 px-3 py-2">
+                                           <div className="flex items-center justify-between gap-3">
+                                               <div>
+                                                   <div className="text-sm font-bold text-white">{machine?.name || placedMachine.machineId}</div>
+                                                   <div className="text-[10px] uppercase tracking-widest text-amber-300/70">{resource?.name || placedMachine.resourceId}</div>
+                                               </div>
+                                               <div className="text-right">
+                                                   <div className="text-sm font-bold text-amber-100">{accrual?.unitsReady || 0}</div>
+                                                   <div className="text-[10px] uppercase tracking-widest text-amber-300/70">Ready</div>
+                                               </div>
+                                           </div>
+                                       </div>
+                                   );
+                               })}
+                           </div>
+                       ) : (
+                           <div className="text-[11px] text-gray-400 italic">No machines deployed here yet.</div>
+                       )}
+                   </div>
+               )}
                
                {/* DYNAMIC PLANET STATS */}
                {(() => {
@@ -2940,6 +3306,115 @@ export default function SolarSystem({ studentView = false, classroomDisplay = fa
                         <span>Touchdown Confirmed</span>
                      </motion.div>
                 </div>
+
+                {isStudentPersonalView && (
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 1.2 }}
+                        className="absolute left-6 top-28 z-20 w-[22rem] max-w-[calc(100vw-3rem)] rounded-2xl border border-amber-500/20 bg-black/55 backdrop-blur-md p-4"
+                    >
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                            <div>
+                                <div className="text-xs uppercase tracking-[0.25em] text-amber-300">Surface Operations</div>
+                                <div className="text-sm text-white/70 mt-1">Manage placed machines without leaving the map.</div>
+                            </div>
+                            <div className="text-right text-[11px] text-emerald-200">
+                                <div>{selectedPlanetDiscoveredResources.length}/{getPlanetResources(selectedPlanet.id).length} found</div>
+                                <div className="mt-1 text-amber-100">Cargo {currentUserCargoUsed}/{currentUserHullStats.cargoCapacity}</div>
+                            </div>
+                        </div>
+
+                        {landingMachineNotice ? (
+                            <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                                {landingMachineNotice}
+                            </div>
+                        ) : null}
+
+                        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                            <div className="rounded-xl border border-amber-500/10 bg-black/25 px-3 py-3">
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                    <div className="text-[10px] uppercase tracking-[0.25em] text-amber-200/70">Ready To Deploy</div>
+                                    <div className="text-[10px] uppercase tracking-[0.25em] text-amber-100/70">{ownPlacedMachines.length}/{currentUserHullStats.activeMachineLimit} active</div>
+                                </div>
+                                {deployableMachinesForSelectedPlanet.length === 0 ? (
+                                    <div className="text-sm text-white/60">No spare compatible machines in cargo.</div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {deployableMachinesForSelectedPlanet.map((entry) => {
+                                            const limitReached = ownPlacedMachines.length >= currentUserHullStats.activeMachineLimit;
+                                            return (
+                                                <div key={entry.machineId} className="rounded-xl border border-amber-500/10 bg-black/35 px-3 py-3">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-sm font-bold text-white">{entry.machineName}</div>
+                                                            <div className="text-[10px] uppercase tracking-[0.25em] text-amber-200/70 mt-1">{entry.resourceName} • {entry.family}</div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-bold text-amber-100">x{entry.availableCount}</div>
+                                                            <div className="text-[10px] uppercase tracking-[0.25em] text-amber-200/70">Cargo</div>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleLandingDeployMachine(entry.machineId)}
+                                                        disabled={Boolean(landingMachineAction) || limitReached}
+                                                        className="mt-3 w-full rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wide bg-amber-300 text-black hover:bg-amber-200 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                                    >
+                                                        {landingMachineAction === `deploy-${entry.machineId}` ? "Deploying..." : limitReached ? "Hull Limit Reached" : "Deploy To Surface"}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="rounded-xl border border-amber-500/10 bg-black/25 px-3 py-3">
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-200/70 mb-2">Deployed On Surface</div>
+                                {ownPlacedMachinesForSelectedPlanet.length === 0 ? (
+                                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/60">
+                                        No machines are deployed on this planet yet.
+                                    </div>
+                                ) : ownPlacedMachinesForSelectedPlanet.map((placedMachine) => {
+                                const machine = getMachineDefinition(placedMachine.machineId);
+                                const resource = getResourceDefinition(placedMachine.resourceId);
+                                const accrual = getMachineAccrualSnapshot(placedMachine, now);
+                                return (
+                                    <div key={placedMachine.id} className="rounded-xl border border-amber-500/10 bg-black/35 px-3 py-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div className="text-sm font-bold text-white">{machine?.name || placedMachine.machineId}</div>
+                                                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-200/70 mt-1">{resource?.name || placedMachine.resourceId}</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-sm font-bold text-amber-100">{accrual?.unitsReady || 0}</div>
+                                                <div className="text-[10px] uppercase tracking-[0.25em] text-amber-200/70">Ready</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 flex gap-2">
+                                            <button
+                                                onClick={() => handleLandingCollectMachine(placedMachine.id)}
+                                                disabled={!accrual || accrual.unitsReady <= 0 || Boolean(landingMachineAction)}
+                                                className="flex-1 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 disabled:bg-gray-700 disabled:text-gray-400 transition-colors"
+                                            >
+                                                {landingMachineAction === `collect-${placedMachine.id}` ? "Collecting..." : "Collect"}
+                                            </button>
+                                            <button
+                                                onClick={() => handleLandingPackMachine(placedMachine.id)}
+                                                disabled={Boolean(landingMachineAction)}
+                                                className="flex-1 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wide border border-amber-400/40 text-amber-100 hover:bg-amber-500/10 disabled:bg-gray-900 disabled:text-gray-500 transition-colors"
+                                            >
+                                                {landingMachineAction === `pack-${placedMachine.id}` ? "Packing..." : "Pack Up"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                                })}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Surface Horizon */}
                 <motion.img

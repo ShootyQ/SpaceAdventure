@@ -13,6 +13,40 @@ export interface Planet {
     xpRequired: number;
 }
 
+export type ResourceCategory = "ore" | "gas" | "organic";
+
+export type MachineFamily = "miner" | "extractor" | "harvester";
+
+export interface ResourceInventory {
+    [resourceId: string]: number;
+}
+
+export interface OwnedMachineInventory {
+    [machineId: string]: number;
+}
+
+export interface PlacedMachine {
+    id: string;
+    machineId: string;
+    family: MachineFamily;
+    tier: number;
+    planetId: string;
+    resourceId: string;
+    category: ResourceCategory;
+    placedAt: number;
+    lastCollectedAt: number;
+}
+
+export interface ClassPlanetDiscoveryState {
+    [planetId: string]: string[];
+}
+
+export interface ClassResourceDiscoveryDoc {
+    planets?: ClassPlanetDiscoveryState;
+    updatedAt?: any;
+    updatedBy?: string;
+}
+
 export const PLANETS: Planet[] = [
     { id: "sun", name: "The Sun", color: "bg-yellow-500 shadow-[0_0_100px_#eab308]", size: "w-32 h-32", pixelSize: 128, orbitSize: 0, orbitDuration: 0, startAngle: 0, description: "The burning core of our system.", xpRequired: 0 },
     { id: "mercury", name: "Mercury", color: "bg-gray-400", size: "w-6 h-6", pixelSize: 24, orbitSize: 300, orbitDuration: 3888, startAngle: 45, description: "Hot, fast, and rocky.", xpRequired: 100 },
@@ -128,6 +162,9 @@ export interface UserData {
         landers: number;
         hull: number;
     };
+    resources?: ResourceInventory;
+    ownedMachines?: OwnedMachineInventory;
+    placedMachines?: Record<string, PlacedMachine>;
     travelStatus?: "idle" | "traveling";
     destinationId?: string;
     travelStart?: number;

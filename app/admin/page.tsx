@@ -325,6 +325,13 @@ export default function AdminPage() {
           <p className="mt-1 text-sm text-slate-600">User management, teacher drilldowns, and classroom visibility.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/resources"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Users size={16} />
+            Resource Dashboard
+          </Link>
           <button
             onClick={() => fetchAllData(false)}
             disabled={refreshing}

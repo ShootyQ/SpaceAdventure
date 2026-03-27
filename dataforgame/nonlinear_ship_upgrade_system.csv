@@ -1,0 +1,16 @@
+﻿Non-Linear Ship Upgrade System,,,,,,,,,
+"All planets remain accessible from the start. Upgrades improve speed, yield, and scale rather than unlocking permission.",,,,,,,,,
+,,,,,,,,,
+Upgrade Family,Upgrade Name,Tier,Role,Description,Effect,Cost 1,Cost 2,Cost 3,Cost 4
+Boosters,Basic Booster,1,Travel,Default ship booster,Baseline travel speed,,,,
+Boosters,Improved Booster,2,Travel,Cuts travel times noticeably,Travel time reduced by 20%,2 Iron,2 Quartz,2 Helium,1 Basic Booster
+Boosters,Advanced Booster,3,Travel,Makes broader travel much easier,Travel time reduced by 40%,3 Iron,3 Sulfur,3 Hydrogen,1 Improved Booster
+Boosters,Elite Booster,4,Travel,Turns long trips into short ones,Travel time reduced by 65%,5 Iron,5 Quartz,5 Hydrogen,1 Advanced Booster
+Hull,Basic Hull,1,Capacity,Default ship hull,"Cargo 20, active machines 2, upgrade slots 1",,,,
+Hull,Improved Hull,2,Capacity,Carries more and supports a larger ship build,"Cargo 40, active machines 4, upgrade slots 2",2 Iron,2 Quartz,2 Algae,1 Basic Hull
+Hull,Advanced Hull,3,Capacity,Built for larger operations,"Cargo 70, active machines 6, upgrade slots 3",3 Iron Oxide,3 Ice,3 Oxygen,1 Improved Hull
+Hull,Elite Hull,4,Capacity,Maximum scale and flexibility,"Cargo 100, active machines 8, upgrade slots 4",5 Iron,5 Ice,5 Sea Bloom,1 Advanced Hull
+Landers,Basic Lander,1,Planet Efficiency,Default landing module,Baseline landing and manual collection,,,,
+Landers,Improved Lander,2,Planet Efficiency,Makes planet-side work smoother,Landing time reduced by 20%; +1 manual gather bonus,2 Iron,2 Algae,2 Oxygen,1 Basic Lander
+Landers,Advanced Lander,3,Planet Efficiency,Boosts deployment and manual collection,Landing time reduced by 40%; +2 manual gather bonus; machine setup faster,3 Sulfur,3 Red Moss,3 Methane,1 Improved Lander
+Landers,Elite Lander,4,Planet Efficiency,Best planet-side performance,Landing time reduced by 60%; +3 manual gather bonus; fastest machine setup,5 Quartz,5 Cloud Bloom,5 Neon,1 Advanced Lander
