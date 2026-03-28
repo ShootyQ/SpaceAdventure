@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Rank, FlagConfig, PlacedMachine, UserData } from "@/types";
 import { doc, updateDoc, onSnapshot, increment, collection, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
     ArrowLeft, Car, Palette, Zap, Save, Shield, Wrench, Flag, Loader2,
-    Box, User, LayoutDashboard, Database, Crosshair, Star, Eye, Map, Sun, Award, Crown, Activity, Store
+    Box, User, LayoutDashboard, Database, Crosshair, Star, Eye, Map, Sun, Award, Crown, Activity, Store, ChevronLeft, ChevronRight, Sparkles
 } from "lucide-react";
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
@@ -402,10 +402,12 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
 function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user: any, unlockedShipIds: Set<string> }) {
     const [loading, setLoading] = useState(false);
     const [liveUserData, setLiveUserData] = useState<UserData | null>(userData || null);
-    const [shipName, setShipName] = useState("");
-    const [selectedColor, setSelectedColor] = useState(SHIP_COLORS[0]);
-    const [selectedShipId, setSelectedShipId] = useState("finalship");
-    // const [selectedType, setSelectedType] = useState('scout'); // Removed Chassis Logic
+    const [draftShipName, setDraftShipName] = useState("");
+    const [draftColorClass, setDraftColorClass] = useState(SHIP_COLORS[0].class);
+    const [draftShipId, setDraftShipId] = useState("finalship");
+    const [hasLocalEdits, setHasLocalEdits] = useState(false);
+    const [systemsExpanded, setSystemsExpanded] = useState(false);
+    const shipScrollerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setLiveUserData(userData || null);
@@ -423,17 +425,16 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     }, [user?.uid]);
 
     const effectiveUserData = liveUserData || userData || null;
+    const savedShipId = resolveEquippedShipId(effectiveUserData?.spaceship);
+    const savedShipName = sanitizeName(effectiveUserData?.spaceship?.name || "");
+    const savedColorClass = SHIP_COLORS.find((color) => color.class === effectiveUserData?.spaceship?.color)?.class || SHIP_COLORS[0].class;
 
     useEffect(() => {
-        if (effectiveUserData?.spaceship) {
-            setShipName(sanitizeName(effectiveUserData.spaceship.name));
-            const storedShipId = resolveEquippedShipId(effectiveUserData.spaceship);
-            setSelectedShipId(storedShipId);
-            const col = SHIP_COLORS.find(c => c.class === effectiveUserData.spaceship?.color) || SHIP_COLORS[0];
-            setSelectedColor(col);
-            // setSelectedType(userData.spaceship.type);
-        }
-    }, [effectiveUserData?.spaceship?.color, effectiveUserData?.spaceship?.id, effectiveUserData?.spaceship?.modelId, effectiveUserData?.spaceship?.name]);
+        if (hasLocalEdits) return;
+        setDraftShipName(savedShipName);
+        setDraftShipId(savedShipId);
+        setDraftColorClass(savedColorClass);
+    }, [hasLocalEdits, savedColorClass, savedShipId, savedShipName]);
 
     const visibleShipOptions = useMemo(() => {
         const builtInUnlocked = SHIP_OPTIONS.filter((option) => unlockedShipIds.has(option.id));
@@ -447,42 +448,89 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
             assetPath: resolveShipAssetPath(id),
         }));
 
-        return [...builtInUnlocked, ...dynamicOptions];
+        return [...builtInUnlocked, ...dynamicOptions].filter((option, index, array) => {
+            return array.findIndex((candidate) => candidate.id === option.id) === index;
+        });
     }, [unlockedShipIds]);
 
     useEffect(() => {
-        const currentShipId = resolveEquippedShipId(effectiveUserData?.spaceship);
-        if (!unlockedShipIds.has(selectedShipId)) {
-            if (unlockedShipIds.has(currentShipId)) {
-                setSelectedShipId(currentShipId);
+        if (!unlockedShipIds.has(draftShipId)) {
+            if (unlockedShipIds.has(savedShipId)) {
+                setDraftShipId(savedShipId);
             } else if (unlockedShipIds.size > 0) {
                 const firstUnlocked = visibleShipOptions[0];
-                if (firstUnlocked) setSelectedShipId(firstUnlocked.id);
+                if (firstUnlocked) setDraftShipId(firstUnlocked.id);
             } else {
-                setSelectedShipId("finalship");
+                setDraftShipId("finalship");
             }
         }
-    }, [effectiveUserData?.spaceship?.id, effectiveUserData?.spaceship?.modelId, selectedShipId, unlockedShipIds, visibleShipOptions]);
+    }, [draftShipId, savedShipId, unlockedShipIds, visibleShipOptions]);
+
+    const selectedColor = SHIP_COLORS.find((color) => color.class === draftColorClass) || SHIP_COLORS[0];
+
+    const markEdited = () => {
+        if (!hasLocalEdits) setHasLocalEdits(true);
+    };
+
+    const handleShipSelect = (shipId: string) => {
+        markEdited();
+        setDraftShipId(shipId);
+    };
+
+    const handleColorSelect = (colorClass: string) => {
+        markEdited();
+        setDraftColorClass(colorClass);
+    };
+
+    const handleShipNameChange = (value: string) => {
+        markEdited();
+        setDraftShipName(value.slice(0, NAME_MAX_LENGTH));
+    };
+
+    const resetDraft = () => {
+        setHasLocalEdits(false);
+        setDraftShipName(savedShipName);
+        setDraftShipId(savedShipId);
+        setDraftColorClass(savedColorClass);
+    };
+
+    const scrollShipBrowser = (direction: "left" | "right") => {
+        shipScrollerRef.current?.scrollBy({
+            left: direction === "left" ? -320 : 320,
+            behavior: "smooth",
+        });
+    };
 
     const handleSave = async () => {
         if (!user) return;
         setLoading(true);
         try {
             const userRef = doc(db, "users", user.uid);
-            const safeShipName = sanitizeName(shipName);
-            const currentShipId = resolveEquippedShipId(effectiveUserData?.spaceship);
-            const fallbackShipId = unlockedShipIds.has(currentShipId)
-                ? currentShipId
+            const safeShipName = sanitizeName(draftShipName);
+            const fallbackShipId = unlockedShipIds.has(savedShipId)
+                ? savedShipId
                 : (visibleShipOptions[0]?.id || "finalship");
-            const safeShipId = unlockedShipIds.has(selectedShipId) ? selectedShipId : fallbackShipId;
+            const safeShipId = unlockedShipIds.has(draftShipId) ? draftShipId : fallbackShipId;
             await updateDoc(userRef, {
                 "spaceship.name": safeShipName,
-                "spaceship.color": selectedColor.class,
+                "spaceship.color": draftColorClass,
                 "spaceship.id": safeShipId,
                 "spaceship.modelId": safeShipId,
-                // "spaceship.type": selectedType
             });
-            setShipName(safeShipName);
+            setLiveUserData((previous) => {
+                if (!previous) return previous;
+                return {
+                    ...previous,
+                    spaceship: {
+                        ...(previous.spaceship || { name: safeShipName, color: draftColorClass, type: "fighter", speed: 1 }),
+                        name: safeShipName,
+                        color: draftColorClass,
+                        id: safeShipId,
+                        modelId: safeShipId,
+                    },
+                };
+            });
+            setHasLocalEdits(false);
             alert("Ship specifications updated, Commander.");
         } catch (e) {
             console.error(e);
@@ -507,181 +555,268 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     const hullStats = getHullTierStats(hullLevel);
     const cargoUsed = getStoredCargoUnits(effectiveUserData?.resources || {}, effectiveUserData?.ownedMachines, effectiveUserData?.placedMachines);
     const routePreview = getTravelComputationBetweenPlanets(currentPlanetId, longRangeDestinationId, boosterLevel);
-    const selectedShipOption = resolveShipOption(selectedShipId);
-    const selectedShipAssetPath = selectedShipOption?.assetPath || resolveShipAssetPath(selectedShipId);
+    const selectedShipOption = resolveShipOption(draftShipId);
+    const selectedShipAssetPath = selectedShipOption?.assetPath || resolveShipAssetPath(draftShipId);
+    const displayedShipName = truncateName(sanitizeName(draftShipName) || selectedShipOption?.name || "Unknown Vessel");
+    const saveDisabled = loading || (!hasLocalEdits && draftShipId === savedShipId && draftColorClass === savedColorClass && sanitizeName(draftShipName) === savedShipName);
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-             {/* Left Column: Visualizer */}
-             <div className="bg-black/50 border border-cyan-900/50 rounded-2xl p-8 flex flex-col items-center justify-center relative min-h-[500px]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 to-transparent pointer-events-none" />
-                <motion.div
-                    className={`relative z-10 ${selectedColor.class}`}
-                    animate={{ y: [-15, 15, -15], rotate: [0, 1, -1, 0] }}
-                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                >
-                    <img 
-                        src={getAssetPath(selectedShipAssetPath)}
-                        onError={(event) => {
-                            event.currentTarget.onerror = null;
-                            event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
-                        }}
-                        alt="Ship"
-                        className="w-[320px] h-[320px] md:w-[560px] md:h-[560px] object-contain drop-shadow-[0_0_25px_currentColor]"
-                    />
-                </motion.div>
+        <div className="max-w-7xl mx-auto space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)] gap-6 items-stretch">
+                <div className="relative overflow-hidden rounded-[28px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top,_rgba(6,182,212,0.16),_transparent_42%),linear-gradient(180deg,rgba(3,7,18,0.95),rgba(2,6,23,0.92))] p-6 md:p-8 min-h-[520px] flex flex-col justify-between">
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(8,145,178,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(8,145,178,0.08)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] opacity-40 pointer-events-none" />
+                    <div className="relative z-10 flex items-start justify-between gap-4">
+                        <div>
+                            <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Primary Vessel Preview</div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">{selectedShipOption?.name || "Unknown Model"}</span>
+                                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">{selectedColor.name}</span>
+                                {hasLocalEdits ? (
+                                    <span className="rounded-full border border-amber-400/30 bg-amber-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-amber-200">Unsaved Changes</span>
+                                ) : null}
+                            </div>
+                        </div>
+                        <div className="text-right text-xs text-cyan-800 font-mono leading-relaxed">
+                            HULL INTEGRITY: 100%<br />
+                            SHIELDS: ONLINE
+                        </div>
+                    </div>
 
-                <div className="mt-12 text-center z-10 w-full max-w-md">
-                    <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-6">{truncateName(shipName || "Unknown Vessel")}</h2>
-                    
-                    {/* Fuel Gauge */}
-                    <div className="bg-black/60 border border-cyan-900/50 rounded-xl p-4 w-full">
-                        <div className="flex justify-between items-center text-xs uppercase font-bold tracking-widest mb-2">
-                            <span className="text-cyan-500">Hyperfuel Reserves</span>
-                            <span className="text-white">{Math.floor(currentFuel)} / {maxFuel} Units</span>
+                    <div className="relative z-10 flex-1 flex items-center justify-center py-4 md:py-6">
+                        <motion.div
+                            className={`relative ${selectedColor.class}`}
+                            animate={{ y: [-10, 10, -10], rotate: [0, 1, -1, 0] }}
+                            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                            <div className="absolute inset-0 rounded-full bg-cyan-400/10 blur-3xl" />
+                            <img
+                                src={getAssetPath(selectedShipAssetPath)}
+                                onError={(event) => {
+                                    event.currentTarget.onerror = null;
+                                    event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                }}
+                                alt={selectedShipOption?.name || "Selected ship"}
+                                className="relative mx-auto w-full max-w-[320px] md:max-w-[460px] xl:max-w-[540px] max-h-[420px] md:max-h-[500px] object-contain drop-shadow-[0_0_28px_currentColor]"
+                            />
+                        </motion.div>
+                    </div>
+
+                    <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] items-end">
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-black uppercase tracking-[0.16em] text-white">{displayedShipName}</h2>
+                            <p className="mt-2 max-w-xl text-sm text-cyan-100/70">Your flagship stays front and center here. Browse hulls to the side, tune the name and nanocoating, then save once the preview looks right.</p>
                         </div>
-                        <div className="relative h-4 bg-cyan-950/50 rounded-full overflow-hidden border border-cyan-900">
-                             <div 
-                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-1000 ease-out"
-                                style={{ width: `${fuelPercentage}%` }}
-                             />
-                             {/* Ticks */}
-                             <div className="absolute inset-0 flex justify-between px-2">
-                                <div className="w-px h-full bg-black/20" />
-                                <div className="w-px h-full bg-black/20" />
-                                <div className="w-px h-full bg-black/20" />
-                                <div className="w-px h-full bg-black/20" />
-                             </div>
+
+                        <div className="rounded-2xl border border-cyan-900/50 bg-black/50 p-4">
+                            <div className="flex justify-between items-center text-xs uppercase font-bold tracking-widest mb-2">
+                                <span className="text-cyan-500">Hyperfuel Reserves</span>
+                                <span className="text-white">{Math.floor(currentFuel)} / {maxFuel} Units</span>
+                            </div>
+                            <div className="relative h-4 bg-cyan-950/50 rounded-full overflow-hidden border border-cyan-900">
+                                <motion.div
+                                    initial={false}
+                                    animate={{ width: `${fuelPercentage}%` }}
+                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-1000 ease-out"
+                                />
+                                <div className="absolute inset-0 flex justify-between px-2">
+                                    <div className="w-px h-full bg-black/20" />
+                                    <div className="w-px h-full bg-black/20" />
+                                    <div className="w-px h-full bg-black/20" />
+                                    <div className="w-px h-full bg-black/20" />
+                                </div>
+                            </div>
+                            <div className="mt-2 text-[10px] text-cyan-700/70 font-mono text-center">FUEL CELLS ONLINE | POWERED BY XP</div>
                         </div>
-                        <div className="text-[10px] text-cyan-700/60 mt-1 font-mono text-center">FUEL CELLS ONLINE  |  POWERED BY XP</div>
                     </div>
                 </div>
 
-                <div className="absolute top-4 left-4 text-xs text-cyan-800 font-mono">
-                    HULL INTEGRITY: 100%<br/>
-                    SHIELDS: ONLINE
+                <div className="space-y-4">
+                    <div className="rounded-[28px] border border-cyan-500/20 bg-cyan-950/20 p-6 backdrop-blur-sm">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Flight Deck Controls</div>
+                                <div className="mt-2 text-lg font-bold uppercase tracking-[0.18em] text-white">Quick Configuration</div>
+                            </div>
+                            <Sparkles className="text-cyan-400" size={18} />
+                        </div>
+
+                        <div className="mt-5 space-y-5">
+                            <div>
+                                <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-2">Vessel Identification</label>
+                                <input
+                                    type="text"
+                                    value={draftShipName}
+                                    onChange={(e) => handleShipNameChange(e.target.value)}
+                                    maxLength={NAME_MAX_LENGTH}
+                                    className="w-full bg-black/50 border border-cyan-700 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-400 placeholder-cyan-800 transition-colors font-mono"
+                                    placeholder="Enter Ship Name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-3 flex items-center gap-2">
+                                    <Palette size={16} /> Hull Nanocoating
+                                </label>
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    {SHIP_COLORS.map((color) => (
+                                        <button
+                                            key={color.name}
+                                            type="button"
+                                            onClick={() => handleColorSelect(color.class)}
+                                            className={`rounded-xl border px-3 py-3 text-left transition-all ${selectedColor.class === color.class ? 'bg-cyan-500/20 border-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.12)]' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`h-4 w-4 rounded-full ${color.bg} shadow-[0_0_8px_currentColor]`} />
+                                                <span className={`text-xs uppercase font-bold ${selectedColor.class === color.class ? 'text-white' : 'text-gray-400'}`}>{color.name}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Travel Profile</div>
+                                    <div className="mt-2 text-sm font-bold text-white">{boosterStats.label}</div>
+                                    <div className="mt-1 text-xs text-cyan-300">{boosterStats.travelReductionPercent}% faster</div>
+                                </div>
+                                <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Cargo Capacity</div>
+                                    <div className="mt-2 text-sm font-bold text-white">{cargoUsed} / {hullStats.cargoCapacity}</div>
+                                    <div className="mt-1 text-xs text-cyan-300">{hullStats.activeMachineLimit} active machines</div>
+                                </div>
+                                <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Surface Ops</div>
+                                    <div className="mt-2 text-sm font-bold text-white">{landerStats.label}</div>
+                                    <div className="mt-1 text-xs text-cyan-300">+{landerStats.manualGatherBonus} manual gather</div>
+                                </div>
+                                <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
+                                    <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Outer Route</div>
+                                    <div className="mt-2 text-sm font-bold text-white">{routePreview ? formatTravelDuration(routePreview.adjustedMinutes) : "Unavailable"}</div>
+                                    <div className="mt-1 text-xs text-cyan-300">{currentPlanetId.toUpperCase()} to {longRangeDestinationId.toUpperCase()}</div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={handleSave}
+                                    disabled={saveDisabled}
+                                    className={`flex-1 min-w-[180px] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${saveDisabled ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-black hover:scale-[1.01] shadow-[0_0_20px_rgba(8,145,178,0.35)]'}`}
+                                >
+                                    <Save size={18} />
+                                    {loading ? "Calibrating..." : "Save Configuration"}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={resetDraft}
+                                    disabled={!hasLocalEdits || loading}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white/80 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Reset Draft
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[28px] border border-cyan-500/20 bg-cyan-950/20 p-5">
+                        <button
+                            type="button"
+                            onClick={() => setSystemsExpanded((current) => !current)}
+                            className="w-full flex items-center justify-between gap-3 text-left"
+                        >
+                            <div>
+                                <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Ship Systems</div>
+                                <div className="mt-2 text-base font-bold uppercase tracking-[0.14em] text-white">Compact Readout</div>
+                            </div>
+                            <span className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">{systemsExpanded ? "Hide" : "Show"}</span>
+                        </button>
+
+                        {systemsExpanded ? (
+                            <div className="mt-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <UpgradeSlot icon={Zap} label="Boosters" level={boosterLevel} active={boosterLevel > 0} />
+                                    <UpgradeSlot icon={Database} label="Fuel Tank" level={fuelUpgradeLevel} active={fuelUpgradeLevel > 0} />
+                                    <UpgradeSlot icon={Map} label="Landers" level={landerLevel} active={landerLevel > 0} />
+                                    <UpgradeSlot icon={Shield} label="Hull Plating" level={hullLevel} active={hullLevel > 0} />
+                                </div>
+
+                                <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-4 text-sm text-cyan-100/80">
+                                    Fabrication now lives at the workshop. Hangar Bay stays focused on ship preview and loadout decisions.
+                                    <div className="mt-4">
+                                        <Link href="/student/crafting" className="inline-flex rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 transition-colors">
+                                            Open Crafting Table
+                                        </Link>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
             </div>
 
-            {/* Right Column: Controls */}
-            <div className="space-y-6">
-                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
-                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
-                        <Shield size={16} /> Ship Models
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                        {visibleShipOptions.map((opt) => (
+            <div className="rounded-[28px] border border-cyan-500/20 bg-cyan-950/20 p-5 md:p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Ship Browser</div>
+                        <div className="mt-2 text-lg font-bold uppercase tracking-[0.18em] text-white">Slide Through Your Fleet</div>
+                    </div>
+                    <div className="flex items-center gap-2 self-end md:self-auto">
+                        <button
+                            type="button"
+                            onClick={() => scrollShipBrowser("left")}
+                            className="rounded-full border border-cyan-500/30 bg-black/40 p-2 text-cyan-200 hover:bg-cyan-500/10"
+                            aria-label="Scroll ships left"
+                            title="Scroll ships left"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => scrollShipBrowser("right")}
+                            className="rounded-full border border-cyan-500/30 bg-black/40 p-2 text-cyan-200 hover:bg-cyan-500/10"
+                            aria-label="Scroll ships right"
+                            title="Scroll ships right"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    ref={shipScrollerRef}
+                    className="mt-5 flex gap-4 overflow-x-auto pb-2 [scrollbar-color:rgba(34,211,238,0.45)_transparent]"
+                >
+                    {visibleShipOptions.map((opt) => {
+                        const isSelected = draftShipId === opt.id;
+                        return (
                             <button
                                 key={opt.id}
                                 type="button"
-                                onClick={() => setSelectedShipId(opt.id)}
-                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedShipId === opt.id ? 'bg-cyan-500/20 border-cyan-400' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
+                                onClick={() => handleShipSelect(opt.id)}
+                                className={`group min-w-[210px] max-w-[210px] rounded-2xl border p-4 text-left transition-all ${isSelected ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_24px_rgba(34,211,238,0.18)]' : 'border-cyan-900 bg-black/40 hover:border-cyan-700'}`}
                             >
-                                <img
-                                    src={getAssetPath(opt.assetPath || resolveShipAssetPath(opt.id))}
-                                    alt={opt.name}
-                                    className="w-20 h-20 object-contain shrink-0"
-                                    onError={(event) => {
-                                        event.currentTarget.onerror = null;
-                                        event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
-                                    }}
-                                />
-                                <div className="min-w-0 flex-1">
-                                    <span className={`block text-xs uppercase font-bold ${selectedShipId === opt.id ? 'text-white' : 'text-gray-500'}`}>{opt.name}</span>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/5 bg-black/30">
+                                        <img
+                                            src={getAssetPath(opt.assetPath || resolveShipAssetPath(opt.id))}
+                                            alt={opt.name}
+                                            className="h-16 w-16 object-contain"
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = getAssetPath('/images/collectibles/ships/starter/finalship.png');
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className={`text-[10px] uppercase tracking-[0.25em] ${isSelected ? 'text-cyan-200' : 'text-cyan-700 group-hover:text-cyan-400'}`}>Model</div>
+                                        <div className={`mt-2 text-sm font-bold uppercase leading-snug ${isSelected ? 'text-white' : 'text-gray-300'}`}>{opt.name}</div>
+                                    </div>
                                 </div>
                             </button>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
-
-                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
-                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-2">Vessel Identification</label>
-                    <input
-                        type="text"
-                        value={shipName}
-                        onChange={(e) => setShipName(e.target.value.slice(0, NAME_MAX_LENGTH))}
-                        maxLength={NAME_MAX_LENGTH}
-                        className="w-full bg-black/50 border border-cyan-700 rounded p-3 text-white focus:outline-none focus:border-cyan-400 placeholder-cyan-800 transition-colors font-mono"
-                        placeholder="Enter Ship Name"
-                    />
-                </div>
-
-                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
-                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
-                        <Palette size={16} /> Hull Nanocoating
-                    </label>
-                    <div className="grid grid-cols-3 gap-3">
-                        {SHIP_COLORS.map(color => (
-                            <button
-                                key={color.name}
-                                onClick={() => setSelectedColor(color)}
-                                className={`p-3 rounded border flex items-center gap-3 transition-all ${selectedColor.name === color.name ? 'bg-cyan-500/20 border-cyan-400 scale-105' : 'bg-black/40 border-cyan-900 hover:border-cyan-700'}`}
-                            >
-                                <div className={`w-4 h-4 rounded-full ${color.bg} shadow-[0_0_5px_currentColor]`} />
-                                <span className={`text-xs uppercase font-bold ${selectedColor.name === color.name ? 'text-white' : 'text-gray-500'}`}>{color.name}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* New Upgrades Section */}
-                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
-                    <label className="block text-sm uppercase tracking-wider text-cyan-500 mb-4 flex items-center gap-2">
-                        <Wrench size={16} /> System Upgrades
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                        <UpgradeSlot icon={Zap} label="Boosters" level={boosterLevel} active={boosterLevel > 0} />
-                        <UpgradeSlot icon={Database} label="Fuel Tank" level={fuelUpgradeLevel} active={fuelUpgradeLevel > 0} />
-                        <UpgradeSlot icon={Map} label="Landers" level={landerLevel} active={landerLevel > 0} />
-                        <UpgradeSlot icon={Shield} label="Hull Plating" level={hullLevel} active={hullLevel > 0} />
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
-                            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Travel Profile</div>
-                            <div className="mt-2 text-sm font-bold text-white">{boosterStats.label}</div>
-                            <div className="mt-1 text-xs text-cyan-300">{boosterStats.travelReductionPercent}% faster than baseline</div>
-                            {routePreview ? (
-                                <div className="mt-2 text-[11px] text-cyan-200/80">
-                                    {currentPlanetId.toUpperCase()} to {longRangeDestinationId.toUpperCase()}: {formatTravelDuration(routePreview.adjustedMinutes)}
-                                </div>
-                            ) : null}
-                        </div>
-                        <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
-                            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Cargo Capacity</div>
-                            <div className="mt-2 text-sm font-bold text-white">{cargoUsed} / {hullStats.cargoCapacity}</div>
-                            <div className="mt-1 text-xs text-cyan-300">{hullStats.activeMachineLimit} active machines allowed</div>
-                        </div>
-                        <div className="rounded-2xl border border-cyan-900/50 bg-black/30 p-3">
-                            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-600">Surface Operations</div>
-                            <div className="mt-2 text-sm font-bold text-white">{landerStats.label}</div>
-                            <div className="mt-1 text-xs text-cyan-300">Landing {landerStats.landingTimeReductionPercent}% faster</div>
-                            <div className="mt-1 text-[11px] text-cyan-200/80">Manual gather bonus +{landerStats.manualGatherBonus}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-cyan-950/20 p-6 rounded-xl border border-cyan-500/20">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <div className="text-sm uppercase tracking-wider text-cyan-500">Fabrication Moved</div>
-                            <div className="mt-2 text-lg font-bold text-white uppercase tracking-wide">Crafting now lives at the workshop</div>
-                            <div className="mt-2 text-sm text-cyan-300/80">Use the dedicated crafting table to build machines and forge system upgrades. This hangar now stays focused on your ship loadout.</div>
-                        </div>
-                        <Link href="/student/crafting" className="rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide bg-cyan-400 text-black hover:bg-cyan-300 transition-colors">
-                            Open Crafting Table
-                        </Link>
-                    </div>
-                </div>
-
-                <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest transition-all ${loading ? 'bg-gray-700 text-gray-400 cursor-wait' : 'bg-cyan-600 hover:bg-cyan-500 text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(8,145,178,0.4)]'}`}
-                >
-                    <Save size={20} />
-                    {loading ? "Calibrating..." : "Save Configuration"}
-                </button>
             </div>
         </div>
     );
