@@ -107,6 +107,13 @@ export function resolveShipOption(shipId?: string): ShipOption | undefined {
     return SHIP_OPTIONS_BY_KEY.get(buildShipKey(normalized));
 }
 
+export function resolveEquippedShipId(
+    spaceship?: Pick<SpaceshipConfig, "modelId" | "id"> | null
+): string {
+    const rawShipId = spaceship?.modelId || spaceship?.id || "finalship";
+    return resolveShipOption(rawShipId)?.id || normalizeShipId(rawShipId);
+}
+
 export function resolveShipDisplayName(shipId?: string): string {
     return resolveShipOption(shipId)?.name || titleizeShipId(shipId);
 }

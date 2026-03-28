@@ -7,7 +7,7 @@ import { Ship, Rank, Behavior } from "@/types";
 import { updateDoc, doc, runTransaction, increment, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAssetPath, truncateName } from "@/lib/utils";
-import { resolveShipAssetPath } from "@/lib/ships";
+import { resolveEquippedShipId, resolveShipAssetPath } from "@/lib/ships";
 import { UserAvatar } from "./UserAvatar";
 import { getPetById } from "@/lib/pets";
 
@@ -76,7 +76,9 @@ type ManifestDensity = 'large' | 'medium' | 'small';
 const ShipCard = memo(({ student, ranks, isSelected, onToggle, density }: { student: Ship, ranks: Rank[], isSelected: boolean, onToggle: () => void, density: ManifestDensity }) => {
     // Memoize rank reset per card to avoid array operations
     const rank = React.useMemo(() => ranks.find(r => student.xp >= r.minXP), [ranks, student.xp]);
-    const shipModelId = (student as any)?.spaceship?.id || (student as any)?.spaceship?.modelId || (student as any)?.shipId || 'finalship';
+    const shipModelId = (student as any)?.spaceship
+        ? resolveEquippedShipId((student as any).spaceship)
+        : ((student as any)?.shipId || 'finalship');
     const selectedPet = React.useMemo(() => getPetById(student.selectedPetId), [student.selectedPetId]);
     const isSmall = density === 'small';
     const isMedium = density === 'medium';

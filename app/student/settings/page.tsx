@@ -12,7 +12,7 @@ import {
 
 import { getAssetPath, NAME_MAX_LENGTH, sanitizeName, truncateName } from "@/lib/utils";
 import { UserAvatar } from "@/components/UserAvatar";
-import { SHIP_OPTIONS, resolveShipAssetPath, resolveShipDisplayName, resolveShipOption } from "@/lib/ships";
+import { SHIP_OPTIONS, resolveEquippedShipId, resolveShipAssetPath, resolveShipDisplayName, resolveShipOption } from "@/lib/ships";
 import { DEFAULT_UNLOCK_CONFIG, getXpUnlockRules, normalizeUnlockConfig, resolveRuntimeUnlockId, type UnlockRule } from "@/lib/unlocks";
 import { isXpUnlockEarned, normalizeXpUnlockProgressMap, syncXpUnlockProgressForRules, type XpUnlockProgressMap } from "@/lib/xp-unlock-progress";
 import {
@@ -134,7 +134,7 @@ const buildUnlockedShipIdSet = ({
         ...starterShipIds,
         ...normalizedShopShipIds,
         ...normalizedPurchasedShopShipIds,
-        String(currentShipId || "finalship"),
+        resolveShipOption(currentShipId)?.id || String(currentShipId || "finalship"),
     ]);
 
     shipXpUnlockRules.forEach((rule) => {
@@ -250,7 +250,7 @@ function CockpitView({ onNavigate, ranks }: { onNavigate: (view: string) => void
     const bgLight = userData?.avatar?.bgLight !== undefined ? userData.avatar.bgLight : 20;
 
     const shipColor = userData?.spaceship?.color || "text-cyan-400";
-    const selectedShipId = userData?.spaceship?.modelId || userData?.spaceship?.id || "finalship";
+    const selectedShipId = resolveEquippedShipId(userData?.spaceship);
     const selectedShipAssetPath = resolveShipOption(selectedShipId)?.assetPath || resolveShipAssetPath(selectedShipId);
     // Extract tailwind color class prefix for glowing effects (e.g. text-blue-400 -> blue)
     const glowColor = shipColor.includes('-') ? shipColor.split('-')[1] : 'cyan';
@@ -427,8 +427,8 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     useEffect(() => {
         if (effectiveUserData?.spaceship) {
             setShipName(sanitizeName(effectiveUserData.spaceship.name));
-            const storedShipId = effectiveUserData.spaceship.id || effectiveUserData.spaceship.modelId || "finalship";
-            setSelectedShipId(resolveShipOption(storedShipId)?.id || storedShipId);
+            const storedShipId = resolveEquippedShipId(effectiveUserData.spaceship);
+            setSelectedShipId(storedShipId);
             const col = SHIP_COLORS.find(c => c.class === effectiveUserData.spaceship?.color) || SHIP_COLORS[0];
             setSelectedColor(col);
             // setSelectedType(userData.spaceship.type);
@@ -451,7 +451,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
     }, [unlockedShipIds]);
 
     useEffect(() => {
-        const currentShipId = effectiveUserData?.spaceship?.id || effectiveUserData?.spaceship?.modelId || "finalship";
+        const currentShipId = resolveEquippedShipId(effectiveUserData?.spaceship);
         if (!unlockedShipIds.has(selectedShipId)) {
             if (unlockedShipIds.has(currentShipId)) {
                 setSelectedShipId(currentShipId);
@@ -470,7 +470,7 @@ function ShipSettings({ userData, user, unlockedShipIds }: { userData: any, user
         try {
             const userRef = doc(db, "users", user.uid);
             const safeShipName = sanitizeName(shipName);
-            const currentShipId = effectiveUserData?.spaceship?.id || effectiveUserData?.spaceship?.modelId || "finalship";
+            const currentShipId = resolveEquippedShipId(effectiveUserData?.spaceship);
             const fallbackShipId = unlockedShipIds.has(currentShipId)
                 ? currentShipId
                 : (visibleShipOptions[0]?.id || "finalship");
@@ -1435,7 +1435,7 @@ export default function SettingsPage() {
             starterShipIds: STARTER_SHIP_IDS,
             shopUnlockedShipIds: userData?.shopUnlockedShipIds,
             purchasedShopItemIds: userData?.purchasedShopItemIds,
-            currentShipId: userData?.spaceship?.id || userData?.spaceship?.modelId || "finalship",
+            currentShipId: resolveEquippedShipId(userData?.spaceship),
             shipXpUnlockRules: SHIP_XP_UNLOCK_RULES,
             planetShipUnlocks,
             planetShipUnlockConfiguredAt,
