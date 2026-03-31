@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { doc, onSnapshot } from "firebase/firestore";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { UserData } from "@/types";
@@ -119,5 +120,19 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <button
+        type="button"
+        onClick={logout}
+        className="fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-black/75 px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] transition hover:border-cyan-300/70 hover:bg-cyan-950/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-300/60 md:bottom-6 md:right-6"
+        aria-label="Sign out"
+        title="Sign out"
+      >
+        <LogOut size={16} />
+        <span className="hidden sm:inline">Sign Out</span>
+      </button>
+    </>
+  );
 }
